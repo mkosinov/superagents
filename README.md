@@ -104,6 +104,30 @@ See [`docs/architecture/token-economy.md`](docs/architecture/token-economy.md) f
 
 See [`docs/architecture/decision-log.md`](docs/architecture/decision-log.md) for architecture decisions.
 
+## Maintaining the Framework
+
+### Golden Source Rule
+
+This repo (`/root/workspace/superagents/`) is the **single source of truth** for the SuperAgents workflow framework.
+
+**Project repos** (e.g., `/root/workspace/memo/.opencode/`) contain **local copies** of agents and skills adapted with project-specific context.
+
+### Change Protocol
+
+1. **Generic workflow changes** → edit in `superagents/` FIRST → commit → sync to project repos
+2. **Project-specific changes** → edit in project `.opencode/` only → no sync needed
+3. **@infra** verifies sync status when workflow files change in either repo
+
+### Generic vs Project-Specific
+
+| Generic (edit superagents/) | Project-specific (edit project .opencode/) |
+|----------------------------|-------------------------------------------|
+| Workflow steps, gates, rules | Project name, design system paths |
+| Agent roles and responsibilities | Model assignments, temperature settings |
+| Task classification, circuit breaker | Tech stack versions, mock data refs |
+| Skill definitions | Permission lists in frontmatter |
+| Review pipeline structure | Project-specific bash allow lists |
+
 ## License
 
 MIT / Proprietary — for internal use in AI-assisted development workflows.
