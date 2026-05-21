@@ -1,13 +1,13 @@
 # SuperAgents Workflow
 
 > **System:** SuperAgents — @architect (controller) + subagents (implementers + reviewers)
-> **Version:** 3.1
+> **Version:** 3.2
 
 ## Legend
 
 | Symbol | Meaning |
 |--------|---------|
-| `G1`–`G7` | Quality Gates |
+| `G1`–`G7`, `G4.5` | Quality Gates |
 | **Human** | Requires user decision (pause) |
 | auto | Passes automatically |
 | `▶` | Automatic transition to next step |
@@ -153,8 +153,26 @@
     │ (auto)               │
     └──────────────────────┘
          │
-         │ ALL TASKS DONE
-         ▼
+          │ ALL TASKS DONE
+          ▼
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 4.5: VISUAL COMPLIANCE GATE  (Auto Gate G4.5)       ║
+║  Run ONCE per phase — NOT per task                         ║
+╚══════════════════════════════════════════════════════════════╝
+          │
+          │ 1. Start dev server (or use static build)
+          │ 2. Run visual-compliance-check.sh <url> <spec>
+          │    • Captures screenshots to /tmp/visual-compliance/
+          │    • Verifies DOM elements from spec's Visual Compliance Checks
+          │    • Generates markdown report
+          │
+          ▼  [G4.5: SOFT BLOCK]
+          │
+          │  ALL CHECKS PASSED? ──▶ proceed to Step 5
+          │  ANY CHECK FAILED?  ──▶ report to user with screenshots
+          │                         user decides: fix / override / abort
+          │
+          ▼ (after pass or user override)
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 5: DOCUMENTATION COMMIT  (Auto)                        ║
 ╚══════════════════════════════════════════════════════════════╝
@@ -195,6 +213,7 @@ G2 ─── Plan Approval ─────────── Human ── Plan w
 G3 ─── Clean Baseline ────────── Auto ─── Tests pass on empty worktree
 G4 ─── TDD Compliance ────────── Auto ─── Implementer self-check
 G4a ── Architect Spot-Check ──── Auto ─── Diff ≤5 lines (trivial only)
+G4.5 ─ Visual Compliance ─────── Auto ─── Screenshots + DOM checks match design spec
 G5 ─── Spec Compliance ───────── Auto ─── Code matches plan (reviewer)
 G6 ─── Code Quality + Tests ──── Auto ─── Clean code, tests pass
 G6a ── Review Loop Limit ─────── Auto ─── Max 3 iterations → escalate
@@ -275,6 +294,39 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
                                     └──────────────┘
 ```
 
+## Visual Compliance Gate (Step 4.5)
+
+**Why:** Prevents UI mismatch incidents (e.g. "Календарь-линия" implemented instead of "Сегодня / Завтра / Календарь" tabs). Caught by user manually — now automated.
+
+**What it does:**
+1. **Screenshot capture** — Playwright captures key page states (mobile 390x844 by default, desktop optional)
+2. **Element presence checks** — Verifies DOM elements from the spec exist and are visible
+3. **Report generation** — Markdown report with pass/fail status and screenshot paths
+
+**Spec integration:** Design specs should include a `## Visual Compliance Checks` section:
+
+```markdown
+## Visual Compliance Checks
+- [ ] "Сегодня" tab is visible and clickable on main page
+- [ ] "Завтра" tab switches view to tomorrow's schedule
+- [ ] "Календарь" tab opens date picker overlay
+- [ ] Filter pills are visible below the tabs
+- [ ] Clicking a filter pill highlights it and filters the list
+```
+
+**Execution:**
+```bash
+/root/workspace/superagents/scripts/visual-compliance-check.sh \
+  http://localhost:3000 \
+  docs/specs/YYYY-MM-DD-<feature>-design.md \
+  /tmp/visual-compliance \
+  mobile
+```
+
+**Gate behavior:**
+- **PASS** → auto-proceed to Step 5
+- **FAIL** → soft block (user can override). User chooses: fix/re-run, override, or abort
+
 ## Implementation Points
 
 **This document describes the workflow conceptually. The actual execution is embedded in agent and skill files. See the main SuperAgents repository for source files.**
@@ -284,6 +336,7 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 | Step 3 (G3 baseline test) | `agents/architect.md` Step 3 |
 | Step 4b (implementer prompt) | `agents/architect.md` Step 4b |
 | Step 4d (review test run) | `agents/architect.md` Stage 2 review |
+| Step 4.5 (visual compliance) | `scripts/visual-compliance-check.sh` |
 | Quality reviewer tests | `agents/code-quality-reviewer.md` |
 | Worktree baseline test | `skills/using-git-worktrees/SKILL.md` Step 4 |
 | Review pipeline | `skills/subagent-driven-development/SKILL.md` |

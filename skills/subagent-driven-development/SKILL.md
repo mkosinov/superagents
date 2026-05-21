@@ -44,7 +44,14 @@ Use when you have a written implementation plan with independent tasks, and you 
   - Code-quality reviewer runs `cd frontend && npm run test`
 
 3. After all tasks: dispatch final code reviewer for entire implementation
-4. Use finishing-a-development-branch skill to complete
+
+4. **Visual Compliance Gate (ONCE per phase, NOT per task)**
+   - Trigger: All tasks in this phase complete, all reviews passed
+   - Run `/root/workspace/superagents/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
+   - If FAILS → soft block: report to user with screenshots, wait for decision (fix/override/abort)
+   - Only proceed to Step 5 (documentation) after pass or explicit user override
+
+5. Use finishing-a-development-branch skill to complete
 
 ## Critical: Working Directory
 

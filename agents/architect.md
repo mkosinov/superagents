@@ -168,6 +168,9 @@ Actions:
 - Only after G1a passes → proceed to write the spec file
 
 4. Save approved design to `docs/specs/YYYY-MM-DD-<feature>-design.md`
+   - **Include `## Visual Compliance Checks` section** in the spec with checklist of key UI elements
+   - Example: `- [ ] "Сегодня" tab is visible and clickable on main page`
+   - These checks feed the automated Visual Compliance Gate (Step 4.5)
 5. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
 6. Run spec self-review (placeholder scan, consistency, scope, ambiguity)
 
@@ -295,8 +298,43 @@ Actions:
    - Automatically proceed to next task. Do NOT ask user "continue?".
    - Exception: if BLOCKED and cannot resolve → stop, update scratchpad, ask user.
 
+### Step 4.5: Visual Compliance Gate (Auto Gate G4.5) — NEW
+Trigger: All tasks in phase complete, all tests passing.
+**Run ONCE per phase, NOT on every task.**
+Actions:
+1. Determine the design spec file for this phase (from Step 1, usually `docs/specs/YYYY-MM-DD-<feature>-design.md`)
+2. Ensure dev server is running (or use static build). For Next.js:
+   - `cd frontend && npm run dev` (background) OR
+   - `cd frontend && npm run build && npx serve out` (static)
+3. Run visual compliance script:
+   ```bash
+   /root/workspace/superagents/scripts/visual-compliance-check.sh \
+     http://localhost:3000 \
+     docs/specs/YYYY-MM-DD-<feature>-design.md \
+     /tmp/visual-compliance \
+     mobile
+   ```
+4. The script will:
+   - Capture screenshots of key pages/states (saved to `/tmp/visual-compliance/<phase>/screenshots/`)
+   - Verify DOM presence of UI elements defined in the spec's `## Visual Compliance Checks` section
+   - Generate report: `/tmp/visual-compliance-report.md`
+5. **[GATE G4.5] Evaluate results:**
+   - If ALL checks PASSED → proceed to Step 5 automatically
+   - If ANY check FAILED → **SOFT BLOCK** (unlike G1b hard block)
+     - Read report and screenshots
+     - Present to user: "Visual compliance failed for N checks. See report: `/tmp/visual-compliance-report.md`"
+     - User decides:
+       1. **Fix and re-run** → re-dispatch implementer to fix issues, then re-run gate
+       2. **Override and proceed** → user explicitly approves skipping, continue to Step 5
+       3. **Abort** → stop, update scratchpad, reassess plan
+
+**Rules:**
+- This is a **soft block** — user can override. G1b is a hard block (cannot override).
+- Do NOT proceed to Step 5 on failure without explicit user override.
+- Screenshots are evidence — always show them to user on failure.
+
 ### Step 5: Documentation Commit (Auto, before finishing)
-Trigger: All tasks complete, all tests passing.
+Trigger: All tasks complete, all tests passing, visual compliance passed (or user-overridden).
 Actions:
 1. Gather context from session:
    - Feature name, design doc path, plan path
