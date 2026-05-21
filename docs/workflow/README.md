@@ -24,17 +24,22 @@
          │ new feature request
          ▼
 ╔══════════════════════════════════════════════════════════════╗
-║  STEP 1: BRAINSTORMING  (Human Gate G1)                     ║
+║  STEP 1: BRAINSTORMING  (Human Gates G1a + G1b)           ║
 ╚══════════════════════════════════════════════════════════════╝
          │
          │ 1. Read scratchpad — resume or start fresh
          │ 2. Invoke skill `brainstorming`
          │ 3. Explore context → ask clarifying questions
-         │ 4. Propose 2-3 approaches → design sections
-         │ 5. Save to docs/specs/YYYY-MM-DD-<feature>-design.md
-         │ 6. Commit design doc
+         │ 4. Propose 2-3 approaches → present design sections
+         │ 5. Get user approval on design concept
          │
-         ▼  [G1: USER APPROVES DESIGN]
+         ▼  [G1a: USER APPROVES DESIGN CONCEPT]
+         │
+         │ 6. Save to docs/specs/YYYY-MM-DD-<feature>-design.md
+         │ 7. Commit design doc
+         │ 8. Spec self-review (placeholder, consistency, scope)
+         │
+         ▼  [G1b: USER APPROVES WRITTEN SPEC (HARD BLOCK)]
          │
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 2: WRITING PLANS  (Human Gate G2)                     ║
@@ -184,7 +189,8 @@
 ## Quality Gates Summary
 
 ```
-G1 ─── Design Approval ───────── Human ── Brainstorming done
+G1a ─── Design Concept Approval ─── Human ── Concept approved
+G1b ─── Written Spec Approval ───── Human ── Spec file reviewed & approved
 G2 ─── Plan Approval ─────────── Human ── Plan written
 G3 ─── Clean Baseline ────────── Auto ─── Tests pass on empty worktree
 G4 ─── TDD Compliance ────────── Auto ─── Implementer self-check
@@ -291,7 +297,7 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 1. **Controller Never Implements** — @architect plans and delegates, never edits code
 2. **Two-Stage Review** — spec compliance → code quality, never one without the other
 3. **Sequential Tasks** — one implementer at a time, no parallel dispatch
-4. **Human Gates** — G1 (design), G2 (plan), G7 (finish) require user approval
+4. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
 5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
 6. **Diff in Prompt** — reviewers receive git diff embedded, never read files
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
