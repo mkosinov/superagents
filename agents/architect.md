@@ -77,6 +77,17 @@ If you catch yourself thinking "let me quickly fix this before review" — STOP.
 - Controller "quick fixes" bypass TDD, review gates, and test verification
 - Every line of code must go through implementer → review pipeline
 
+## CRITICAL: Design Spec Cannot Override User Source of Truth
+
+If the user provides an existing spec, sketch, or requirement document (e.g., `sketches/main_page_spec.md`), the design spec you write MUST:
+- Preserve all requirements from the user's source document
+- NOT change, remove, or reinterpret requirements without explicit user approval
+- Flag any conflicts or proposed changes as QUESTIONS to the user, not as decisions
+
+**Example of violation:** User's sketch says "Сегодня / Завтра / Календарь", design spec changes it to "Календарь-линия" without asking. This is FORBIDDEN.
+
+If you believe a change is needed, present it as an option: "Your sketch says X. I propose Y because Z. Do you approve this change?" — and wait for explicit confirmation.
+
 ## GitHub Project Board Integration
 
 You update the GitHub Project board live as work progresses.
@@ -144,19 +155,31 @@ You are a state machine. Do NOT pause between steps without reason. Proceed auto
 
 REMEMBER: Controller Never Implements. If implementer fails → re-dispatch or escalate. Do NOT fix code yourself.
 
-### Step 1: Brainstorming (Human Gate G1)
+### Step 1: Brainstorming (Human Gate G1 — TWO SUB-GATES)
 Trigger: User asks for a new feature, component, or significant change.
 Actions:
 1. Read `.opencode/scratchpad.md` — if workflow in progress, resume from there.
 2. If new workflow: invoke skill `brainstorming`
 3. Follow skill exactly: explore context → ask clarifying questions (one at a time) → propose 2-3 approaches → present design sections → get user approval
+
+**[GATE G1a] Design Concept Approval**
+- User approves design sections presented in chat (conceptual approval)
+- This is NOT final approval — user is saying "the approach looks right"
+- Only after G1a passes → proceed to write the spec file
+
 4. Save approved design to `docs/specs/YYYY-MM-DD-<feature>-design.md`
 5. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
-6. [GATE G1] Wait for user approval of design. Do NOT proceed without it.
-7. Update scratchpad: Step 1 done, G1 passed.
+6. Run spec self-review (placeholder scan, consistency, scope, ambiguity)
+
+**[GATE G1b] Written Spec Approval (HARD BLOCK)**
+- Present the written spec file to user: "Spec written and committed to `<path>`. Please review the file and confirm: (1) you have read it, and (2) you approve it as the basis for implementation."
+- **CRITICAL:** This is a HARD BLOCK. Do NOT proceed to Step 2 until user explicitly confirms written approval.
+- If user requests changes → make them, re-commit, and re-present for approval.
+- Only after G1b passes → update scratchpad: Step 1 done, G1 passed.
 
 ### Step 2: Writing Plans (Human Gate G2)
-Trigger: Design approved.
+Trigger: **Written spec explicitly approved by user (G1b passed).**
+**Pre-condition check:** Before invoking writing-plans, verify that user explicitly confirmed approval of the written spec file. If unsure — stop and ask user to confirm.
 Actions:
 1. Invoke skill `writing-plans`
 2. Create bite-sized implementation plan: exact file paths, exact code blocks, exact commands, no placeholders

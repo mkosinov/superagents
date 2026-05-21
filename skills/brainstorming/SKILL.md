@@ -10,7 +10,11 @@ Help turn ideas into fully formed designs and specs through natural collaborativ
 Start by understanding the current project context, then ask questions one at a time to refine the idea. Once you understand what you're building, present the design and get user approval.
 
 <HARD-GATE>
-Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until you have presented a design and the user has approved it. This applies to EVERY project regardless of perceived simplicity.
+Do NOT invoke any implementation skill, write any code, scaffold any project, or take any implementation action until:
+1. You have presented a design and the user has approved it (design concept approval)
+2. You have written the design to a spec file and the user has EXPLICITLY approved the WRITTEN SPEC (file review approval)
+
+Both approvals are REQUIRED. The second approval (written spec) is the gate that blocks all implementation. No exceptions.
 </HARD-GATE>
 
 ## Anti-Pattern: "This Is Too Simple To Need A Design"
@@ -24,11 +28,14 @@ You MUST create a task for each of these items and complete them in order:
 1. **Explore project context** — check files, docs, recent commits
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **Present design** — in sections scaled to their complexity, get user approval after each section
+4. **Present design sections** — in sections scaled to their complexity, get user approval after each section
 5. **Write design doc** — save to `docs/specs/YYYY-MM-DD-<topic>-design.md` and commit
 6. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope
 7. **User reviews written spec** — ask user to review the spec file before proceeding
-8. **Transition to implementation** — invoke writing-plans skill to create implementation plan
+8. **Get EXPLICIT written spec approval** — user must confirm they reviewed the file and approve it as-is
+9. **Transition to implementation** — ONLY after step 8, invoke writing-plans skill to create implementation plan
+
+**CRITICAL:** Steps 4 and 8 are TWO SEPARATE approvals. Step 4 is "design concept looks right". Step 8 is "the written spec file is correct and I approve it for implementation". Do NOT skip step 8.
 
 ## Process Flow
 
@@ -92,12 +99,20 @@ After writing the spec document, look at it with fresh eyes:
 
 Fix any issues inline. No need to re-review — just fix and move on.
 
-**User Review Gate:**
+**User Review Gate (BLOCKING):**
 After the spec review loop passes, ask the user to review the written spec before proceeding:
 
-> "Spec written and committed to `<path>`. Please review it and let me know if you want to make any changes before we start writing out the implementation plan."
+> "Spec written and committed to `<path>`. Please review the file and confirm: (1) you have read it, and (2) you approve it as the basis for implementation. If you want changes, tell me now — I will NOT start the implementation plan until you explicitly approve this spec."
 
-Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user approves.
+**This is a HARD BLOCK.** Do NOT:
+- Invoke writing-plans skill
+- Create any implementation plan
+- Start any coding
+- Proceed to Step 2 of the workflow
+
+Until the user explicitly confirms: "I have reviewed the spec and approve it" or equivalent.
+
+Wait for the user's response. If they request changes, make them and re-run the spec review loop. Only proceed once the user gives EXPLICIT written approval.
 
 **Implementation:**
 
