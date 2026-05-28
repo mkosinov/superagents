@@ -268,21 +268,24 @@ Actions:
     - If this was the last task of the этап → `gh-project-move <issue> done`
     - If suspicious → escalate to small review pipeline.
 
-   **Small:** Spec-review only.
-   - Save `BASE_SHA=$(git rev-parse HEAD)` before implementer dispatch.
-   - After implementer DONE, get `HEAD_SHA=$(git rev-parse HEAD)`. Generate diff: `git diff $BASE_SHA..$HEAD_SHA > /tmp/task-diff.patch`
-   - Read diff content. Read template from `.opencode/skills/reviewers/spec-reviewer.md`
-   - Fill placeholders, dispatch spec-reviewer via `task` tool.
-   - Max 3 review-fix iterations (see 4e).
-   - If ✅ → mark task complete. Update scratchpad.
+    **Small:** Spec-review only.
+    - Save `BASE_SHA=$(git rev-parse HEAD)` before implementer dispatch.
+    - After implementer DONE, get `HEAD_SHA=$(git rev-parse HEAD)`.
+    - Run `git diff --stat $BASE_SHA..$HEAD_SHA` to see scale.
+    - Save diff to file: `git diff $BASE_SHA..$HEAD_SHA > /tmp/task-diff.patch`
+    - Read template from `.opencode/skills/reviewers/spec-reviewer.md`
+    - Fill placeholders (pass **file path** to diff, not content), dispatch spec-reviewer via `task` tool.
+    - Max 3 review-fix iterations (see 4e).
+    - If ✅ → mark task complete. Update scratchpad.
 
-    **Standard / Large:** Full two-stage review.
-    - Save `BASE_SHA` before dispatch. Get `HEAD_SHA` after DONE. Generate diff.
-    - Stage 1: dispatch spec-reviewer (max 3 iterations).
-    - Only if spec ✅ → Stage 2: dispatch code-quality-reviewer (max 3 iterations).
-      - Include in reviewer prompt: "UI changes detected: [yes/no]. If yes → run `cd frontend && npm run test:all`. If no → run `cd frontend && npm run test`."
-    - Only if quality ✅ → mark task complete. Update scratchpad.
-    - If this was the last task of the этап → `gh-project-move <issue> done`
+     **Standard / Large:** Full two-stage review.
+     - Save `BASE_SHA` before dispatch. Get `HEAD_SHA` after DONE.
+     - Run `git diff --stat` to see scale. Save diff to `/tmp/task-diff.patch`.
+     - Stage 1: dispatch spec-reviewer (max 3 iterations).
+     - Only if spec ✅ → Stage 2: dispatch code-quality-reviewer (max 3 iterations).
+       - Include in reviewer prompt: "UI changes detected: [yes/no]. If yes → run `cd frontend && npm run test:all`. If no → run `cd frontend && npm run test`."
+     - Only if quality ✅ → mark task complete. Update scratchpad.
+     - If this was the last task of the этап → `gh-project-move <issue> done`
 
    **4e. Review Loop Limit (circuit breaker)**
    - Max 3 iterations per reviewer (implementer → reviewer → fix → re-review).
@@ -372,15 +375,23 @@ Actions:
 - You construct EXACTLY what they need: full task text from plan + scene-setting + required skill.
 - Subagents load their own domain knowledge from their agent.md (Next.js, FastAPI, etc.).
 - You NEVER make subagents read plan files. Provide full text in prompt.
-- For reviewers, you provide **git diff output** embedded in prompt, NOT file paths to read. This avoids duplicate file reads across reviewer sessions.
+- For reviewers, you provide **path to diff file** (`/tmp/task-diff.patch`), NOT embedded diff content. Reviewer reads file independently. This saves architect tokens.
 
-## Git Diff for Reviewers
+## Git Diff for Reviewers (Hybrid Approach)
+
+**Goal:** Minimize architect token usage while giving reviewers full context.
 
 - Before dispatching implementer, save `BASE_SHA=$(git rev-parse HEAD)`.
 - After implementer reports DONE, save `HEAD_SHA=$(git rev-parse HEAD)`.
 - If BASE_SHA == HEAD_SHA (no commits) → reviewer checks working tree directly (rare).
-- Generate diff: `git diff $BASE_SHA..$HEAD_SHA > /tmp/task-diff.patch`
-- Read diff content, embed in reviewer prompt template.
+- **Step 1:** Run `git diff --stat $BASE_SHA..$HEAD_SHA` — read output (5-10 lines, see scale).
+- **Step 2:** Save full diff to file: `git diff $BASE_SHA..$HEAD_SHA > /tmp/task-diff.patch`
+- **Step 3:** Pass **file path** to reviewer prompt, NOT diff content. Reviewer reads file independently.
+
+**Why hybrid:**
+- Architect saves ~30-40% tokens per task (no reading of `uv.lock`, boilerplate, etc.)
+- Reviewer has fresh context, reads only what's relevant
+- No duplication of diff reading
 
 ## Task Complexity Classification
 

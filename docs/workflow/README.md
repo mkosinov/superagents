@@ -117,29 +117,35 @@
          ├─│   git diff spot-check (≤5 lines)        │
          │ └─────────────────────────────────────────┘
          │
-         │ ┌─────────────────────────────────────────┐
-         │ │ Small: spec-review only (max 3 loops)   │
-         ├─│                                          │
-         │ │   git diff BASE..HEAD → embed in prompt  │
-         │ │   Dispatch @spec-reviewer                 │
-         │ │   If ❌ → re-dispatch implementer         │
-         │ └─────────────────────────────────────────┘
-         │
-         │ ┌─────────────────────────────────────────┐
-         │ │ Standard/Large: full two-stage review   │
-         ├─│   (each max 3 loops)                     │
-         │ │                                          │
-         │ │   Stage 1: @spec-reviewer                 │
-         │ │     If ❌ → implementer fixes → re-review │
-         │ │     If ✅ → Stage 2                       │
-         │ │                                          │
-         │ │   Stage 2: @code-quality-reviewer         │
-         │ │     Reads diff + runs test suite          │
-         │ │     UI diff → `npm run test:all`          │
-         │ │     Else → `npm run test` (vitest only)   │
-         │ │     If ❌ → implementer fixes → re-review │
-         │ │     If ✅ → task complete                 │
-         │ └─────────────────────────────────────────┘
+          │ ┌─────────────────────────────────────────┐
+          │ │ Small: spec-review only (max 3 loops)   │
+          ├─│                                          │
+          │ │   git diff --stat BASE..HEAD (see scale) │
+          │ │   git diff BASE..HEAD > /tmp/diff.patch  │
+          │ │   Pass FILE PATH to reviewer prompt      │
+          │ │   Dispatch @spec-reviewer                 │
+          │ │   If ❌ → re-dispatch implementer         │
+          │ └─────────────────────────────────────────┘
+          │
+          │ ┌─────────────────────────────────────────┐
+          │ │ Standard/Large: full two-stage review   │
+          ├─│   (each max 3 loops)                     │
+          │ │                                          │
+          │ │   git diff --stat (see scale)            │
+          │ │   git diff > /tmp/task-diff.patch        │
+          │ │                                          │
+          │ │   Stage 1: @spec-reviewer                 │
+          │ │     Reads diff file independently        │
+          │ │     If ❌ → implementer fixes → re-review │
+          │ │     If ✅ → Stage 2                       │
+          │ │                                          │
+          │ │   Stage 2: @code-quality-reviewer         │
+          │ │     Reads diff file + runs test suite    │
+          │ │     UI diff → `npm run test:all`          │
+          │ │     Else → `npm run test` (vitest only)   │
+          │ │     If ❌ → implementer fixes → re-review │
+          │ │     If ✅ → task complete                 │
+          │ └─────────────────────────────────────────┘
          │
          ▼
     ┌──────────────────────┐
@@ -352,6 +358,6 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 3. **Sequential Tasks** — one implementer at a time, no parallel dispatch
 4. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
 5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
-6. **Diff in Prompt** — reviewers receive git diff embedded, never read files
+6. **Hybrid Diff Review** — architect reads `--stat` only, passes file path to reviewers (saves ~30-40% tokens)
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
 8. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
