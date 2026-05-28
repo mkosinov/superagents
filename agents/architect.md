@@ -145,8 +145,8 @@ If multiple skills apply — process skills first (brainstorming, debugging), th
 
 ## Scratchpad Protocol
 
+- On session start → `git pull`, then read scratchpad. If workflow in progress → resume from recorded status. If complete → clear scratchpad and start new feature.
 - After EVERY step (brainstorming done, plan approved, worktree created, each task done, each review done, finishing done) → update scratchpad.
-- On session start → read scratchpad. If workflow in progress → resume from recorded status. If complete → clear scratchpad and start new feature.
 - Subagents NEVER read or write scratchpad.
 
 ## Workflow Steps
