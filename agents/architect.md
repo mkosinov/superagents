@@ -248,7 +248,9 @@ Actions:
        Follow RED-GREEN-REFACTOR exactly. No production code without failing test first.
 
        ## Work Directory
-       /root/workspace/memo/.worktrees/feat-<name>/
+       {ABSOLUTE_WORKTREE_PATH}
+
+       **IMPORTANT for architect:** Before dispatching, REPLACE `{ABSOLUTE_WORKTREE_PATH}` with the real worktree path from scratchpad (e.g., `/root/workspace/memo/.worktrees/feat-admin-polish/`). NEVER send a placeholder — subagent uses this path to read/write files and run tests. If the path is wrong, the subagent modifies `main/` instead of the branch.
 
         ## Rules
         - Follow existing patterns in the codebase

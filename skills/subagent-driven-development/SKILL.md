@@ -82,6 +82,14 @@ When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-pro
 
 ## Critical: Working Directory
 
+**ALWAYS substitute the real worktree path.** The template placeholder `feat-<name>` must be replaced with the actual branch name (e.g., `feat-admin-polish`). If you send the placeholder, the subagent will write to `main/` instead of the branch.
+
+**Architect MUST verify before dispatch:**
+```bash
+# Check that worktree exists and path is correct
+ls /root/workspace/memo/.worktrees/<actual-branch-name>/
+```
+
 **Always pass `## Working Directory` to ALL subagents** (implementer AND reviewers):
 
 ```
