@@ -222,6 +222,14 @@ Actions:
 
    **4b. Dispatch Implementer Subagent**
 
+   **⚠️ CRITICAL: Work Directory path check**
+   BEFORE every dispatch, you MUST:
+   1. Read scratchpad to get the active worktree path (e.g., `.worktrees/feat-admin-polish/`)
+   2. Verify it exists: `ls /root/workspace/memo/.worktrees/<actual-branch>/`
+   3. Substitute the real path in the `## Work Directory` section below
+   
+   **Never send the placeholder `feat-<name>` or the wrong path** — subagent will write to `main/` instead of the branch.
+
    **IMPORTANT: Bug Fix Two-Gate Protocol**
    If this task is a **bug fix** (not a feature task from a plan), you MUST use the **Bug Fix Two-Gate Protocol** from the `subagent-driven-development` skill:
    1. **Gate 1:** Dispatch implementer ONLY to write a RED test reproducing the bug → review test → approve
