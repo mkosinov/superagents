@@ -221,6 +221,14 @@ Actions:
     - If this is the first task of a new этап → `gh-project-move <issue> in-progress`
 
    **4b. Dispatch Implementer Subagent**
+
+   **IMPORTANT: Bug Fix Two-Gate Protocol**
+   If this task is a **bug fix** (not a feature task from a plan), you MUST use the **Bug Fix Two-Gate Protocol** from the `subagent-driven-development` skill:
+   1. **Gate 1:** Dispatch implementer ONLY to write a RED test reproducing the bug → review test → approve
+   2. **Gate 2:** Dispatch implementer to make the test GREEN → standard review
+   
+   **For feature tasks (from plan):** Use standard single dispatch:
+
    - Determine agent type from plan (frontend task → `frontend-coder`, backend task → `backend-coder`)
    - Use `task` tool:
      ```

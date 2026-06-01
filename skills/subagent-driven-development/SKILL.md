@@ -35,6 +35,33 @@ Use when you have a written implementation plan with independent tasks, and you 
    f. If ❌ → implementer fixes → re-dispatch quality reviewer (max 3 loops)
     g. If ✅ → mark task complete in TodoWrite
 
+## Bug Fix Two-Gate Protocol
+
+When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-process:
+
+### Gate 1: RED Test (reproduce the bug)
+1. Dispatch implementer with ONLY the task to write a failing test that reproduces the bug
+2. The test must be `test.skip` or clearly marked as reproducing the exact bug scenario
+3. **Review Gate:** You (architect) review the test BEFORE accepting it:
+   - Does it match the bug description?
+   - Does it represent real data conditions?
+   - Does it fail with the expected error/message?
+   - Could it pass for the wrong reasons?
+4. Only when the test accurately reproduces the bug → mark Gate 1 ✅
+
+### Gate 2: GREEN (fix the code)
+1. Dispatch implementer again with the task to make the RED test GREEN
+2. Implementer fixes production code — test must pass
+3. Implementer also ensures all existing tests still pass
+4. **Review Gate:** Standard review applies (spec + quality for standard/large tasks)
+
+### Rules
+- Do NOT skip Gate 1 — no "I know what the fix is, let me just do it"
+- Do NOT let implementer write fix + test in one dispatch
+- Architect reviews the test file only (read it), does NOT run it
+- Test must be new and specific to the bug, not an existing test
+- If the bug is complex, split into sub-bugs and repeat the protocol
+
 **Visual Regression Testing:**
 - If task touches UI (.tsx, .css, tailwind.config.ts, next.config.mjs):
   - Implementer runs `cd frontend && npm run test:all` before marking DONE
