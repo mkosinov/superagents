@@ -64,9 +64,34 @@ This structure informs the task decomposition. Each task should produce self-con
 
 Each task must include:
 - **Files:** exact paths (create/modify/test)
+- **Required Docs:** list of docs the implementer must read before starting
 - **Steps:** checkbox format with exact code/commands
 - **No placeholders** — no "TBD", "TODO", "implement later"
 - **Exact commands with expected output**
+
+### Required Docs Section
+
+Every task MUST have a `### Required Docs` section listing which docs the implementer needs to read. This is the **primary mechanism** for context transfer from architect to implementer.
+
+**Example:**
+
+```markdown
+## Task 1: Add Master color validation
+### Classification: small
+### Required Docs
+- `docs/domain-rules/masters.md` — entity fields, validation rules
+- `docs/design-system.md` — color format conventions
+
+### Task Description
+[full task text]
+```
+
+**Rules for Required Docs:**
+- If task touches an entity → include `docs/domain-rules/{entity}.md`
+- If task touches UI → include `docs/design-system.md`
+- If task touches naming → include `docs/domain-rules/_overview.md` (Naming Conventions)
+- If task touches testing → include relevant skill (pytest-patterns, vitest-playwright-patterns)
+- Be specific: add comment explaining what to look for in each doc
 
 ## No Placeholders
 
@@ -84,6 +109,7 @@ After writing the complete plan:
 1. **Spec coverage:** Can you point to a task for each requirement? List gaps.
 2. **Placeholder scan:** Fix any red flags.
 3. **Type consistency:** Functions/types match across tasks?
+4. **Required Docs check:** Every task has `### Required Docs` section? Missing docs?
 
 If issues found, fix inline.
 
