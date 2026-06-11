@@ -100,6 +100,35 @@ Keep tests green. Don't add behavior.
 
 Next failing test for next feature.
 
+## Schema Updates (Backend Tasks)
+
+**When:** You're adding a new field to a SQLAlchemy model (e.g., `sort_order`, `custom_price`).
+
+**Rule:** Update SQLite schema BEFORE writing the RED test.
+
+**Steps:**
+1. **Identify schema change:** New field in model = schema migration needed
+2. **Update SQLite:** Run `ALTER TABLE table_name ADD COLUMN column_name TYPE`
+   - Example: `sqlite3 backend/memo.db "ALTER TABLE masters ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;"`
+3. **Update seed.py:** Add the new field to seed data
+4. **Verify schema:** Run `sqlite3 backend/memo.db ".schema table_name"` to confirm
+5. **NOW write RED test:** Only after schema is updated
+
+**Why:** If you write tests first, they'll fail with "no such column" error, and you'll waste time debugging instead of implementing.
+
+**Example:**
+```python
+# Model change
+class Master(Base):
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)  # NEW
+
+# BEFORE writing test:
+# 1. ALTER TABLE masters ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0
+# 2. Update seed.py to include sort_order in master data
+# 3. Verify: sqlite3 backend/memo.db ".schema masters"
+# 4. NOW write RED test for sort_order functionality
+```
+
 ## Good Tests
 
 | Quality | Good | Bad |

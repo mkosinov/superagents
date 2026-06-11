@@ -93,6 +93,56 @@ Every task MUST have a `### Required Docs` section listing which docs the implem
 - If task touches testing → include relevant skill (pytest-patterns, vitest-playwright-patterns)
 - Be specific: add comment explaining what to look for in each doc
 
+## Backend Tasks with Schema Changes
+
+**When:** Task involves adding/modifying SQLAlchemy model fields.
+
+**Rule:** Architect MUST explicitly specify database migration in task description.
+
+**Task template:**
+```markdown
+### Task N: Add [field] to [model]
+
+**Schema change:**
+- Model: `backend/src/models/[model].py`
+- Field: `[field_name]: Mapped[type] = mapped_column(...)`
+- SQLite: `ALTER TABLE [table] ADD COLUMN [field] [TYPE] [constraints]`
+- Seed: Update `backend/src/seed/seed.py` to include new field
+
+**Implementation steps:**
+1. Update SQLite schema: `sqlite3 backend/memo.db "ALTER TABLE ..."`
+2. Verify: `sqlite3 backend/memo.db ".schema [table]"`
+3. Update model: add field to SQLAlchemy class
+4. Update seed.py: add field to seed data
+5. Write RED test
+6. Implement GREEN
+7. Refactor
+
+**Why:** Schema must exist BEFORE tests run. Architect decides schema changes, implementer executes.
+```
+
+**Example:**
+```markdown
+### Task 3: Add sort_order to Master and Location models
+
+**Schema change:**
+- Models: `backend/src/models/master.py`, `backend/src/models/location.py`
+- Field: `sort_order: Mapped[int] = mapped_column(Integer, default=0)`
+- SQLite: 
+  - `ALTER TABLE masters ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`
+  - `ALTER TABLE locations ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`
+- Seed: Update seed data to include sort_order values
+
+**Implementation steps:**
+1. Update SQLite: run both ALTER TABLE commands
+2. Verify schemas: `.schema masters` and `.schema locations`
+3. Update models: add sort_order field
+4. Update seed.py: add sort_order to master/location data
+5. Write RED test for sort_order functionality
+6. Implement GREEN
+7. Refactor
+```
+
 ## No Placeholders
 
 Every step must contain the actual content an engineer needs. These are **plan failures**:

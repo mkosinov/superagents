@@ -322,6 +322,43 @@ async def _reset() -> None:
 
 ---
 
+## Schema Synchronization Check
+
+**Problem:** SQLAlchemy model has new column, but SQLite database doesn't have it. Tests pass but app crashes.
+
+**Solution:** Add autouse fixture that verifies schema sync before tests run:
+
+```python
+# conftest.py
+import pytest
+from sqlalchemy import inspect
+from src.core.database import Base
+
+@pytest.fixture(autouse=True)
+def verify_schema_sync(db_session):
+    """Verify SQLAlchemy models match SQLite schema."""
+    inspector = inspect(db_session.bind)
+    for table in Base.metadata.tables.values():
+        if table.name == 'alembic_version':
+            continue
+        db_columns = {col['name'] for col in inspector.get_columns(table.name)}
+        model_columns = {col.name for col in table.columns}
+        missing = model_columns - db_columns
+        assert not missing, f"Table '{table.name}' missing columns: {missing}. Run ALTER TABLE or recreate DB."
+```
+
+**When to use:**
+- After adding new field to SQLAlchemy model
+- Before running tests
+- In CI/CD pipeline
+
+**Fix:** If assertion fails:
+1. Add column via `ALTER TABLE table_name ADD COLUMN column_name TYPE`
+2. Or recreate database from scratch
+3. Update seed.py if needed
+
+---
+
 ## Known Gaps Pattern
 
 When a validation is missing in the schema, document it as a known gap — not a passing test:
