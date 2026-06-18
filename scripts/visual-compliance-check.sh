@@ -168,7 +168,10 @@ echo "Found $CHECKS_COUNT visual checks"
 PLAYWRIGHT_SCRIPT="$PHASE_DIR/run-checks.js"
 
 cat > "$PLAYWRIGHT_SCRIPT" << 'PLAYWRIGHT_EOF'
-const { chromium } = require('playwright');
+// Use @playwright/test (installed globally via Dockerfile npm install -g @playwright/test).
+// The bare 'playwright' package is nested under @playwright/test/node_modules/ and not
+// resolvable via NODE_PATH. @playwright/test re-exports the full Playwright API.
+const { chromium } = require('@playwright/test');
 const fs = require('fs');
 
 (async () => {
@@ -353,7 +356,10 @@ set +e
 npx playwright install chromium 2>/dev/null
 set -e
 
-node "$PLAYWRIGHT_SCRIPT" "$DEV_URL" "$CHECKS_FILE" "$PHASE_DIR" "$VIEWPORT"
+# NODE_PATH makes the globally-installed @playwright/test resolvable by require().
+# @playwright/test is installed in /usr/local/lib/node_modules by the Dockerfile,
+# and Node's require() does not search global modules unless NODE_PATH is set.
+NODE_PATH=/usr/local/lib/node_modules node "$PLAYWRIGHT_SCRIPT" "$DEV_URL" "$CHECKS_FILE" "$PHASE_DIR" "$VIEWPORT"
 EXIT_CODE=$?
 
 # --- Generate Markdown Report -------------------------------------------------
