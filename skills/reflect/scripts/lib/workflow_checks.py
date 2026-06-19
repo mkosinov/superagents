@@ -1,4 +1,4 @@
-"""16 workflow compliance checks mapped to SuperAgents Key Principles.
+"""17 workflow compliance checks mapped to SuperAgents Key Principles.
 
 Each check is a function: (sessions, tool_calls, config) -> list[Violation]
 """
@@ -301,7 +301,10 @@ def check_skill_triggered_when_should(
     tool_calls: list[dict],
     config: ReflectConfig,
 ) -> list[Violation]:
-    """Stub: requires per-project skill_triggers config. Returns []."""
+    """Stub: requires per-project skill_triggers config."""
+    cfg = config.workflow_checks["skill_triggered_when_should"]
+    if not cfg.enabled:
+        return []
     return []
 
 
@@ -358,7 +361,8 @@ def check_first_time_right(
     total = len(by_parent)
     if total > 0:
         three_plus_rate = three_plus / total
-        if three_plus_rate > 0.5:
+        target_rate = cfg.options.get("target_rate", 0.5)
+        if three_plus_rate > target_rate:
             violations.append(Violation(
                 check_name="first_time_right",
                 severity="warning",
@@ -435,7 +439,10 @@ def check_skill_orphan(
     tool_calls: list[dict],
     config: ReflectConfig,
 ) -> list[Violation]:
-    """Stub: needs cross-reference to skills/ directory. Returns []."""
+    """Stub: needs cross-reference to skills/ directory."""
+    cfg = config.workflow_checks["skill_orphan"]
+    if not cfg.enabled:
+        return []
     return []
 
 
@@ -498,6 +505,7 @@ ALL_CHECKS = [
     check_stuck_in_retry,
     check_same_error_repeated,
     check_mandatory_reviewer_for_code,
+    check_gate_compliance,
     check_tdd_red_first,
     check_max_review_loops,
     check_regression_test_on_bugfix,

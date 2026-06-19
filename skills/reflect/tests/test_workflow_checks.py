@@ -374,8 +374,8 @@ def test_missed_parallelism_clean_single_subagent():
 # ===== ALL CHECKS LIST =====
 
 
-def test_all_checks_has_16_entries():
-    assert len(ALL_CHECKS) == 16
+def test_all_checks_has_17_entries():
+    assert len(ALL_CHECKS) == 17
 
 
 def test_all_checks_are_callable():
