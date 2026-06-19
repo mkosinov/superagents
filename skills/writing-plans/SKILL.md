@@ -91,7 +91,25 @@ Every task MUST have a `### Required Docs` section listing which docs the implem
 - If task touches UI → include `docs/design-system.md`
 - If task touches naming → include `docs/domain-rules/_overview.md` (Naming Conventions)
 - If task touches testing → include relevant skill (pytest-patterns, vitest-playwright-patterns)
+- **If task implements a User Scenario** → the DoD must include "E2E test for scenario N passes" — written as a RED-GREEN-REFACTOR cycle. See testing-strategy-v2.
 - Be specific: add comment explaining what to look for in each doc
+
+## E2E Coverage in DoD
+
+**When a task implements a User Scenario** (from the spec's `## User Scenarios` section), the task's DoD (Definition of Done) **MUST** include a line like:
+
+> "E2E test for scenario N passes (RED-GREEN-REFACTOR)"
+
+**Why:** The whole point of User Scenarios in the spec is to give E2E tests an anchor. If a task implements a scenario but its DoD doesn't mention an E2E, there's no guarantee the E2E exists or passes.
+
+**Pattern in the task's Steps section:**
+1. Write RED E2E for scenario N (test fails because feature is missing or buggy)
+2. Implement minimal code to make E2E pass (GREEN)
+3. Refactor if needed
+4. Verify E2E still passes
+5. Commit
+
+See testing-strategy-v2 for full context.
 
 ## Backend Tasks with Schema Changes
 
