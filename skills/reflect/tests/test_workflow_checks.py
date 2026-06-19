@@ -86,3 +86,44 @@ def test_mandatory_reviewer_for_code_missing():
 def test_gate_compliance_returns_empty():
     """Gate compliance is a stub — no gate markers in opencode.db yet."""
     assert check_gate_compliance([], [], ReflectConfig.from_dict({})) == []
+
+
+def test_check_disabled_returns_empty():
+    """When check is disabled in config, returns empty list regardless of data."""
+    from reflect.scripts.lib.config import CheckConfig
+    cfg = ReflectConfig.from_dict({})
+    cfg.workflow_checks["stuck_in_retry"].enabled = False
+    sessions = [
+        {"id": "a", "title": "t", "parent_id": None, "agent": "frontend-coder",
+         "time_created": 1, "time_updated": 100, "time_archived": 100},
+    ]
+    tool_calls = [
+        {"session_id": "a", "tool": "bash", "status": "completed", "error": None,
+         "cmd": "x", "time_created": 10, "duration_ms": 1},
+        {"session_id": "a", "tool": "bash", "status": "completed", "error": None,
+         "cmd": "x", "time_created": 20, "duration_ms": 1},
+        {"session_id": "a", "tool": "bash", "status": "completed", "error": None,
+         "cmd": "x", "time_created": 30, "duration_ms": 1},
+    ]
+    from reflect.scripts.lib.workflow_checks import check_stuck_in_retry
+    assert check_stuck_in_retry(sessions, tool_calls, cfg) == []
+
+
+def test_violation_to_proposal_dict():
+    from reflect.scripts.lib.workflow_checks import Violation
+    v = Violation(
+        check_name="test_check",
+        severity="critical",
+        session_id="abc",
+        title="Test Title",
+        message="Test message",
+        context={"foo": 42, "bar": "x"},
+    )
+    d = v.to_proposal_dict()
+    assert d["check"] == "test_check"
+    assert d["severity"] == "critical"
+    assert d["session_id"] == "abc"
+    assert d["title"] == "Test Title"
+    assert d["message"] == "Test message"
+    assert d["foo"] == 42
+    assert d["bar"] == "x"

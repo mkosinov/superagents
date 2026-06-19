@@ -5,7 +5,7 @@ Each check is a function: (sessions, tool_calls, config) -> list[Violation]
 from __future__ import annotations
 from dataclasses import dataclass, field
 from collections import Counter, defaultdict
-from typing import Any
+from .config import ReflectConfig
 
 
 @dataclass
@@ -30,7 +30,11 @@ class Violation:
 
 # ===== CRITICAL CHECKS =====
 
-def check_controller_never_implements(sessions, tool_calls, config):
+def check_controller_never_implements(
+    sessions: list[dict],
+    tool_calls: list[dict],
+    config: ReflectConfig,
+) -> list[Violation]:
     """Principle 1: architect must not call edit/write/apply_patch."""
     if not config.workflow_checks["controller_never_implements"].enabled:
         return []
@@ -57,7 +61,11 @@ def check_controller_never_implements(sessions, tool_calls, config):
     return violations
 
 
-def check_stuck_in_retry(sessions, tool_calls, config):
+def check_stuck_in_retry(
+    sessions: list[dict],
+    tool_calls: list[dict],
+    config: ReflectConfig,
+) -> list[Violation]:
     """Same bash command 3+ times in one session without variation."""
     cfg = config.workflow_checks["stuck_in_retry"]
     if not cfg.enabled:
@@ -84,7 +92,11 @@ def check_stuck_in_retry(sessions, tool_calls, config):
     return violations
 
 
-def check_same_error_repeated(sessions, tool_calls, config):
+def check_same_error_repeated(
+    sessions: list[dict],
+    tool_calls: list[dict],
+    config: ReflectConfig,
+) -> list[Violation]:
     """Same tool+error in 3+ different sessions."""
     cfg = config.workflow_checks["same_error_repeated"]
     if not cfg.enabled:
@@ -108,7 +120,11 @@ def check_same_error_repeated(sessions, tool_calls, config):
     return violations
 
 
-def check_mandatory_reviewer_for_code(sessions, tool_calls, config):
+def check_mandatory_reviewer_for_code(
+    sessions: list[dict],
+    tool_calls: list[dict],
+    config: ReflectConfig,
+) -> list[Violation]:
     """Every implementer session must have spec-reviewer + code-quality-reviewer as children."""
     cfg = config.workflow_checks["mandatory_reviewer_for_code"]
     if not cfg.enabled:
@@ -141,7 +157,11 @@ def check_mandatory_reviewer_for_code(sessions, tool_calls, config):
     return violations
 
 
-def check_gate_compliance(sessions, tool_calls, config):
+def check_gate_compliance(
+    sessions: list[dict],
+    tool_calls: list[dict],
+    config: ReflectConfig,
+) -> list[Violation]:
     """Stub: returns []. No gate markers in opencode.db yet."""
     cfg = config.workflow_checks["gate_compliance"]
     if not cfg.enabled:
