@@ -6,18 +6,19 @@ LLM call (via opencode subprocess) is added in Task 14.
 from __future__ import annotations
 import re
 from datetime import datetime
-from pathlib import Path
 from typing import Iterable
 from .workflow_checks import Violation
-from .proposals import create_proposal
 
 
 def fill_template(template: str, **kwargs) -> str:
     """Substitute {var} placeholders in template."""
+    # Extract known placeholders from the original template
+    known_placeholders = set(re.findall(r"\{(\w+)\}", template))
     result = template
     for key, value in kwargs.items():
         result = result.replace("{" + key + "}", str(value))
-    leftover = re.findall(r"\{(\w+)\}", result)
+    # Only check placeholders that were in the original template
+    leftover = [k for k in known_placeholders if "{" + k + "}" in result]
     if leftover:
         raise ValueError(f"Unfilled template placeholders: {leftover}")
     return result
