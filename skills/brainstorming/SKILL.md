@@ -28,7 +28,7 @@ You MUST create a task for each of these items and complete them in order:
 1. **Explore project context** — check files, docs, recent commits
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **Present design sections** — in sections scaled to their complexity, get user approval after each section
+4. **Present design sections** — in sections scaled to their complexity, get user approval after each section. **Must include a `## User Scenarios` section** listing 3-7 user tasks the feature enables. Each scenario maps to an E2E test (see testing-strategy-v2 / User Scenario workflow).
 5. **Write design doc** — save to `docs/specs/YYYY-MM-DD-<topic>-design.md` and commit
 6. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope
 7. **User reviews written spec** — ask user to review the spec file before proceeding
@@ -87,6 +87,7 @@ Explore project context → Ask clarifying questions → Propose 2-3 approaches 
 **Documentation:**
 
 - Write the validated design (spec) to `docs/specs/YYYY-MM-DD-<topic>-design.md`
+- **The spec MUST include a `## User Scenarios` section** (3-7 user tasks the feature enables, each mapping to an E2E test)
 - Commit the design document to git
 
 **Spec Self-Review:**
@@ -102,7 +103,7 @@ Fix any issues inline. No need to re-review — just fix and move on.
 **User Review Gate (BLOCKING):**
 After the spec review loop passes, ask the user to review the written spec before proceeding:
 
-> "Spec written and committed to `<path>`. Please review the file and confirm: (1) you have read it, and (2) you approve it as the basis for implementation. If you want changes, tell me now — I will NOT start the implementation plan until you explicitly approve this spec."
+> "Spec written and committed to `<path>`. Please review the file and confirm: (1) you have read it, and (2) you approve it as the basis for implementation. **Also confirm the spec has a `## User Scenarios` section.** If you want changes, tell me now — I will NOT start the implementation plan until you explicitly approve this spec."
 
 **This is a HARD BLOCK.** Do NOT:
 - Invoke writing-plans skill
