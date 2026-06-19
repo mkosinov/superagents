@@ -1,0 +1,6 @@
+# Consuming projects of superagents framework
+# One absolute path per line
+# Lines starting with # are ignored
+# Projects not present locally are skipped silently (so devs without all projects can still commit)
+
+/root/workspace/memo

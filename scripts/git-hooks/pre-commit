@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Pre-commit hook: verifies all consuming projects are in sync with framework skills.
+# Installed by superagents/scripts/install-hooks.sh
+
+set -uo pipefail
+
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+FRAMEWORK_ROOT="$(cd "$HOOK_DIR/../.." && pwd)"
+PROJECTS_FILE="$FRAMEWORK_ROOT/PROJECTS"
+CHECK_SCRIPT="$FRAMEWORK_ROOT/scripts/check-skill-sync.sh"
+
+# Only run if skills/ or PROJECTS changed in this commit
+STAGED=$(git diff --cached --name-only 2>/dev/null || true)
+if ! echo "$STAGED" | grep -qE "^skills/|^PROJECTS$"; then
+  exit 0
+fi
+
+if [ ! -f "$PROJECTS_FILE" ]; then
+  echo "⚠️  PROJECTS file not found at $PROJECTS_FILE — skipping skill sync check"
+  echo "   Create it with one project path per line to enable sync enforcement"
+  exit 0
+fi
+
+if [ ! -x "$CHECK_SCRIPT" ]; then
+  echo "❌ check-skill-sync.sh not executable: $CHECK_SCRIPT" >&2
+  exit 1
+fi
+
+FAILED=0
+while IFS= read -r project; do
+  # Skip empty lines and comments
+  [[ -z "$project" || "$project" =~ ^# ]] && continue
+
+  # Skip if project doesn't exist (developer might not have all projects locally)
+  if [ ! -d "$project" ]; then
+    echo "⏭️  Skipping $project (not present locally)"
+    continue
+  fi
+
+  echo "Checking skill sync for: $project"
+  if ! bash "$CHECK_SCRIPT" "$project"; then
+    FAILED=1
+  fi
+done < "$PROJECTS_FILE"
+
+if [ "$FAILED" -ne 0 ]; then
+  echo ""
+  echo "❌ Skill sync check FAILED"
+  echo "   Run: bash $FRAMEWORK_ROOT/scripts/sync-skills.sh <project-path>"
+  echo "   For all failing projects above, then re-commit."
+  exit 1
+fi
+
+exit 0

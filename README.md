@@ -128,6 +128,32 @@ This repo (`/root/workspace/superagents/`) is the **single source of truth** for
 | Skill definitions | Permission lists in frontmatter |
 | Review pipeline structure | Project-specific bash allow lists |
 
+## Skill sync mechanism
+
+To prevent drift between framework skills and consuming projects' `.opencode/skills/`:
+
+**After cloning this repo:**
+```bash
+bash scripts/install-hooks.sh
+```
+
+This installs a pre-commit hook that:
+- Reads `PROJECTS` (one project path per line)
+- For each staged change to `skills/` or `PROJECTS`, runs `scripts/check-skill-sync.sh` on each registered project
+- If any project is out of sync, the commit fails with a clear fix message
+
+**To manually sync a project:**
+```bash
+bash scripts/sync-skills.sh /path/to/project
+```
+
+**To add a new consuming project:**
+1. Add the absolute path to `PROJECTS` (one per line)
+2. Run `bash scripts/sync-skills.sh /new/project/path` to populate its `.opencode/skills/`
+3. Commit `PROJECTS`
+
+**Why this exists:** Drift caused by `.opencode/` being gitignored in consuming projects. Pre-commit enforcement at framework level catches it at the source.
+
 ## License
 
 MIT / Proprietary — for internal use in AI-assisted development workflows.
