@@ -25,7 +25,7 @@ See [`docs/setup/new-project-setup.md`](docs/setup/new-project-setup.md)
 
 ### Run Workflow
 
-1. **G1 Brainstorming** → invoke `brainstorming` skill
+1. **G1a+b Brainstorming** → invoke `brainstorming` skill
 2. **G2 Planning** → invoke `writing-plans` skill
 3. **G3 Worktree** → invoke `using-git-worktrees` skill
 4. **G4-G6 Development** → invoke `subagent-driven-development` skill
@@ -52,7 +52,8 @@ superagents/
 │   ├── subagent-driven-development/
 │   ├── finishing-a-development-branch/
 │   ├── using-skills/
-│   └── systematic-debugging/
+│   ├── systematic-debugging/
+│   └── reflect/
 ├── templates/               # Reviewer prompt templates
 │   └── reviewers/
 │       ├── spec-reviewer.md
@@ -81,7 +82,7 @@ superagents/
 1. **Controller Never Implements** — @architect plans and delegates, never edits code
 2. **Two-Stage Review** — spec compliance → code quality, never one without the other
 3. **Sequential Tasks** — one implementer at a time, no parallel dispatch
-4. **Human Gates** — G1 (design), G2 (plan), G7 (finish) require user approval
+4. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
 5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
 6. **Diff in Prompt** — reviewers receive git diff embedded, never read files
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
@@ -92,9 +93,27 @@ superagents/
 See [`docs/workflow/README.md`](docs/workflow/README.md) for full flow.
 
 ```
-G1 (Human) → G2 (Human) → G3 (Auto) → G4-G6 (Auto) → G7 (Human)
-Brainstorm   Plan         Worktree    Development      Finish
+G1a(Human) → G1b(Human) → G2(Human) → G3(Auto) → G4-G6(Auto) → G7(Human)
+Concept      Spec        Plan         Worktree    Development      Finish
 ```
+
+## Reflection Mode
+
+A self-analysis layer for the SuperAgents workflow. Reads `opencode.db` (read-only) to audit compliance against 17 checks mapped to the 8 Key Principles, then generates actionable improvement proposals as filesystem diffs (human-in-the-loop by default — user reviews before applying).
+
+**Location:** [`skills/reflect/`](skills/reflect/)<br>
+**CLI wrapper:** `skills/reflect/scripts/reflect.sh` (modes: `post-mortem`, `wave`, `nightly`, `status`)
+
+**Trigger modes:**
+| Mode | When | Who |
+|------|------|-----|
+| **Bug-driven** | Before fixing a bug | Architect (manual) |
+| **Wave-driven** | End of a development wave | Architect or command |
+| **Time-driven** | Nightly cron | `0 3 * * *` (install with `install-cron.sh`) |
+
+Key concepts: closing-the-loop (tracks if applied proposals prevent recurrence), quality scoring (heuristic + LLM for skills/agents), and auto skill generation (detects patterns suggesting new skills).
+
+See the [specification](docs/specs/2026-06-19-reflection-mode-design.md) for detailed design, and [`docs/architecture/reflection-mode.md`](docs/architecture/reflection-mode.md) for architecture overview.
 
 ## Token Economy
 

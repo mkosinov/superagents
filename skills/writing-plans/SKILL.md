@@ -64,9 +64,102 @@ This structure informs the task decomposition. Each task should produce self-con
 
 Each task must include:
 - **Files:** exact paths (create/modify/test)
+- **Required Docs:** list of docs the implementer must read before starting
 - **Steps:** checkbox format with exact code/commands
 - **No placeholders** — no "TBD", "TODO", "implement later"
 - **Exact commands with expected output**
+
+### Required Docs Section
+
+Every task MUST have a `### Required Docs` section listing which docs the implementer needs to read. This is the **primary mechanism** for context transfer from architect to implementer.
+
+**Example:**
+
+```markdown
+## Task 1: Add Master color validation
+### Classification: small
+### Required Docs
+- `docs/domain-rules/masters.md` — entity fields, validation rules
+- `docs/design-system.md` — color format conventions
+
+### Task Description
+[full task text]
+```
+
+**Rules for Required Docs:**
+- If task touches an entity → include `docs/domain-rules/{entity}.md`
+- If task touches UI → include `docs/design-system.md`
+- If task touches naming → include `docs/domain-rules/_overview.md` (Naming Conventions)
+- If task touches testing → include relevant skill (pytest-patterns, vitest-playwright-patterns)
+- **If task implements a User Scenario** → the DoD must include "E2E test for scenario N passes" — written as a RED-GREEN-REFACTOR cycle. See testing-strategy-v2.
+- Be specific: add comment explaining what to look for in each doc
+
+## E2E Coverage in DoD
+
+**When a task implements a User Scenario** (from the spec's `## User Scenarios` section), the task's DoD (Definition of Done) **MUST** include a line like:
+
+> "E2E test for scenario N passes (RED-GREEN-REFACTOR)"
+
+**Why:** The whole point of User Scenarios in the spec is to give E2E tests an anchor. If a task implements a scenario but its DoD doesn't mention an E2E, there's no guarantee the E2E exists or passes.
+
+**Pattern in the task's Steps section:**
+1. Write RED E2E for scenario N (test fails because feature is missing or buggy)
+2. Implement minimal code to make E2E pass (GREEN)
+3. Refactor if needed
+4. Verify E2E still passes
+5. Commit
+
+See testing-strategy-v2 for full context.
+
+## Backend Tasks with Schema Changes
+
+**When:** Task involves adding/modifying SQLAlchemy model fields.
+
+**Rule:** Architect MUST explicitly specify database migration in task description.
+
+**Task template:**
+```markdown
+### Task N: Add [field] to [model]
+
+**Schema change:**
+- Model: `backend/src/models/[model].py`
+- Field: `[field_name]: Mapped[type] = mapped_column(...)`
+- SQLite: `ALTER TABLE [table] ADD COLUMN [field] [TYPE] [constraints]`
+- Seed: Update `backend/src/seed/seed.py` to include new field
+
+**Implementation steps:**
+1. Update SQLite schema: `sqlite3 backend/memo.db "ALTER TABLE ..."`
+2. Verify: `sqlite3 backend/memo.db ".schema [table]"`
+3. Update model: add field to SQLAlchemy class
+4. Update seed.py: add field to seed data
+5. Write RED test
+6. Implement GREEN
+7. Refactor
+
+**Why:** Schema must exist BEFORE tests run. Architect decides schema changes, implementer executes.
+```
+
+**Example:**
+```markdown
+### Task 3: Add sort_order to Master and Location models
+
+**Schema change:**
+- Models: `backend/src/models/master.py`, `backend/src/models/location.py`
+- Field: `sort_order: Mapped[int] = mapped_column(Integer, default=0)`
+- SQLite: 
+  - `ALTER TABLE masters ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`
+  - `ALTER TABLE locations ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0`
+- Seed: Update seed data to include sort_order values
+
+**Implementation steps:**
+1. Update SQLite: run both ALTER TABLE commands
+2. Verify schemas: `.schema masters` and `.schema locations`
+3. Update models: add sort_order field
+4. Update seed.py: add sort_order to master/location data
+5. Write RED test for sort_order functionality
+6. Implement GREEN
+7. Refactor
+```
 
 ## No Placeholders
 
@@ -84,6 +177,7 @@ After writing the complete plan:
 1. **Spec coverage:** Can you point to a task for each requirement? List gaps.
 2. **Placeholder scan:** Fix any red flags.
 3. **Type consistency:** Functions/types match across tasks?
+4. **Required Docs check:** Every task has `### Required Docs` section? Missing docs?
 
 If issues found, fix inline.
 

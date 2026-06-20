@@ -1,0 +1,36 @@
+{
+  "workflow_checks": {
+    "controller_never_implements": { "enabled": true, "severity": "critical" },
+    "mandatory_reviewer_for_code": { "enabled": true, "file_patterns": ["*.ts", "*.tsx", "*.py"], "severity": "critical" },
+    "tdd_red_first": { "enabled": true, "severity": "warning" },
+    "max_review_loops": { "enabled": true, "max_loops": 3, "severity": "warning" },
+    "gate_compliance": { "enabled": true, "gates": ["G1a", "G1b", "G2", "G7"], "severity": "critical" },
+    "regression_test_on_bugfix": { "enabled": true, "severity": "warning" },
+    "stuck_in_retry": { "enabled": true, "min_repeats": 3, "severity": "critical" },
+    "same_error_repeated": { "enabled": true, "min_sessions": 3, "severity": "critical" },
+    "arch_session_too_long": { "enabled": true, "max_minutes_without_subagent": 30, "severity": "warning" },
+    "skill_triggered_when_should": { "enabled": true, "severity": "warning" },
+    "subagent_completion_rate": { "enabled": true, "min_rate": 0.8, "severity": "warning" },
+    "first_time_right": { "enabled": true, "target_rate": 0.5, "severity": "warning" },
+    "over_orchestration": { "enabled": true, "max_subagents": 6, "severity": "warning" },
+    "dead_end_sessions": { "enabled": true, "max_duration_sec": 60, "severity": "info" },
+    "skill_orphan": { "enabled": true, "max_days_unused": 30, "severity": "info" },
+    "context_overflow": { "enabled": true, "severity": "info" },
+    "missed_parallelism": { "enabled": true, "severity": "info" }
+  },
+  "auto_apply": {
+    "enabled": false,
+    "max_confidence": 0.95,
+    "allowed_severities": ["info"],
+    "allowed_types": ["archive-skill"]
+  },
+  "notify": {
+    "telegram_chat_id": null,
+    "min_severity_to_notify": "warning"
+  },
+  "thresholds": {
+    "regression_delta_pct": 30.0,
+    "min_confidence_for_proposal": 0.6,
+    "min_samples_for_quality_score": 5
+  }
+}

@@ -35,6 +35,33 @@ Use when you have a written implementation plan with independent tasks, and you 
    f. If ❌ → implementer fixes → re-dispatch quality reviewer (max 3 loops)
     g. If ✅ → mark task complete in TodoWrite
 
+## Bug Fix Two-Gate Protocol
+
+When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-process:
+
+### Gate 1: RED Test (reproduce the bug)
+1. Dispatch implementer with ONLY the task to write a failing test that reproduces the bug
+2. The test must be `test.skip` or clearly marked as reproducing the exact bug scenario
+3. **Review Gate:** You (architect) review the test BEFORE accepting it:
+   - Does it match the bug description?
+   - Does it represent real data conditions?
+   - Does it fail with the expected error/message?
+   - Could it pass for the wrong reasons?
+4. Only when the test accurately reproduces the bug → mark Gate 1 ✅
+
+### Gate 2: GREEN (fix the code)
+1. Dispatch implementer again with the task to make the RED test GREEN
+2. Implementer fixes production code — test must pass
+3. Implementer also ensures all existing tests still pass
+4. **Review Gate:** Standard review applies (spec + quality for standard/large tasks)
+
+### Rules
+- Do NOT skip Gate 1 — no "I know what the fix is, let me just do it"
+- Do NOT let implementer write fix + test in one dispatch
+- Architect reviews the test file only (read it), does NOT run it
+- Test must be new and specific to the bug, not an existing test
+- If the bug is complex, split into sub-bugs and repeat the protocol
+
 **Visual Regression Testing:**
 - If task touches UI (.tsx, .css, tailwind.config.ts, next.config.mjs):
   - Implementer runs `cd frontend && npm run test:all` before marking DONE
@@ -44,9 +71,24 @@ Use when you have a written implementation plan with independent tasks, and you 
   - Code-quality reviewer runs `cd frontend && npm run test`
 
 3. After all tasks: dispatch final code reviewer for entire implementation
-4. Use finishing-a-development-branch skill to complete
+
+4. **Visual Compliance Gate (ONCE per phase, NOT per task)**
+   - Trigger: All tasks in this phase complete, all reviews passed
+   - Run `/root/workspace/superagents/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
+   - If FAILS → soft block: report to user with screenshots, wait for decision (fix/override/abort)
+   - Only proceed to Step 5 (documentation) after pass or explicit user override
+
+5. Use finishing-a-development-branch skill to complete
 
 ## Critical: Working Directory
+
+**ALWAYS substitute the real worktree path.** The template placeholder `feat-<name>` must be replaced with the actual branch name (e.g., `feat-admin-polish`). If you send the placeholder, the subagent will write to `main/` instead of the branch.
+
+**Architect MUST verify before dispatch:**
+```bash
+# Check that worktree exists and path is correct
+ls /root/workspace/memo/.worktrees/<actual-branch-name>/
+```
 
 **Always pass `## Working Directory` to ALL subagents** (implementer AND reviewers):
 

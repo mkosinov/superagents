@@ -1,0 +1,7 @@
+# Worktrees (per using-git-worktrees skill)
+.worktrees/
+worktrees/
+
+# Python
+__pycache__/
+*.pyc
