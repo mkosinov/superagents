@@ -99,21 +99,51 @@ Concept      Spec        Plan         Worktree    Development      Finish
 
 ## Reflection Mode
 
-A self-analysis layer for the SuperAgents workflow. Reads `opencode.db` (read-only) to audit compliance against 17 checks mapped to the 8 Key Principles, then generates actionable improvement proposals as filesystem diffs (human-in-the-loop by default — user reviews before applying).
+Self-analysis tool for the SuperAgents workflow. Reads `opencode.db` (read-only), runs 16 compliance checks (mapped to the 8 Key Principles), and produces human-approved improvement proposals as markdown files.
 
-**Location:** [`skills/reflect/`](skills/reflect/)<br>
-**CLI wrapper:** `skills/reflect/scripts/reflect.sh` (modes: `post-mortem`, `wave`, `nightly`, `status`)
+### How to run
 
-**Trigger modes:**
-| Mode | When | Who |
-|------|------|-----|
-| **Bug-driven** | Before fixing a bug | Architect (manual) |
-| **Wave-driven** | End of a development wave | Architect or command |
-| **Time-driven** | Nightly cron | `0 3 * * *` (install with `install-cron.sh`) |
+**Slash command (easiest)** — type in opencode:
+```
+/reflect
+/reflect websearch was failing all day
+```
+Optional text after `/reflect` = "what user noticed as wrong/strange", passed to the analysis as context.
 
-Key concepts: closing-the-loop (tracks if applied proposals prevent recurrence), quality scoring (heuristic + LLM for skills/agents), and auto skill generation (detects patterns suggesting new skills).
+**CLI** — `skills/reflect/scripts/reflect.sh`:
 
-See the [specification](docs/specs/2026-06-19-reflection-mode-design.md) for detailed design, and [`docs/architecture/reflection-mode.md`](docs/architecture/reflection-mode.md) for architecture overview.
+| Mode | Command | Use when |
+|------|---------|----------|
+| `post-mortem` | `reflect.sh post-mortem --target=path/to/file` | Before fixing a bug — investigate the workflow that produced it |
+| `wave` | `reflect.sh wave --name="Wave 4.5"` | After a wave — compliance + quality report |
+| `in_session` | `reflect.sh in_session --session=ses_xxx` | Analyze current session + all subagents |
+| `nightly` | `reflect.sh nightly --days=7` | Last N days digest (run from cron) |
+| `status` | `reflect.sh status` | Health summary (proposal counts, adoption rate) |
+
+**Auto-triggers:**
+- **Nightly cron** (host): `0 3 * * *` → `reflect.sh nightly --days=7` → telegram on critical. Install with `bash ~/.config/opencode/scripts/install-host-cron.sh`.
+- **Post-wave** (in `finishing-a-development-branch` skill): suggests running `reflect.sh wave` after merge or PR.
+
+### Where the output lives
+
+```
+~/.config/opencode/reflection/
+├── reports/      # Human-readable analysis (markdown)
+├── proposals/    # Pending improvement proposals
+├── decisions/    # Applied/rejected history (audit trail)
+└── state.json    # Last-run cursors
+```
+
+**Apply a proposal** → read the `.md` in `proposals/`, decide. On decision (apply/reject), the file moves to `decisions/`.
+
+### LLM
+
+Uses `opencode-go/deepseek-v4-flash` (1M context, MIT license, $0.09/M input). No additional config needed.
+
+### More info
+
+- Spec: [`docs/specs/2026-06-19-reflection-mode-design.md`](docs/specs/2026-06-19-reflection-mode-design.md)
+- Architecture: [`docs/architecture/reflection-mode.md`](docs/architecture/reflection-mode.md)
 
 ## Token Economy
 
