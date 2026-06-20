@@ -168,6 +168,25 @@ Then: Cleanup worktree (Step 6), then force-delete branch:
 git branch -D <feature-branch>
 ```
 
+### Step 5.5: Suggest Post-Wave Reflection (Options 1 and 2 only)
+
+After the wave is merged locally (Option 1) or PR is created (Option 2), **suggest to user** running reflection analysis. This is not auto-run — human decides.
+
+```bash
+# Extract wave name from branch (e.g., "Wave 4.5" from "Wave 4.5 старт" or PR title)
+WAVE_NAME=$(git log -1 --format='%s' | grep -oE 'Wave [0-9.]+' | head -1)
+[ -z "$WAVE_NAME" ] && WAVE_NAME="<ask user>"
+
+# Suggest to user:
+echo "Wave complete. Recommended next step:"
+echo "  reflect.sh wave --name=\"$WAVE_NAME\""
+echo "Or run /reflect in the next session for in-session analysis."
+```
+
+**Why not auto-run:** Retrospection principle. Reflection after the fact is more useful than pre-block. User reviews proposals at their own pace.
+
+**For Option 2 (PR):** Suggestion is forward-looking — when the PR is merged, run `/reflect` or `reflect.sh wave`. Don't run it now (wave isn't on main yet).
+
 ### Step 6: Cleanup Workspace
 
 **Only runs for Options 1 and 4.** Options 2 and 3 always preserve the worktree.
