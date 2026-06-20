@@ -9,8 +9,8 @@ from .workflow_checks import ALL_CHECKS
 from .config import load_config
 from .quality_scoring import score_agents, score_skills
 from .metrics import compute_proposal_metrics, compute_compliance_trend
-from .analyze import fill_template, format_violations_with_context
-from .post_mortem import _violations_to_proposals
+from .analyze import fill_template, format_violations_with_context, batch_violations_to_proposals, generate_proposal_id
+from .proposals import create_proposal
 from .notify import notify_telegram
 
 REFLECT_HOME = Path.home() / ".config" / "opencode" / "reflection"
@@ -113,9 +113,27 @@ def run_nightly(args: argparse.Namespace) -> int:
     
     # Build report
     today = datetime.now()
-    proposal_ids = _violations_to_proposals(
-        all_violations, config, base_dir, today,
-    )
+    proposal_specs = batch_violations_to_proposals(all_violations, config)
+    proposal_ids = []
+    for i, spec in enumerate(proposal_specs):
+        pid = generate_proposal_id(today, i + 1)
+        v = all_violations[i] if i < len(all_violations) else None
+        eligible = (
+            v and v.severity == "info"
+            and config.auto_apply.enabled
+        )
+        create_proposal(
+            base_dir=base_dir,
+            proposal_id=pid,
+            title=spec.get("title", "(batch)"),
+            severity=v.severity if v else "info",
+            confidence=0.7,
+            target=spec.get("target", "unknown"),
+            rationale=spec.get("rationale", ""),
+            diff=spec.get("diff", ""),
+            auto_apply_eligible=eligible,
+        )
+        proposal_ids.append(pid)
     proposals_section = (
         "\n".join(f"- {pid}" for pid in proposal_ids) or "_No proposals._"
     )
