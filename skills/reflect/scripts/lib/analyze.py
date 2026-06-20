@@ -118,3 +118,82 @@ Respond with JSON: {{"title": "...", "target": "path/to/file", "rationale": "...
         "rationale": violation.message,
         "diff": "",
     }
+
+
+# ===== Batched LLM integration =====
+
+MAX_BATCH = 30
+
+
+def batch_violations_to_proposals(
+    violations: list,
+    config: "ReflectConfig",
+) -> list[dict]:
+    """Generate proposals for multiple violations in ONE LLM call.
+
+    Replaces N sequential subprocess calls with 1 batched call.
+    Falls back to heuristic if LLM fails or returns invalid JSON.
+    """
+    if not violations:
+        return []
+
+    # Sort by priority (critical > warning > info), then cap to MAX_BATCH
+    sev_order = {"critical": 0, "warning": 1, "info": 2}
+    sorted_violations = sorted(violations, key=lambda v: sev_order.get(v.severity, 3))
+    capped = sorted_violations[:MAX_BATCH]
+
+    # Build batched prompt
+    violations_text = "\n\n".join(
+        f"### Violation {i+1}\n"
+        f"check: {v.check_name}\n"
+        f"severity: {v.severity}\n"
+        f"title: {v.title}\n"
+        f"message: {v.message}\n"
+        f"context: {v.context}"
+        for i, v in enumerate(capped)
+    )
+    prompt = f"""You are a workflow analyst. Given {len(capped)} workflow violations, generate a concrete proposal for each.
+
+For EACH violation, respond with one JSON object: {{"index": N, "title": "...", "target": "path/to/file", "rationale": "...", "diff": "..."}}
+Output a JSON array of {len(capped)} objects, in order. No other text.
+
+{violations_text}
+"""
+
+    response = call_llm(prompt, config, model="omniroute/flash")
+
+    # Parse JSON array from response
+    try:
+        start = response.find("[")
+        end = response.rfind("]")
+        if start != -1 and end != -1:
+            parsed = json.loads(response[start:end + 1])
+            # Match by index
+            results = [None] * len(capped)
+            for item in parsed:
+                idx = item.get("index", 0) - 1
+                if 0 <= idx < len(capped):
+                    results[idx] = item
+            # Fallback for any missing
+            for i, v in enumerate(capped):
+                if results[i] is None:
+                    results[i] = {
+                        "title": v.title,
+                        "target": "",
+                        "rationale": v.message,
+                        "diff": "",
+                    }
+            return results
+    except (json.JSONDecodeError, KeyError, IndexError):
+        pass
+
+    # Heuristic fallback: 1 proposal per violation, no LLM
+    return [
+        {
+            "title": v.title,
+            "target": "",
+            "rationale": v.message,
+            "diff": "",
+        }
+        for v in capped
+    ]

@@ -25,7 +25,7 @@ from .closing_the_loop import find_related_decisions
 from .analyze import (
     fill_template,
     format_violations_with_context,
-    generate_proposal_with_llm,
+    batch_violations_to_proposals,
     generate_proposal_id,
 )
 from .proposals import create_proposal
@@ -65,33 +65,30 @@ def _violations_to_proposals(
     date: datetime,
     seq_start: int = 1,
 ) -> list[str]:
-    """Convert violations to proposal IDs."""
-    proposals = []
-    seq = seq_start
-    for v in violations:
-        llm_result = generate_proposal_with_llm(
-            violation=v, template_str="", config=config,
-        )
-        pid = generate_proposal_id(date=date, seq=seq)
+    """Convert violations to proposal IDs using batched LLM call."""
+    violation_list = list(violations)
+    proposal_specs = batch_violations_to_proposals(violation_list, config)
+    proposal_ids = []
+    for i, spec in enumerate(proposal_specs):
+        pid = generate_proposal_id(date=date, seq=seq_start + i)
+        v = violation_list[i] if i < len(violation_list) else None
         eligible = (
-            v.severity == "info"
-            and llm_result.get("confidence", 0) >= config.auto_apply.max_confidence
+            v and v.severity == "info"
             and config.auto_apply.enabled
         )
         create_proposal(
             base_dir=base_dir,
             proposal_id=pid,
-            title=llm_result.get("title", v.title),
-            severity=v.severity,
+            title=spec.get("title", "(batch)"),
+            severity=v.severity if v else "info",
             confidence=0.7,
-            target=llm_result.get("target", "unknown"),
-            rationale=llm_result.get("rationale", v.message),
-            diff=llm_result.get("diff", ""),
+            target=spec.get("target", "unknown"),
+            rationale=spec.get("rationale", ""),
+            diff=spec.get("diff", ""),
             auto_apply_eligible=eligible,
         )
-        proposals.append(pid)
-        seq += 1
-    return proposals
+        proposal_ids.append(pid)
+    return proposal_ids
 
 
 def run_post_mortem(args: argparse.Namespace) -> int:
