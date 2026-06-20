@@ -70,7 +70,7 @@ def generate_proposal_id(date: datetime, seq: int) -> str:
 def call_llm(
     prompt: str,
     config: ReflectConfig,
-    model: str = "omniroute/flash",
+    model: str = "opencode-go/deepseek-v4-flash",
 ) -> str:
     """Call opencode via subprocess to run LLM."""
     safe_prompt = redact_secrets(prompt)
@@ -160,7 +160,7 @@ Output a JSON array of {len(capped)} objects, in order. No other text.
 {violations_text}
 """
 
-    response = call_llm(prompt, config, model="omniroute/flash")
+    response = call_llm(prompt, config, model="opencode-go/deepseek-v4-flash")
 
     # Parse JSON array from response
     try:
