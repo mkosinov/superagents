@@ -20,6 +20,11 @@ def main() -> int:
     wv = sub.add_parser("wave", help="Wave-driven report")
     wv.add_argument("--name", required=True, help='Wave name, e.g. "Wave 4.5"')
 
+    # in_session
+    is_ = sub.add_parser("in_session", help="In-session reflection")
+    is_.add_argument("--session", required=True, help="Session ID to analyze")
+    is_.add_argument("--notes", default="", help="User notes about what to focus on")
+
     # nightly
     nt = sub.add_parser("nightly", help="Time-driven nightly digest")
     nt.add_argument("--days", type=int, default=7)
@@ -35,6 +40,9 @@ def main() -> int:
     elif args.mode == "wave":
         from .wave_report import run_wave_report
         return run_wave_report(args)
+    elif args.mode == "in_session":
+        from .in_session import run_in_session
+        return run_in_session(args)
     elif args.mode == "nightly":
         from .nightly import run_nightly
         return run_nightly(args)
