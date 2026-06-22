@@ -53,6 +53,7 @@ superagents/
 │   ├── finishing-a-development-branch/
 │   ├── using-skills/
 │   ├── systematic-debugging/
+│   ├── fast-track-protocol/ # Lightweight code-only protocol (no spec/plan) for post-merge polish
 │   └── reflect/
 ├── templates/               # Reviewer prompt templates
 │   └── reviewers/
