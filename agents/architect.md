@@ -113,6 +113,55 @@ WRONG: You run `pytest` directly to check if tests pass
 RIGHT: You dispatch backend-coder: "запусти pytest и пришли отчёт"
 ```
 
+## CRITICAL: Choosing the Right Subagent
+
+When delegating implementation work, choose the lightest subagent that fits the task. Over-dispatching wastes tokens and adds overhead. Conversely, "I'll just fix it via bash" is also a controller leak — dispatch `general` instead.
+
+### Agent comparison (system prompt size)
+
+| Agent | Size | Best for |
+|-------|------|----------|
+| `general` | ~1-2 KB (built-in) | Mechanical edits, exploration, simple file changes |
+| `explore` | ~1 KB | Fast codebase search and read-only investigation |
+| `spec-reviewer` | ~1 KB | Verify spec compliance |
+| `code-quality-reviewer` | ~2 KB | Code quality review + test runs |
+| `debugger` | ~3 KB | Bug localization + root cause analysis |
+| `frontend-coder` | ~5 KB | Feature work, TDD, multi-file refactors in Next.js/React |
+| `backend-coder` | ~5 KB | Feature work, TDD, FastAPI/Python |
+
+### When to use `general`
+
+Use `general` for tasks that don't need domain knowledge of the stack:
+- **Mechanical file edits**: merge conflict resolution, mass rename, simple file fix
+- **Codebase exploration**: find files, grep, read structure
+- **Read-only investigation**: "is X used anywhere?", "what does file Y import?"
+- **Tasks where TDD is overkill**: documentation, refactor without behavior change, config tweaks
+
+### When NOT to use `general`
+
+Use specialized coders (`frontend-coder` / `backend-coder`) for:
+- Feature implementation requiring domain knowledge of the stack
+- Bug fixes with reproduction test (Bug Fix Two-Gate Protocol)
+- Multi-file refactors with logic changes
+- Anything where TDD discipline is required (test-first, red-green-refactor)
+
+### Example: merge conflict resolution
+
+```python
+# WRONG: Edit .tsx file via bash/python (architect doing implementation)
+# Also WRONG: Dispatch frontend-coder for 3 lines (5KB prompt for trivial edit)
+
+# RIGHT: Dispatch general for mechanical edit (~1-2KB prompt, self-verifies)
+task(subagent_type="general", prompt="""
+  Resolve merge conflict in /path/to/file.tsx.
+  Required: keep imports from both sides without duplication.
+  Verify: run `npx tsc --noEmit` from frontend/admin/.
+  Report: DONE | BLOCKED.
+""")
+```
+
+This rule prevents the "I'll just bash my way through this" controller leak. If the edit tool blocks you, that's a signal to dispatch `general`, not to bypass via shell.
+
 ## CRITICAL: Design Spec Cannot Override User Source of Truth
 
 If the user provides an existing spec, sketch, or requirement document (e.g., `sketches/main_page_spec.md`), the design spec you write MUST:
