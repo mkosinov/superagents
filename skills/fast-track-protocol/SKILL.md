@@ -40,9 +40,9 @@ The protocol uses three slash commands. They are **explicit, not legacy**:
 
 | Command | Effect |
 |---------|--------|
-| `/fasTP_start <description>` | Begin a FasTP session with explicit description. Equivalent to a chat fix request. |
-| `/fasTP_end` | End Phase 1, transition to Phase 2 (full procedural package). Equivalent to "коммитим" / "let's ship". |
-| `/fasTP_save` | Persist current todowwrite to scratchpad or GH issues (see "State Persistence" below). Triggered manually before session end or when user wants a checkpoint. |
+| `/fastp_start <description>` | Begin a FasTP session with explicit description. Equivalent to a chat fix request. |
+| `/fastp_end` | End Phase 1, transition to Phase 2 (full procedural package). Equivalent to "коммитим" / "let's ship". |
+| `/fastp_save` | Persist current todowwrite to scratchpad or GH issues (see "State Persistence" below). Triggered manually before session end or when user wants a checkpoint. |
 
 **Without slash commands**, the user submits fix requests **directly in chat**. Each request is a single FasTP fix.
 
@@ -52,7 +52,7 @@ User: "Fix the label alignment in the client header (mb-2 → mb-1)"
 User: [screenshot] "the date picker overlaps the calendar icon on mobile"
 ```
 
-**End of Phase 1:** when the user signals wrap-up ("коммитим", "let's commit", "Phase 2", "let's ship", or `/fasTP_end`), the architect transitions to Phase 2 (the full procedural package).
+**End of Phase 1:** when the user signals wrap-up ("коммитим", "let's commit", "Phase 2", "let's ship", or `/fastp_end`), the architect transitions to Phase 2 (the full procedural package).
 
 ---
 
@@ -61,7 +61,7 @@ User: [screenshot] "the date picker overlaps the calendar icon on mobile"
 The Architect (`@architect`) is the **orchestrator**. The user is in the loop for visual verification (default, MITL mode) or out of the loop (autonomous mode — see below).
 
 ```
-1. User writes fix request in chat (or via /fasTP_start)
+1. User writes fix request in chat (or via /fastp_start)
         ↓
 2. Architect runs Task Lifecycle (see below):
    - NEW task → dedup against todowwrite → add to todowwrite (status: pending)
@@ -84,7 +84,7 @@ The Architect (`@architect`) is the **orchestrator**. The user is in the loop fo
         ↓
 8. If issues found → re-dispatch coder → loop (max 3 fix iterations)
         ↓
-9. At `/fasTP_end` or user signal: Phase 2 (full procedural package)
+9. At `/fastp_end` or user signal: Phase 2 (full procedural package)
 ```
 
 ### Why TodoWrite?
@@ -95,7 +95,7 @@ User wants to see at a glance:
 - What was completed and awaits user verification (`completed` — flagged in chat)
 - What's blocked or needs decision (`pending` with comment)
 
-**todowwrite is the only in-session task tracker** in FasTP. It must be updated after every step — user is always watching todowwrite in the opencode UI. For **cross-session persistence**, use `/fasTP_save` (see "State Persistence" below).
+**todowwrite is the only in-session task tracker** in FasTP. It must be updated after every step — user is always watching todowwrite in the opencode UI. For **cross-session persistence**, use `/fastp_save` (see "State Persistence" below).
 
 ### Task Lifecycle
 
@@ -141,7 +141,7 @@ For **every** user message, apply this algorithm before responding substantively
    - Add to existing task's scope OR create new entry — decide and tell user
 ```
 
-**Note:** FasTP uses todowwrite as the SOLE in-session task tracker. There is no scratchpad mirror, no GH-issues search, no META-INSTRUCTION classification. For cross-session persistence, use `/fasTP_save` (see "State Persistence" below).
+**Note:** FasTP uses todowwrite as the SOLE in-session task tracker. There is no scratchpad mirror, no GH-issues search, no META-INSTRUCTION classification. For cross-session persistence, use `/fastp_save` (see "State Persistence" below).
 
 ### Brief Report Format
 
@@ -169,7 +169,7 @@ User responds with one of:
 
 ### State Persistence (cross-session)
 
-`/fasTP_save` checkpoints the current todowwrite so work can resume in a future session. The architect MUST ask the user where to save before writing:
+`/fastp_save` checkpoints the current todowwrite so work can resume in a future session. The architect MUST ask the user where to save before writing:
 
 ```
 Architect: "Where to save current todowwrite?
@@ -193,9 +193,9 @@ User: [choice]
 **Why:** todowrite is per-session (UI element). Scratchpad and GH issues are durable. The save command bridges ephemeral and persistent state.
 
 **When to trigger:**
-- Before `/fasTP_end` (Phase 1 wrap-up)
+- Before `/fastp_end` (Phase 1 wrap-up)
 - Manually when user wants a checkpoint mid-session
-- When user types `/fasTP_save`, "сохрани статус", "save session", "save fasTP"
+- When user types `/fastp_save`, "сохрани статус", "save session", "save fasTP"
 
 ---
 
@@ -250,7 +250,7 @@ Multiple fixes can be issued sequentially or in parallel if edits are independen
 
 ## Phase 2: Procedural
 
-Phase 2 is triggered when the user signals wrap-up ("коммитим", "Phase 2", "let's ship", `/fasTP_end`). The architect runs the complete procedural package:
+Phase 2 is triggered when the user signals wrap-up ("коммитим", "Phase 2", "let's ship", `/fastp_end`). The architect runs the complete procedural package:
 
 1. **Visual verification final pass** (whole branch, all changes since last Phase 2)
 2. `code-quality-reviewer` — review the final code
@@ -439,7 +439,7 @@ The architect records this in chat and uses it as the basis for the next dispatc
   8. Coder reports DONE
   9. Brief report + User Verification Report → user says "ok"
  10. On user OK → mark todowrite completed + WIP commit
- 11. Wait for next fix OR /fasTP_end (Phase 2)
+ 11. Wait for next fix OR /fastp_end (Phase 2)
 ```
 
 ## Example Session (Autonomous mode)
@@ -490,8 +490,8 @@ A single source of truth for what is and isn't allowed in Phase 1.
 - **Mark `Mode: autonomous | mitl`** in scratchpad at session start
 - **Track open subagent sessions** in scratchpad for reuse
 - **Wait for user OK** before marking `completed` or making WIP commits
-- **Use `/fasTP_save`** to checkpoint state when user wants a snapshot
-- **Transition to Phase 2** when the user signals wrap-up (`/fasTP_end` or chat equivalent)
+- **Use `/fastp_save`** to checkpoint state when user wants a snapshot
+- **Transition to Phase 2** when the user signals wrap-up (`/fastp_end` or chat equivalent)
 
 ---
 
