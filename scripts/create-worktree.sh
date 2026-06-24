@@ -52,23 +52,37 @@ if [ -f ".env.local" ]; then
   echo "Copied .env.local"
 fi
 
-# Symlink root node_modules if exists
-if [ -d "node_modules" ]; then
-  ln -s "$(pwd)/node_modules" "$WORKTREE_DIR/node_modules"
-fi
+# node_modules setup
+#
+# Strategy: all-or-nothing.
+#   - If EVERY source node_modules is valid (real dir or valid symlink to dir),
+#     symlink them into the worktree. Fast (no install).
+#   - If ANY source is missing or a broken symlink, do a fresh `pnpm install`
+#     in the worktree. Slower (20-30s) but guaranteed-correct.
+#
+# Why all-or-nothing: a partial symlink set + pnpm install would either
+# (a) cause pnpm to misinterpret the symlinked dirs and rewrite them, or
+# (b) leave the worktree in a hybrid state that's hard to debug. Better
+# to pick one path and commit.
+#
+# Why this matters: a broken self-referential symlink (e.g.
+#   /root/workspace/<project>/node_modules -> /root/workspace/<project>/node_modules)
+# would cause pnpm to ELOOP on any operation in the worktree if propagated.
+# Instead, the script detects the broken state and self-heals via pnpm install.
 
-# Symlink every workspace's node_modules (not just root).
-# pnpm 11 checks per-workspace deps status; missing workspace node_modules
-# causes runDepsStatusCheck to prompt for TTY confirmation, which fails
-# in non-interactive environments (CI, dev.sh background).
+# Check whether every source node_modules is usable.
+# [ -d ] follows symlinks: TRUE for real dir, TRUE for valid symlink→dir,
+# FALSE for broken symlink (target missing) and missing path.
+SOURCE_NEEDS_INSTALL=false
+if [ ! -d "node_modules" ]; then
+  echo "⚠ Root node_modules missing or broken in source"
+  SOURCE_NEEDS_INSTALL=true
+fi
 while IFS= read -r pkg_dir; do
-  # pkg_dir is relative to source repo root
-  if [ -d "$pkg_dir/node_modules" ]; then
-    # Compute path relative to source root, replicate in worktree
-    src_nm="$pkg_dir/node_modules"
-    dest_dir="$WORKTREE_DIR/$pkg_dir"
-    mkdir -p "$dest_dir"
-    ln -s "$(pwd)/$src_nm" "$dest_dir/node_modules"
+  if [ ! -d "$pkg_dir/node_modules" ]; then
+    pkg_name="$(basename "$pkg_dir")"
+    echo "⚠ $pkg_name/node_modules missing or broken in source"
+    SOURCE_NEEDS_INSTALL=true
   fi
 done < <(find . -name "package.json" \
             -not -path "./node_modules/*" \
@@ -76,6 +90,37 @@ done < <(find . -name "package.json" \
             -not -path "*/.next/*" \
             -not -path "*/.worktrees/*" \
             -exec dirname {} \;)
+
+if [ "$SOURCE_NEEDS_INSTALL" = true ]; then
+  # Self-heal: run pnpm install inside the worktree (don't touch source —
+  # other worktrees may be using it).
+  echo ""
+  echo "→ Source node_modules incomplete; running 'pnpm install' in worktree to self-heal..."
+  if ! (cd "$WORKTREE_DIR" && pnpm install --prefer-offline); then
+    echo "❌ pnpm install failed in worktree. Worktree is in a partial state."
+    echo "   Manual fix:  cd $WORKTREE_DIR && pnpm install"
+    exit 1
+  fi
+  echo "✓ pnpm install succeeded — worktree node_modules repaired"
+else
+  # All sources are valid — symlink everything (fast path).
+  ln -s "$(pwd)/node_modules" "$WORKTREE_DIR/node_modules"
+  echo "Symlinked root node_modules"
+  while IFS= read -r pkg_dir; do
+    # pnpm 11 checks per-workspace deps status; missing workspace node_modules
+    # causes runDepsStatusCheck to prompt for TTY confirmation, which fails
+    # in non-interactive environments (CI, dev.sh background).
+    src_nm="$pkg_dir/node_modules"
+    dest_dir="$WORKTREE_DIR/$pkg_dir"
+    mkdir -p "$dest_dir"
+    ln -s "$(pwd)/$src_nm" "$dest_dir/node_modules"
+  done < <(find . -name "package.json" \
+              -not -path "./node_modules/*" \
+              -not -path "*/node_modules/*" \
+              -not -path "*/.next/*" \
+              -not -path "*/.worktrees/*" \
+              -exec dirname {} \;)
+fi
 
 # Create venv and install Python deps if Python project detected
 cd "$WORKTREE_DIR"
