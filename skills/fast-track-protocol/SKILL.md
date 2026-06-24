@@ -180,22 +180,51 @@ Architect: "Where to save current todowwrite?
 User: [choice]
 ```
 
-**Format saved per task** (regardless of destination):
+**Format saved per task** (regardless of destination) — scratchpad form uses a `## FasTP-saved items` heading so the next session can find and consume the block:
 
 ```markdown
+## FasTP-saved items
+
 - [status] [task title]
   - Agent: [current subagent type, e.g. frontend-coder]
   - Context: [brief description of the fix / what was happening]
   - Files: [list of files touched so far]
   - Resume instructions: [what to do in next session to pick this up]
+- [status] [next task title]
+  - ...
 ```
 
-**Why:** todowrite is per-session (UI element). Scratchpad and GH issues are durable. The save command bridges ephemeral and persistent state.
+The `## FasTP-saved items` heading is the marker `/fastp_start` looks for on session start to auto-load items back into todowrite — see "Auto-load saved items on session start" below.
+
+**Why:** todowrite is per-session (UI element). Scratchpad and GH issues are durable. The save command bridges ephemeral and persistent state; the next session's `fastp_start` consumes that bridge back into todowrite.
 
 **When to trigger:**
 - Before `/fastp_end` (Phase 1 wrap-up)
 - Manually when user wants a checkpoint mid-session
 - When user types `/fastp_save`, "сохрани статус", "save session", "save fasTP"
+
+### Auto-load saved items on session start
+
+When a FasTP session begins — via `/fastp_start <description>` or the chat equivalent ("let's start fastp", "начнём fastp", "begin fasTP session") — the architect MUST first check `.opencode/scratchpad.md` for previously saved items and load them back into todowrite before processing the new request.
+
+**Procedure:**
+
+```
+1. Read .opencode/scratchpad.md in the current project.
+2. Locate the `## FasTP-saved items` section (written by /fastp_save).
+3. For each saved item, run Task Lifecycle dedup against current todowrite:
+   - DUPLICATE → skip (already in todowrite, e.g. resumed in same session)
+   - NEW → add to todowrite, preserving the saved status verbatim:
+       - [pending]     → add as `pending`
+       - [in_progress] → add as `in_progress` (resume the active work)
+       - [completed]   → add as `completed` (do NOT re-dispatch)
+4. Remove the loaded `## FasTP-saved items` section from scratchpad
+   (consume, not copy). If load fails partway, leave the block intact
+   and notify the user.
+5. Announce: "Loaded N items from scratchpad: [list with statuses]"
+```
+
+**Why consume (not copy):** scratchpad is durable cross-session storage; todowrite is ephemeral in-session. After load, the saved block has been fully migrated to todowrite and is no longer needed in scratchpad. Keeping a copy would invite double-counting on the next load.
 
 ---
 
@@ -481,6 +510,8 @@ A single source of truth for what is and isn't allowed in Phase 1.
 - **Cold-start browserMCP** when a verifier session already has the browser context
 - **Auto-mark todowrite completed** without user OK
 - **Edit this protocol doc** without first showing the plan and getting user approval — meta-documents need approval before changes
+- **Load saved items from scratchpad without preserving the saved status** — losing `in_progress` mid-task breaks the architect's mental model of which fix is active
+- **Keep a copy of loaded items in scratchpad after a successful load** — scratchpad is durable storage, not a mirror of todowrite
 
 ### Always
 
@@ -492,6 +523,7 @@ A single source of truth for what is and isn't allowed in Phase 1.
 - **Wait for user OK** before marking `completed` or making WIP commits
 - **Use `/fastp_save`** to checkpoint state when user wants a snapshot
 - **Transition to Phase 2** when the user signals wrap-up (`/fastp_end` or chat equivalent)
+- **Run the auto-load check** when starting a FasTP session (`/fastp_start` or chat equivalent) — saved items in scratchpad must be loaded into todowrite and removed from scratchpad before processing the new request
 
 ---
 
