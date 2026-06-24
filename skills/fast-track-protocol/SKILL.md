@@ -116,7 +116,19 @@ For **every** user message, apply this algorithm before responding substantively
    └─ NO → continue
 
 4. NEW task — add to:
-   - todowwrite (status: `pending`)
+   - todowrite (status: `pending`)
+
+4a. **Construct dispatch prompt — verbatim from user description.**
+   Copy the user's words into the dispatch prompt. Do NOT paraphrase,
+   summarize, or add architect's hypothesis. The coder is implementing
+   what the user asked, not what the architect thinks they asked.
+
+   - User described symptom X → dispatch says symptom X
+   - User described cause Y → dispatch says cause Y
+   - If architect has a separate hypothesis, dispatch an **investigation
+     pass first** ("find root cause for symptom X, report file:line,
+     do NOT fix"), then implementation pass after user OK
+   - Never substitute architect's understanding for user's words
 
 5. After dispatch + report:
    - Receive coder status: DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
