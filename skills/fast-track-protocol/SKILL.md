@@ -30,9 +30,9 @@ A lightweight protocol for making small code edits **without** the full SuperAge
 - New features requiring user research
 - Breaking API changes
 - Anything needing real-time product decisions
-- Backend schema or migration changes (use full protocol)
+- Backend schema or migration changes — **including scope that emerges mid-fix, not just at session start** (use full protocol)
 
-If a request starts as a FasTP fix and grows into a feature, **escalate out of FasTP** — return to the standard workflow (brainstorming → plan → worktree → subagent loop).
+If a request starts as a FasTP fix and grows into a feature, **escalate out of FasTP** — return to the standard workflow (brainstorming → plan → worktree → subagent loop). The same rule applies if the scope grows **mid-fix** — see "Scope-change protocol" below.
 
 ## How to invoke
 
@@ -224,7 +224,17 @@ When a FasTP session begins — via `/fastp_start <description>` or the chat equ
 5. Announce: "Loaded N items from scratchpad: [list with statuses]"
 ```
 
-**Why consume (not copy):** scratchpad is durable cross-session storage; todowrite is ephemeral in-session. After load, the saved block has been fully migrated to todowrite and is no longer needed in scratchpad. Keeping a copy would invite double-counting on the next load.
+**Why consume (not copy):** scratchpad is durable cross-session storage; todowrite is ephemeral in-session. After load, the saved block has been fully migrated to todowwrite and is no longer needed in scratchpad. Keeping a copy would invite double-counting on the next load.
+
+### Scope-change protocol
+
+If during Phase 1 the architect realizes a fix is touching a data contract, schema, ORM model, migration, or new architectural pattern that wasn't anticipated at `fastp_start` time:
+
+- **Pause the current dispatch** (let any in-flight coder finish their current step, but don't approve their commit)
+- **Brief the user** with: (a) what grew, (b) why standard workflow is now safer, (c) options (escalate fully / hybrid + tests / accept gap with Phase 2 dependency)
+- **Wait for the user's choice** before proceeding
+
+The original FasTP dispatch becomes a "first draft" that gets reviewed under the standard workflow. This is not a regression — it's an explicit escalation rule that prevents scope creep from silently bypassing tests and reviews.
 
 ---
 
@@ -512,6 +522,7 @@ A single source of truth for what is and isn't allowed in Phase 1.
 - **Edit this protocol doc** without first showing the plan and getting user approval — meta-documents need approval before changes
 - **Load saved items from scratchpad without preserving the saved status** — losing `in_progress` mid-task breaks the architect's mental model of which fix is active
 - **Keep a copy of loaded items in scratchpad after a successful load** — scratchpad is durable storage, not a mirror of todowrite
+- **Continue FasTP when a fix's scope expands** to backend schema/model/migration changes, breaking API changes, or new architectural patterns — even if the user said "just fix it". **Escalate to standard workflow** (brainstorming → spec → plan → TDD → reviews → docs). The original FasTP dispatch becomes a "first draft" that gets reviewed.
 
 ### Always
 
@@ -524,6 +535,7 @@ A single source of truth for what is and isn't allowed in Phase 1.
 - **Use `/fastp_save`** to checkpoint state when user wants a snapshot
 - **Transition to Phase 2** when the user signals wrap-up (`/fastp_end` or chat equivalent)
 - **Run the auto-load check** when starting a FasTP session (`/fastp_start` or chat equivalent) — saved items in scratchpad must be loaded into todowrite and removed from scratchpad before processing the new request
+- **Notice and call out scope growth** during a FasTP fix. Present the user with a brief options table (escalate / hybrid / accept gap) and let them choose. Do NOT silently expand scope.
 
 ---
 
