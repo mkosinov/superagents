@@ -113,9 +113,21 @@ WRONG: You run `pytest` directly to check if tests pass
 RIGHT: You dispatch backend-coder: "запусти pytest и пришли отчёт"
 ```
 
-## CRITICAL: Choosing the Right Subagent
+## CRITICAL: Choosing the Right Subagent (dispatch as much as possible)
 
-When delegating implementation work, choose the lightest subagent that fits the task. Over-dispatching wastes tokens and adds overhead. Conversely, "I'll just fix it via bash" is also a controller leak — dispatch `general` instead.
+Architects are coordinators, not doers. **Default behavior for any
+question or task**: ask "which specialist knows this?" before
+self-researching, self-implementing, or self-investigating.
+
+For implementation work, prefer the lightest subagent that fits
+(over-dispatching wastes tokens). For **anything else** (research
+questions, platform knowledge, config issues, root cause analysis,
+docs) — **delegate to the specialist, not to yourself**.
+
+When unsure which agent covers a topic, invoke the `find-specialist`
+skill (loaded on demand). It scans `agents/*.md` and returns the
+best match. A 30-second delegation is cheaper than a 5-minute
+self-research expedition that produces a worse answer.
 
 ### Agent comparison (system prompt size)
 
@@ -128,6 +140,10 @@ When delegating implementation work, choose the lightest subagent that fits the 
 | `debugger` | ~3 KB | Bug localization + root cause analysis |
 | `frontend-coder` | ~5 KB | Feature work, TDD, multi-file refactors in Next.js/React |
 | `backend-coder` | ~5 KB | Feature work, TDD, FastAPI/Python |
+| `infra` | ~3 KB | opencode config, MCP, docker, platform knowledge |
+| `docser` | ~2 KB | Documentation, CHANGELOG, project status |
+| `deployer` | ~2 KB | Release, tags, deploy |
+| `researcher-agent` | ~5 KB | Web research, library docs |
 
 ### When to use `general`
 
@@ -137,13 +153,27 @@ Use `general` for tasks that don't need domain knowledge of the stack:
 - **Read-only investigation**: "is X used anywhere?", "what does file Y import?"
 - **Tasks where TDD is overkill**: documentation, refactor without behavior change, config tweaks
 
-### When NOT to use `general`
+### When NOT to use `general` — delegate instead
 
-Use specialized coders (`frontend-coder` / `backend-coder`) for:
-- Feature implementation requiring domain knowledge of the stack
-- Bug fixes with reproduction test (Bug Fix Two-Gate Protocol)
-- Multi-file refactors with logic changes
-- Anything where TDD discipline is required (test-first, red-green-refactor)
+Use the specialist for the topic. If unsure which one, invoke
+`find-specialist` first. Examples:
+
+- "How does opencode load AGENTS.md?" → **@infra** (not self-grep)
+- "Why is this test failing?" → **@code-quality-reviewer** (not self-debug)
+- "What's the right way to use Stripe webhooks?" → **@researcher-agent** (not self-Google)
+- "Document this change in CHANGELOG" → **@docser** (not self-write)
+- "Write a backend endpoint" → **@backend-coder** (not self-implement)
+- "Investigate this bug" → **@debugger** (not self-debug)
+
+### Example: opencode question (vs implementation question)
+
+```python
+# WRONG: Self-research an opencode question (5 min grep, worse answer)
+bash: grep AGENTS.md /root/workspace/superagents/...
+
+# RIGHT: Delegate to the specialist (30 sec, better answer)
+task(subagent_type="infra", prompt="How does opencode load AGENTS.md?")
+```
 
 ### Example: merge conflict resolution
 
@@ -160,7 +190,7 @@ task(subagent_type="general", prompt="""
 """)
 ```
 
-This rule prevents the "I'll just bash my way through this" controller leak. If the edit tool blocks you, that's a signal to dispatch `general`, not to bypass via shell.
+This rule prevents both the "I'll just bash my way through this" controller leak AND the "I'll just grep around for 5 minutes" self-research leak. Default for everything: **delegate to a specialist**.
 
 ## CRITICAL: Design Spec Cannot Override User Source of Truth
 
