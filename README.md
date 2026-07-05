@@ -3,8 +3,8 @@
 > A reusable agentic workflow framework for AI-driven software development.
 >
 > **System:** @architect (controller) + subagent implementers + two-stage review pipeline
-> **Version:** 3.1
-> **Date:** 2026-05-15
+> **Version:** 3.2
+> **Date:** 2026-07-05
 
 ## What is SuperAgents?
 
@@ -26,7 +26,7 @@ See [`docs/setup/new-project-setup.md`](docs/setup/new-project-setup.md)
 ### Run Workflow
 
 1. **G1a+b Brainstorming** → invoke `brainstorming` skill
-2. **G2 Planning** → invoke `writing-plans` skill
+2. **G2 Planning + plan review (spec-reviewer)** → invoke `writing-plans` skill; spec-reviewer validates the plan against the spec before the asymmetric user gate
 3. **G3 Worktree** → invoke `using-git-worktrees` skill
 4. **G4-G6 Development** → invoke `subagent-driven-development` skill
 5. **G7 Finishing** → invoke `finishing-a-development-branch` skill
@@ -177,6 +177,10 @@ This repo (`/root/workspace/superagents/`) is the **single source of truth** for
 | Task classification, circuit breaker | Tech stack versions, mock data refs |
 | Skill definitions | Permission lists in frontmatter |
 | Review pipeline structure | Project-specific bash allow lists |
+
+## Changelog
+
+- **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code.
 
 ## License
 

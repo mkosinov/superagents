@@ -375,17 +375,34 @@ Actions:
 - If user requests changes → make them, re-commit, and re-present for approval.
 - Only after G1b passes → update scratchpad: Step 1 done, G1 passed.
 
-### Step 2: Writing Plans (Human Gate G2)
+### Step 2: Writing Plans + Plan Review (Human Gate G2 — ASYMMETRIC)
 Trigger: **Written spec explicitly approved by user (G1b passed).**
 **Pre-condition check:** Before invoking writing-plans, verify that user explicitly confirmed approval of the written spec file. If unsure — stop and ask user to confirm.
 Actions:
 1. Invoke skill `writing-plans`
 2. Create bite-sized implementation plan: exact file paths, exact code blocks, exact commands, no placeholders
 3. **Classify each task:** trivial / small / standard / large (see Section 13)
-4. Save to `docs/plans/YYYY-MM-DD-<feature>-plan.md`
-5. Self-review: scan for TBD, TODO, "implement later", vague requirements. Fix inline.
-6. [GATE G2] Present plan to user for approval. Classification visible in plan.
-7. Update scratchpad: Step 2 done, G2 passed.
+4. Save to `docs/plans/YYYY-MM-DD-<feature>-plan.md` and commit it (`git add docs/plans/... && git commit -m "docs: add plan for <feature>"`).
+5. **Architect self-review:** scan for TBD, TODO, "implement later", vague requirements. Fix inline.
+
+6. **Plan Review (automated — runs BEFORE the user gate):**
+   - **Applies to `standard` / `large` features only.** Skip for `trivial` / `small` (there is barely a plan — go straight to G2). Note this skip explicitly in the scratchpad.
+   - Save the committed plan file path. Dispatch **spec-reviewer** in **Plan Review Mode** (see spec-reviewer agent) via the `task` tool. The dispatch prompt MUST:
+     - State "Plan Review Mode" explicitly.
+     - Pass the **approved spec file path** (`docs/specs/...`) and the **plan file path** (`docs/plans/...`). spec-reviewer reads both files itself (read/grep/glob/cat allowed).
+   - spec-reviewer validates: (a) plan covers ALL spec requirements, (b) tasks are internally consistent — no gaps, no contradictions, no task depending on something never created, (c) task classification is realistic, (d) no undefined engineering leaps that contradict the spec.
+   - **Max 3 iterations.** If spec-reviewer reports ❌:
+     - **Architect fixes the PLAN itself** — this is the architect's own domain (planning, NOT implementation). Editing a plan doc is allowed; writing production code is NOT.
+     - Re-commit the plan, re-dispatch spec-reviewer in Plan Review Mode.
+   - If still ❌ after 3 iterations → **escalate to user** with a summary of the unresolved plan issues.
+   - **Controller-never-implements still holds:** fixing a plan document is allowed; touching .ts/.tsx/.py/.css/.sql is NOT.
+
+7. **[GATE G2] Asymmetric user gate — present by BEHAVIOR, not code:**
+   - **Frontend features:** Present to the user ONLY the **behavioral delta** — how the feature will behave for the user, mapped to the spec's acceptance criteria (use the plan's `## Behavioral Delta` section, see writing-plans skill). Do NOT dump code, file names, or the task breakdown. The user approves by BEHAVIOR and relies on spec-reviewer (Step 2.6) for engineering correctness.
+   - **Backend features:** Default to the behavioral presentation, but explicitly offer: "Full plan available at `<path>` if you want to review it." — the user can engineer-review backend plans.
+   - **Mixed features:** Present the behavioral delta and note: "Backend portions of the plan are available in full on request."
+   - Wait for user approval of the behavioral delta (or of the full plan if they request it).
+8. Update scratchpad: Step 2 done, plan-review passed (or skipped for trivial/small), G2 passed.
 
 ### Step 3: Git Worktree (Auto Gate G3)
 Trigger: Plan approved.
