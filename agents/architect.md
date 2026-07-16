@@ -203,53 +203,35 @@ If the user provides an existing spec, sketch, or requirement document (e.g., `s
 
 If you believe a change is needed, present it as an option: "Your sketch says X. I propose Y because Z. Do you approve this change?" — and wait for explicit confirmation.
 
-## CRITICAL: Pre-push Hook & `--no-verify` Policy
+## Push Policy & CI
 
-The pre-push hook (`scripts/git-hooks/pre-push` → `scripts/test-all.sh`) is the source of truth for code quality. **It is mandatory for every push.**
-
-### NEVER use `--no-verify` without explicit user OK
-
-`git push --no-verify` MUST NOT be used unless:
-1. The user has explicitly said "use --no-verify" in the current session
-2. AND the architect has independently verified the hook would pass (e.g., ran the hook in isolation and saw exit 0)
-
-### When `--no-verify` is acceptable (rare, user-OKed cases)
-
-- **Cleanup hangs:** If `test-all.sh` cleanup trap hangs after `🚀 All checks passed` (a known issue with `wait` on unresponsive shard backends), the hook technically exits 0 but the script hangs. User can OK `--no-verify` once.
-- **Known infrastructure flakes:** If a pre-existing flake causes failures unrelated to the current change, and the user explicitly accepts the state.
-
-### If a hook is broken, fix it — don't bypass
-
-`--no-verify` is not a long-term solution. If a hook is slow, flaky, or buggy:
-- Diagnose the root cause
-- Fix the underlying issue
-- Then the hook passes naturally
-
-### Pattern: communicate hook status clearly
-
-Before pushing, always:
-1. Run the hook in isolation (or have a subagent do it)
-2. Report the per-stage results (4 mandatory + N playwright shards)
-3. Note any deferred test.fixme entries
-4. State: "Hook clean (exit 0) — safe to push" OR "Hook has residual failures — list them"
-5. Only then push (or wait for user OK on `--no-verify`)
+The pre-push hook is **disabled** (no-op). Tests run in GitHub Actions CI on push and PR. No `--no-verify` flag needed — push directly.
 
 ### Push execution pattern
 
 ```bash
-# Step 1: Run hook in isolation to verify
-cd .worktrees/feat-<name>
-VISUAL_COMPLIANCE=0 bash scripts/test-all.sh 2>&1 | tee /tmp/hook.log
-
-# Step 2: If hook passes, push (in background to avoid bash timeout)
+# Push directly — CI runs on GitHub Actions (no local hook)
 setsid nohup git push -u origin feat-<name> > /tmp/git-push.log 2>&1 < /dev/null &
 disown
 
-# Step 3: Poll for push completion
-sleep 60 && git ls-remote --heads origin feat-<name>
+# Poll for push completion
+sleep 30 && git ls-remote --heads origin feat-<name>
 ```
 
-The bash tool has timeouts (typically 120s-25min). Pushes can take 10-20+ min due to hook. **Always push in the background** with `setsid nohup` and poll for completion.
+The bash tool has timeouts (typically 120s-25min). **Always push in the background** with `setsid nohup` and poll for completion.
+
+### CI coverage
+
+GitHub Actions runs on push to `main` and PRs to `main`:
+- **test.yml**: backend pytest (4 shards: unit, api, integration, misc) + coverage, frontend vitest (5 groups), Playwright E2E (2 shards)
+- **smoke.yml**: backend smoke (unit+api), frontend smoke (lint+typecheck+vitest)
+
+### Manual full test suite (optional)
+
+```bash
+# Run the full local test suite manually (before important releases)
+VISUAL_COMPLIANCE=0 bash scripts/test-all.sh
+```
 
 ## GitHub Project Board Integration
 
@@ -580,7 +562,7 @@ Actions:
 4. Wait for commit SHA from @docser.
 5. Update scratchpad: Step 5 done.
 
-### Step 6: Finishing Development Branch (Human Gate G7)
+### Step 6: Finishing Development Branch (Auto-merge Gate G7)
 Trigger: Doc commit done.
 Actions:
 1. Invoke skill `finishing-a-development-branch`
@@ -588,13 +570,13 @@ Actions:
    - Run tests yourself ONLY to verify state. If failing → report, do NOT fix.
 3. Present 4 options to user:
    - 1. Merge locally to main
-   - 2. Push and Create PR (DEFAULT — auto-select if user doesn't respond in 30s, but MUST show options)
+   - 2. Push, Create PR & Auto-merge after CI green (DEFAULT — auto-select if user doesn't respond in 30s, but MUST show options)
    - 3. Keep branch as-is
    - 4. Discard this work
 4. [GATE G7] Wait for user choice.
 5. Execute chosen option:
    - Option 1: merge, cleanup worktree, delete branch
-   - Option 2: push branch, create PR via `gh pr create`, preserve worktree
+   - Option 2: push branch, create PR via `gh pr create`, **poll CI checks until all pass, then auto-merge via `gh pr merge --squash --delete-branch`**, cleanup worktree + delete local branch. If CI fails → report to user, do NOT auto-merge.
    - Option 3: report "branch kept at <path>"
    - Option 4: typed confirmation required, then force-delete branch + cleanup worktree
 6. Update scratchpad: workflow complete OR branch kept.
@@ -650,19 +632,6 @@ Every task in a plan MUST have an explicit classification. Classification determ
 | Implementer failed 2 times | **Stop.** Report to user. Do not retry blindly |
 | Blocked and cannot resolve | Stop, update scratchpad, ask user |
 | Agent needs more data | Read it yourself or use grep, then re-delegate |
-
-### If the hook hangs (cleanup trap blocks)
-
-`scripts/test-all.sh` has a known issue: the cleanup trap can hang on `wait` for unresponsive shard backends even after tests pass. To unblock:
-1. Kill the shard stacks by specific PID (NOT pkill -f which killed opencode in one session):
-   ```bash
-   for pid in $(pgrep -f "e2e-shard-start\|uvicorn.*800[12]\|next dev" 2>/dev/null); do
-     kill -KILL $pid 2>/dev/null
-   done
-   ```
-2. Verify the hook printed "🚀 All checks passed." in the log (proves tests passed)
-3. If user agrees, use `--no-verify` for THIS push only
-4. Open a follow-up issue to fix the cleanup hang (e.g., add `--no-fail` on the wait loop)
 
 ## Communication
 

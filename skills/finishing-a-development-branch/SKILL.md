@@ -118,10 +118,10 @@ Then: Cleanup worktree (Step 6), then delete branch:
 git branch -d <feature-branch>
 ```
 
-#### Option 2: Push and Create PR
+#### Option 2: Push, Create PR & Auto-merge after CI
 
 ```bash
-# Push branch
+# Push branch (pre-push hook is disabled — CI runs on GitHub Actions)
 git push -u origin <feature-branch>
 
 # Create PR
@@ -130,12 +130,35 @@ gh pr create --title "<title>" --body "$(cat <<'EOF'
 <2-3 bullets of what changed>
 
 ## Test Plan
-- [ ] <verification steps>
+- [x] CI checks pass (GitHub Actions)
 EOF
 )"
+
+# Get PR URL for reporting
+PR_URL=$(gh pr view --json url -q .url)
+echo "PR created: $PR_URL"
+echo "Waiting for CI checks to complete (may take 5-15 min)..."
+
+# Poll CI checks until completion
+# gh pr checks --watch blocks until all checks conclude, then:
+#   exit 0 = all passed, exit 1 = some failed
+if gh pr checks --watch; then
+  echo "✅ All CI checks passed. Auto-merging..."
+  gh pr merge --squash --delete-branch --subject "<title>" --body "Auto-merged: all CI checks passed."
+  # Update local main
+  git checkout <base-branch>
+  git pull origin <base-branch>
+else
+  echo "❌ CI checks failed. NOT auto-merging."
+  echo "PR: $PR_URL — fix failures or merge manually."
+  # Do NOT clean up worktree — user needs it for fixes
+  exit 1
+fi
 ```
 
-**Do NOT clean up worktree** — user needs it alive to iterate on PR feedback.
+If auto-merge succeeds: cleanup worktree (Step 6), delete local branch.
+
+If CI fails: report to user with PR URL. Do NOT auto-merge. Do NOT clean up worktree — user may need to push fixes. User decides next action.
 
 #### Option 3: Keep As-Is
 
@@ -215,7 +238,7 @@ git worktree prune  # Self-healing: clean up any stale registrations
 | Option | Merge | Push | Keep Worktree | Cleanup Branch |
 |--------|-------|------|---------------|----------------|
 | 1. Merge locally | yes | - | - | yes |
-| 2. Create PR | - | yes | yes | - |
+| 2. Create PR & Auto-merge | yes (after CI green) | yes | - (after merge) | yes |
 | 3. Keep as-is | - | - | yes | - |
 | 4. Discard | - | - | - | yes (force) |
 

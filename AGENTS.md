@@ -31,3 +31,9 @@ When the user sends a new message, structure your response as:
 - Open questions or "OK пометить выполненной?" prompt
 
 **What NOT to do:** don't repeat the full brief from earlier turns; don't paste diffs into the brief; don't make the brief longer than the answer to the actual question.
+
+---
+
+## Subagents: report your session ID first
+
+**First step in every subtask:** before any other work, call the `get-session` tool and print its returned `task_id: ses_...` as the FIRST line of your reply. This lets the orchestrator resume your session if it is interrupted.
