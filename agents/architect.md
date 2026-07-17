@@ -562,24 +562,33 @@ Actions:
 4. Wait for commit SHA from @docser.
 5. Update scratchpad: Step 5 done.
 
-### Step 6: Finishing Development Branch (Auto-merge Gate G7)
+### Step 6: Finishing Development Branch (Auto-flow G7 — auto-merge, error-escalation)
 Trigger: Doc commit done.
+
+**G7 is NOT a user-choice gate on the happy path.** On the success path the architect
+finishes AUTOMATICALLY (push + PR + auto-merge after green CI) and contacts the user ONLY
+when something goes wrong. There is NO 4-option menu on success.
+
 Actions:
 1. Invoke skill `finishing-a-development-branch`
 2. Verify all tests pass (including doc commit).
    - Run tests yourself ONLY to verify state. If failing → report, do NOT fix.
-3. Present 4 options to user:
-   - 1. Merge locally to main
-   - 2. Push, Create PR & Auto-merge after CI green (DEFAULT — auto-select if user doesn't respond in 30s, but MUST show options)
-   - 3. Keep branch as-is
-   - 4. Discard this work
-4. [GATE G7] Wait for user choice.
-5. Execute chosen option:
-   - Option 1: merge, cleanup worktree, delete branch
-   - Option 2: push branch, create PR via `gh pr create`, **poll CI checks until all pass, then auto-merge via `gh pr merge --squash --delete-branch`**, cleanup worktree + delete local branch. If CI fails → report to user, do NOT auto-merge.
-   - Option 3: report "branch kept at <path>"
-   - Option 4: typed confirmation required, then force-delete branch + cleanup worktree
-6. Update scratchpad: workflow complete OR branch kept.
+3. **Notify (fire-and-continue — do NOT wait for a reply):** print one short line, then proceed:
+   - `Финиш: пушу ветку feat-<name> + создаю PR + авто-мерж после зелёного CI.`
+4. **Auto-execute the default flow** (via the skill):
+   a. Push the branch (background push pattern from "Push Policy & CI"; poll for completion).
+   b. Create the PR via `gh pr create`.
+   c. Wait for CI: `gh pr checks --watch` (poll until all checks conclude).
+   d. If ALL CI checks green → auto-merge via `gh pr merge --squash --delete-branch`, update local main (`git checkout <base>` + `git pull`), then cleanup worktree + delete local branch.
+5. **[GATE G7 — error escalation only]** Contact the user ONLY when something goes WRONG:
+   - Push fails → STOP, report the failure, preserve worktree.
+   - PR creation errors → STOP, report, preserve worktree.
+   - CI is red / checks fail → STOP, do NOT merge, report to user with the PR URL, preserve worktree for fixes.
+   - Merge command errors → STOP, do NOT merge, report to user with the PR URL, preserve worktree.
+   - In every error case: do NOT clean up the worktree; the user decides the next action.
+6. **Explicit fallbacks (only on explicit user request, NOT the default):** merge locally / keep branch as-is / discard. The skill documents each; run one only if the user explicitly asks. `discard` still requires typed confirmation.
+7. **Controller Never Implements still holds:** the architect runs git/gh finish commands only — it does NOT edit code, fix failing CI, or debug. On red CI it escalates (re-dispatch implementer or report to user), never self-fixes.
+8. Update scratchpad: workflow complete (auto-merged) OR escalated-on-error OR branch kept.
 
 ## Context Handoff to Subagents
 

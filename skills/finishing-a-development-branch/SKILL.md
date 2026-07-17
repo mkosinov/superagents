@@ -1,15 +1,17 @@
 ---
 name: finishing-a-development-branch
-description: Use when implementation is complete, all tests pass, and you need to decide how to integrate the work - guides completion of development work by presenting structured options for merge, PR, or cleanup
+description: Use when implementation is complete, all tests pass, and you need to finish the work - the default is auto push+PR+auto-merge after green CI, notifying the user before push and contacting them only on error
 ---
 
 # Finishing a Development Branch
 
 ## Overview
 
-Guide completion of development work by presenting clear options and handling chosen workflow.
+Finish development work by **automatically** pushing, opening a PR, and auto-merging
+after CI goes green. The user is **notified** before the push (fire-and-continue) and is
+**contacted only when something goes wrong**.
 
-**Core principle:** Verify tests → Detect environment → Present options → Execute choice → Clean up.
+**Core principle:** Verify tests → Detect environment → Notify → Push + PR + auto-merge on green CI → Clean up. Contact the user ONLY on error.
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
@@ -17,7 +19,7 @@ Guide completion of development work by presenting clear options and handling ch
 
 ### Step 1: Verify Tests
 
-**Before presenting options, verify tests pass:**
+**Before finishing, verify tests pass:**
 
 ```bash
 # Run project's test suite
@@ -39,20 +41,20 @@ Stop. Don't proceed to Step 2.
 
 ### Step 2: Detect Environment
 
-**Determine workspace state before presenting options:**
+**Determine workspace state before the auto-flow:**
 
 ```bash
 GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
 GIT_COMMON=$(cd "$(git rev-parse --git-common-dir)" 2>/dev/null && pwd -P)
 ```
 
-This determines which menu to show and how cleanup works:
+This determines the default flow and how cleanup works:
 
-| State | Menu | Cleanup |
-|-------|------|---------|
-| `GIT_DIR == GIT_COMMON` (normal repo) | Standard 4 options | No worktree to clean up |
-| `GIT_DIR != GIT_COMMON`, named branch | Standard 4 options | Provenance-based |
-| `GIT_DIR != GIT_COMMON`, detached HEAD | Reduced 3 options (no merge) | No cleanup |
+| State | Default flow | Cleanup |
+|-------|--------------|---------|
+| `GIT_DIR == GIT_COMMON` (normal repo) | Auto push + PR + auto-merge | No worktree to clean up |
+| `GIT_DIR != GIT_COMMON`, named branch | Auto push + PR + auto-merge | Provenance-based |
+| `GIT_DIR != GIT_COMMON`, detached HEAD | Auto push (as new branch) + PR + auto-merge | No cleanup |
 
 ### Step 3: Determine Base Branch
 
@@ -63,38 +65,93 @@ git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null
 
 Or ask: "This branch split from main - is that correct?"
 
-### Step 4: Present Options
+### Step 4: Notify (fire-and-continue)
 
-**Normal repo and named-branch worktree — present exactly these 4 options:**
-
-```
-Implementation complete. What would you like to do?
-
-1. Merge back to <base-branch> locally
-2. Push and create a Pull Request
-3. Keep the branch as-is (I'll handle it later)
-4. Discard this work
-
-Which option?
-```
-
-**Detached HEAD — present exactly these 3 options:**
+**Do NOT present a menu and do NOT wait for a reply.** Print a SHORT notification and
+proceed immediately to Step 5:
 
 ```
-Implementation complete. You're on a detached HEAD (externally managed workspace).
-
-1. Push as new branch and create a Pull Request
-2. Keep as-is (I'll handle it later)
-3. Discard this work
-
-Which option?
+Финиш: пушу ветку <feature-branch> + создаю PR + авто-мерж после зелёного CI.
 ```
 
-**Don't add explanation** - keep options concise.
+For detached HEAD, note the new branch name:
 
-### Step 5: Execute Choice
+```
+Финиш: детач-HEAD → пушу как новую ветку <feature-branch> + создаю PR + авто-мерж после зелёного CI.
+```
 
-#### Option 1: Merge Locally
+**Don't add explanation** - keep the notification to one line, then continue.
+
+### Step 5: Auto Push + PR + Auto-merge (DEFAULT)
+
+This is the default success-path flow. Run it automatically after the notification.
+**Contact the user ONLY on error** (push failure, PR creation error, red CI, merge error).
+
+```bash
+# Push branch (pre-push hook is disabled — CI runs on GitHub Actions)
+if ! git push -u origin <feature-branch>; then
+  echo "❌ Push failed for <feature-branch>."
+  # STOP — report to user, preserve worktree for fixes. Do NOT continue.
+  exit 1
+fi
+
+# Create PR
+if ! gh pr create --title "<title>" --body "$(cat <<'EOF'
+## Summary
+<2-3 bullets of what changed>
+
+## Test Plan
+- [x] CI checks pass (GitHub Actions)
+EOF
+)"; then
+  echo "❌ PR creation failed."
+  # STOP — report to user with the push state. Preserve worktree.
+  exit 1
+fi
+
+# Get PR URL for reporting
+PR_URL=$(gh pr view --json url -q .url)
+echo "PR created: $PR_URL"
+echo "Waiting for CI checks to complete (may take 5-15 min)..."
+
+# Poll CI checks until completion
+# gh pr checks --watch blocks until all checks conclude, then:
+#   exit 0 = all passed, exit 1 = some failed
+if gh pr checks --watch; then
+  echo "✅ All CI checks passed. Auto-merging..."
+  if ! gh pr merge --squash --delete-branch --subject "<title>" --body "Auto-merged: all CI checks passed."; then
+    echo "❌ Merge command failed."
+    echo "PR: $PR_URL — report to user. Preserve worktree."
+    # STOP — do NOT clean up worktree.
+    exit 1
+  fi
+  # Update local main
+  git checkout <base-branch>
+  git pull origin <base-branch>
+else
+  echo "❌ CI checks failed (red). NOT auto-merging."
+  echo "PR: $PR_URL — report to user. Preserve worktree for fixes."
+  # STOP — do NOT clean up worktree.
+  exit 1
+fi
+```
+
+**On success (all CI green + merged):** cleanup worktree (Step 6), delete local branch.
+
+**On ANY error — STOP and contact the user:**
+- Push fails → report the failure, preserve worktree.
+- PR creation errors → report the error, preserve worktree.
+- CI is red / checks fail → report to user with PR URL. Do NOT auto-merge.
+- Merge command errors → report to user with PR URL. Do NOT auto-merge.
+
+In all error cases: preserve the worktree (user may need to push fixes) and let the user decide the next action.
+
+### Step 5.1: Explicit User-Requested Fallbacks (NOT the default)
+
+The default flow above always applies unless the **user explicitly asks** for one of these
+alternatives. These are no longer offered as a menu — only run them on explicit request.
+
+#### Fallback: Merge Locally (only if user explicitly asks)
 
 ```bash
 # Get main repo root for CWD safety
@@ -110,63 +167,16 @@ git merge <feature-branch>
 <test command>
 
 # Only after merge succeeds: cleanup worktree (Step 6), then delete branch
-```
-
-Then: Cleanup worktree (Step 6), then delete branch:
-
-```bash
 git branch -d <feature-branch>
 ```
 
-#### Option 2: Push, Create PR & Auto-merge after CI
-
-```bash
-# Push branch (pre-push hook is disabled — CI runs on GitHub Actions)
-git push -u origin <feature-branch>
-
-# Create PR
-gh pr create --title "<title>" --body "$(cat <<'EOF'
-## Summary
-<2-3 bullets of what changed>
-
-## Test Plan
-- [x] CI checks pass (GitHub Actions)
-EOF
-)"
-
-# Get PR URL for reporting
-PR_URL=$(gh pr view --json url -q .url)
-echo "PR created: $PR_URL"
-echo "Waiting for CI checks to complete (may take 5-15 min)..."
-
-# Poll CI checks until completion
-# gh pr checks --watch blocks until all checks conclude, then:
-#   exit 0 = all passed, exit 1 = some failed
-if gh pr checks --watch; then
-  echo "✅ All CI checks passed. Auto-merging..."
-  gh pr merge --squash --delete-branch --subject "<title>" --body "Auto-merged: all CI checks passed."
-  # Update local main
-  git checkout <base-branch>
-  git pull origin <base-branch>
-else
-  echo "❌ CI checks failed. NOT auto-merging."
-  echo "PR: $PR_URL — fix failures or merge manually."
-  # Do NOT clean up worktree — user needs it for fixes
-  exit 1
-fi
-```
-
-If auto-merge succeeds: cleanup worktree (Step 6), delete local branch.
-
-If CI fails: report to user with PR URL. Do NOT auto-merge. Do NOT clean up worktree — user may need to push fixes. User decides next action.
-
-#### Option 3: Keep As-Is
+#### Fallback: Keep As-Is (only if user explicitly asks)
 
 Report: "Keeping branch <name>. Worktree preserved at <path>."
 
 **Don't cleanup worktree.**
 
-#### Option 4: Discard
+#### Fallback: Discard (only if user explicitly asks)
 
 **Confirm first:**
 ```
@@ -191,9 +201,9 @@ Then: Cleanup worktree (Step 6), then force-delete branch:
 git branch -D <feature-branch>
 ```
 
-### Step 5.5: Suggest Post-Wave Reflection (Options 1 and 2 only)
+### Step 5.5: Suggest Post-Merge Reflection
 
-After the wave is merged locally (Option 1) or PR is created (Option 2), **suggest to user** running reflection analysis. This is not auto-run — human decides.
+After the PR is created (default flow) or the branch is merged locally (fallback), **suggest to user** running reflection analysis. This is not auto-run — human decides.
 
 ```bash
 # Extract wave name from branch (e.g., "Wave 4.5" from "Wave 4.5 старт" or PR title)
@@ -208,11 +218,11 @@ echo "Or run /reflect in the next session for in-session analysis."
 
 **Why not auto-run:** Retrospection principle. Reflection after the fact is more useful than pre-block. User reviews proposals at their own pace.
 
-**For Option 2 (PR):** Suggestion is forward-looking — when the PR is merged, run `/reflect` or `reflect.sh wave`. Don't run it now (wave isn't on main yet).
+**For the default PR flow:** Suggestion is forward-looking — when the PR is merged, run `/reflect` or `reflect.sh wave`. Don't run it now (wave isn't on main yet).
 
 ### Step 6: Cleanup Workspace
 
-**Only runs for Options 1 and 4.** Options 2 and 3 always preserve the worktree.
+**Runs on the default success path (after auto-merge) and for the explicit "merge locally" / "discard" fallbacks.** The "keep as-is" fallback and any error path always preserve the worktree.
 
 ```bash
 GIT_DIR=$(cd "$(git rev-parse --git-dir)" 2>/dev/null && pwd -P)
@@ -235,18 +245,22 @@ git worktree prune  # Self-healing: clean up any stale registrations
 
 ## Quick Reference
 
-| Option | Merge | Push | Keep Worktree | Cleanup Branch |
-|--------|-------|------|---------------|----------------|
-| 1. Merge locally | yes | - | - | yes |
-| 2. Create PR & Auto-merge | yes (after CI green) | yes | - (after merge) | yes |
-| 3. Keep as-is | - | - | yes | - |
-| 4. Discard | - | - | - | yes (force) |
+| Flow | Trigger | Merge | Push | Keep Worktree | Cleanup Branch |
+|------|---------|-------|------|---------------|----------------|
+| **Auto push + PR + auto-merge** (default) | success path | yes (after CI green) | yes | - (after merge) | yes |
+| Merge locally (fallback) | user asks explicitly | yes | - | - | yes |
+| Keep as-is (fallback) | user asks explicitly | - | - | yes | - |
+| Discard (fallback) | user asks explicitly | - | - | - | yes (force) |
+| Error (push/PR/CI/merge) | anything goes wrong | no | maybe | yes (preserved) | no |
 
 ## Red Flags
 
 **Never:**
 - Proceed with failing tests
+- Merge on red / failing CI
 - Merge without verifying tests on result
+- Auto-merge when any error occurred — STOP and contact the user instead
+- Clean up a worktree on any error path (user may need it for fixes)
 - Delete work without confirmation
 - Force-push without explicit request
 - Remove a worktree before confirming merge success
@@ -254,10 +268,11 @@ git worktree prune  # Self-healing: clean up any stale registrations
 - Run `git worktree remove` from inside the worktree
 
 **Always:**
-- Verify tests before offering options
-- Detect environment before presenting menu
-- Present exactly 4 options (or 3 for detached HEAD)
-- Get typed confirmation for Option 4
-- Clean up worktree for Options 1 & 4 only
+- Verify tests before finishing
+- Detect environment before the auto-flow
+- Notify before push (one line, fire-and-continue — do NOT wait for a reply)
+- Contact the user ONLY on error (push failure, PR error, red CI, merge error)
+- Get typed confirmation before the discard fallback
+- Clean up worktree only on the default merge success path and the explicit merge-locally / discard fallbacks
 - `cd` to main repo root before worktree removal
 - Run `git worktree prune` after removal
