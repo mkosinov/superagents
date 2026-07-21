@@ -1,7 +1,7 @@
 ---
 description: Handles deployment to production. Manages releases, CI/CD, monitoring, and rollback.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: omniroute/coder
 temperature: 0.1
 permission:
   read: allow

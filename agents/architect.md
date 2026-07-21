@@ -1,7 +1,7 @@
 ---
 description: Workflow controller. Entry point, brainstorming, planning, subagent dispatch, quality gates, timeline, scratchpad keeper.
 mode: primary
-model: opencode-go/glm-5.1
+model: omniroute/architect
 temperature: 0.2
 permission:
   read: allow
@@ -342,18 +342,12 @@ Actions:
 ### Step 3: Git Worktree (Auto Gate G3)
 Trigger: Plan approved.
 Actions:
-1. Invoke skill `using-git-worktrees`
-2. Create isolated worktree: `git worktree add .worktrees/feat-<name> -b feat-<name>`
-3. Change to worktree: `cd .worktrees/feat-<name>`
-4. Run project setup (auto-detect):
-   - If `package.json` exists: `npm install`
-   - If `pyproject.toml` exists: `uv sync || poetry install || pip install -e .`
-   - If `requirements.txt` exists: `pip install -r requirements.txt`
-5. Run tests to verify clean baseline:
-    - Frontend: `cd frontend && npm run test:all` (vitest + playwright visual tests)
-    - Backend: `cd backend && pytest` or `python -m pytest`
-6. [GATE G3] If tests FAIL → stop, report failures to user, ask whether to proceed. If PASS → proceed to Step 4 automatically.
-7. Update scratchpad: Step 3 done, worktree path recorded.
+1. Invoke skill `using-git-worktrees` and follow it — **run `./scripts/create-worktree.sh <branch-name>` from repo root** (no manual `git worktree add`, env copy, or node_modules wiring).
+2. `cd .worktrees/<branch-name>` per script output.
+3. Complete skill Step 2 (`.worktrees/` in `.gitignore`) if needed.
+4. Run tests to verify clean baseline — **use this project's test commands** (see project docs or `.opencode/`; e.g. frontend/backend paths, pnpm vs npm).
+5. [GATE G3] If tests FAIL → stop, report failures to user, ask whether to proceed. If PASS → proceed to Step 4 automatically.
+6. Update scratchpad: Step 3 done, worktree path recorded.
 
 ### Step 4: Subagent-Driven Development Loop (Auto Gates G4-G6)
 Trigger: Clean baseline verified.
@@ -466,9 +460,12 @@ Actions:
    - Automatically proceed to next task. Do NOT ask user "continue?".
    - Exception: if BLOCKED and cannot resolve → stop, update scratchpad, ask user.
 
-### Step 4.5: Visual Compliance Gate (Auto Gate G4.5) — NEW
+### Step 4.5: Visual Compliance Gate (Auto Gate G4.5)
 Trigger: All tasks in phase complete, all tests passing.
 **Run ONCE per phase, NOT on every task.**
+
+**Skip Step 4.5** when the phase has no user-visible UI (backend/API/CLI/data only) or the design spec marks Visual Compliance N/A — proceed directly to Step 5. If the phase shipped UI but the spec lacks `## Visual Compliance Checks`, treat as a spec gap: add checks or ask the user before skipping.
+
 Actions:
 1. Determine the design spec file for this phase (from Step 1, usually `docs/specs/YYYY-MM-DD-<feature>-design.md`)
 2. Ensure dev server is running (or use static build). For Next.js:
@@ -502,7 +499,7 @@ Actions:
 - Screenshots are evidence — always show them to user on failure.
 
 ### Step 5: Documentation Commit (Auto, before finishing)
-Trigger: All tasks complete, all tests passing, visual compliance passed (or user-overridden).
+Trigger: All tasks complete, all tests passing; Step 4.5 passed, user-overridden, or skipped (non-UI phase).
 Actions:
 1. Gather context from session:
    - Feature name, design doc path, plan path

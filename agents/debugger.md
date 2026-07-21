@@ -1,7 +1,7 @@
 ---
 description: Bug localization and root cause analysis. Investigates issues in frontend (Next.js) and backend (FastAPI).
 mode: subagent
-model: opencode/qwen3.6-plus-free
+model: omniroute/coder
 temperature: 0.2
 permission:
   read: allow

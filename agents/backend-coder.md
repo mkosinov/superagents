@@ -1,7 +1,7 @@
 ---
 description: Backend developer — implements FastAPI API, SQLite database, business logic, and integrations.
 mode: subagent
-model: opencode/qwen3.6-plus-free
+model: omniroute/coder
 temperature: 0.3
 permission:
   read: allow

@@ -1,33 +1,28 @@
 # SuperAgents — Shared Agent Rules
 
-This file is auto-loaded by all agents in the superagents framework.
-It defines cross-cutting rules that apply regardless of the specific agent role.
+Cross-cutting rules auto-loaded for every agent.
 
 ---
 
 ## User input types
 
-A message ending with `?` is a question. The agent answers with text and **takes no actions** (no tools, commits, file edits).
-
-**Exception:** if the answer needs info not in context — read-only gathering (read a file, `git log`). After gathering — text answer immediately.
+Message ending with `?` → text answer only (no tools, commits, edits). Exception: read-only gather if needed (`read`, `git log`), then answer.
 
 ---
 
-## Response Pattern: Status First
+## Response Pattern: Work Results First
 
-When the user sends a new message, structure your response as:
+A new message does **not** cancel a pending report. Show work outcome **before** the new topic.
 
-1. **Brief on previous task** — 1-3 lines max. Status of the most recent in-flight or just-completed task (DONE / BLOCKED / awaiting user OK), files changed in the last dispatch, what's pending from the user.
-2. **Then** answer the user's actual question or proceed with the request.
+1. **Work results** — you or a dispatched subagent since the user's last turn (tools, dispatch return, commits, failures). Lead even if the new message is unrelated.
+2. **Then** answer or continue the new request.
 
-**When to skip the brief:** if no dispatch happened since the user's last message and no in-flight task is awaiting user action, the brief is a 1-line "no in-flight tasks" and you can go straight to the answer.
+Never open with only the latest question while deliverables are still unreported.
 
-**Why:** the user often reads the architect's last message and asks a new question before the next coder dispatch returns. When the dispatch DOES return between turns, the user sees a fresh question without context. The brief closes that loop and keeps the session state visible.
+**First report** (user has not seen the outcome): status (DONE | DONE_WITH_CONCERNS | BLOCKED | awaiting user OK), what changed, file paths, evidence (no full FasTP Phase 1 test runs), blockers, "OK пометить выполненной?" if needed — as long as clarity needs; not capped at 3 lines.
 
-**What to put in the brief:**
-- Status (DONE | DONE_WITH_CONCERNS | BLOCKED | awaiting user OK)
-- File(s) changed (paths only, not diffs)
-- Evidence (type-check, smoke test, etc. — but NOT test runs in Phase 1 of FasTP)
-- Open questions or "OK пометить выполненной?" prompt
+**Reminder** (outcome already shown): 1–3 lines, then answer.
 
-**What NOT to do:** don't repeat the full brief from earlier turns; don't paste diffs into the brief; don't make the brief longer than the answer to the actual question.
+**Same turn:** tools/edits in this turn → final message must summarize them, not only a side-answer.
+
+Avoid: new topic first with pending work; repeating a full first report after acknowledgment; full diffs (paths + short outcome enough).

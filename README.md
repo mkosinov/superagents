@@ -3,33 +3,56 @@
 > A reusable agentic workflow framework for AI-driven software development.
 >
 > **System:** @architect (controller) + subagent implementers + two-stage review pipeline
-> **Version:** 3.1
-> **Date:** 2026-05-15
+> **Version:** 3.3
+>
+> **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
 ## What is SuperAgents?
 
-SuperAgents is a workflow framework for orchestrating AI agents to develop software with:
+SuperAgents orchestrates AI agents through a fixed **feature lifecycle**: design and written spec → implementation plan → isolated git worktree → sequential tasks with reviews → docs on the branch → merge or PR. Humans approve at key gates; everything between gates runs automatically.
 
-- **Automatic workflow progression** through 7 quality gates
-- **Test-Driven Development** (RED-GREEN-REFACTOR) for all code
-- **Two-stage review** after every non-trivial task (spec compliance + code quality)
-- **Git worktree isolation** for every feature
-- **Documentation committed** into feature branch before PR
-- **Workflow resumable** after session interruption via scratchpad
+Capabilities:
+
+- **7+ quality gates** (G1a/b, G2, G3, G4–G6, G4.5 visual, G7) — see [Workflow guide](docs/workflow/README.md)
+- **Test-Driven Development** (RED-GREEN-REFACTOR) for implementation work
+- **Two-stage review** after non-trivial tasks (spec compliance, then code quality + tests)
+- **Git worktree isolation** per feature via `scripts/create-worktree.sh`
+- **Documentation on the feature branch** before finish
+- **Resumable sessions** via `.opencode/scratchpad.md`
+- **Fast Track Protocol** for post-merge polish without full G1–G2
+- **Reflection mode** for workflow self-analysis (`/reflect`, `skills/reflect/`)
+
+## Workflow guide (detailed)
+
+**For people:** step-by-step flow, gate diagram, agent roles, visual compliance, and which files agents actually run.
+
+**[→ SuperAgents Workflow (`docs/workflow/README.md`)](docs/workflow/README.md)**
+
+One-line map:
+
+```
+G1a/G1b (Human) → G2 (Human) → G3 worktree (Auto) → G4–G6 dev+review (Auto) → G4.5 visual if UI (Auto) → docs → G7 (Human)
+```
+
+In the IDE, start **@architect** and ask for a new feature; it invokes skills (`brainstorming`, `writing-plans`, `using-git-worktrees`, …) in order.
 
 ## Quick Start
 
 ### New Project Setup
 
-See [`docs/setup/new-project-setup.md`](docs/setup/new-project-setup.md)
+[New Project Setup](docs/setup/new-project-setup.md) — copy agents, skills, and templates into your repo and adjust project-specific paths and test commands.
 
-### Run Workflow
+### Run Workflow (architect)
 
-1. **G1a+b Brainstorming** → invoke `brainstorming` skill
-2. **G2 Planning** → invoke `writing-plans` skill
-3. **G3 Worktree** → invoke `using-git-worktrees` skill
-4. **G4-G6 Development** → invoke `subagent-driven-development` skill
-5. **G7 Finishing** → invoke `finishing-a-development-branch` skill
+| Step | Gate | Skill |
+|------|------|--------|
+| Brainstorming + spec | G1a, G1b | `brainstorming` |
+| Implementation plan | G2 | `writing-plans` |
+| Worktree + baseline tests | G3 | `using-git-worktrees` (+ `scripts/create-worktree.sh`) |
+| Tasks + reviews | G4–G6 | `subagent-driven-development` |
+| Finish (merge / PR / …) | G7 | `finishing-a-development-branch` |
+
+Details, review tiers, and diagrams: **[Workflow guide](docs/workflow/README.md)**.
 
 ## Repository Structure
 
@@ -44,25 +67,28 @@ superagents/
 │   ├── debugger.md          # Root cause investigator
 │   ├── docser.md            # Meta documentation
 │   └── deployer.md          # DevOps / deploy
+├── scripts/                 # Shared automation (worktree, visual gate)
+│   ├── create-worktree.sh
+│   ├── remove-worktree.sh
+│   └── visual-compliance-check.sh
 ├── skills/                  # Reusable skills (invoked via skill tool)
 │   ├── brainstorming/
 │   ├── writing-plans/
 │   ├── using-git-worktrees/
+│   ├── find-specialist/     # Pick agent when dispatch is unclear (architect)
 │   ├── test-driven-development/
 │   ├── subagent-driven-development/
 │   ├── finishing-a-development-branch/
 │   ├── using-skills/
 │   ├── systematic-debugging/
-│   ├── fast-track-protocol/ # Lightweight code-only protocol (no spec/plan) for post-merge polish
+│   ├── fast-track-protocol/
 │   └── reflect/
 ├── templates/               # Reviewer prompt templates
 │   └── reviewers/
-│       ├── spec-reviewer.md
-│       └── code-quality-reviewer.md
 └── docs/
-    ├── workflow/            # Workflow documentation
-    ├── architecture/        # System design decisions
-    └── setup/               # Project initialization guides
+    ├── workflow/            # Human workflow reference (start here for flow)
+    ├── architecture/
+    └── setup/
 ```
 
 ## Agents
@@ -85,18 +111,11 @@ superagents/
 3. **Sequential Tasks** — one implementer at a time, no parallel dispatch
 4. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
 5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
-6. **Diff in Prompt** — reviewers receive git diff embedded, never read files
+6. **Diff for reviewers (hybrid)** — architect reads `git diff --stat` only; full diff goes to a file; reviewers read the file (saves architect tokens). Not “paste entire diff into architect chat.”
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
 8. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
 
-## Workflow Diagram
-
-See [`docs/workflow/README.md`](docs/workflow/README.md) for full flow.
-
-```
-G1a(Human) → G1b(Human) → G2(Human) → G3(Auto) → G4-G6(Auto) → G7(Human)
-Concept      Spec        Plan         Worktree    Development      Finish
-```
+Full gate list and behavior: **[Workflow guide](docs/workflow/README.md)**.
 
 ## Reflection Mode
 
@@ -158,15 +177,16 @@ See [`docs/architecture/decision-log.md`](docs/architecture/decision-log.md) for
 
 ### Golden Source Rule
 
-This repo (`/root/workspace/superagents/`) is the **single source of truth** for the SuperAgents workflow framework.
+This repo is the **single source of truth** for the SuperAgents workflow framework.
 
-**Project repos** (e.g., `/root/workspace/memo/.opencode/`) contain **local copies** of agents and skills adapted with project-specific context.
+**Project repos** contain **local copies** of agents and skills with project-specific context (test commands, paths, models).
 
 ### Change Protocol
 
 1. **Generic workflow changes** → edit in `superagents/` FIRST → commit → sync to project repos
 2. **Project-specific changes** → edit in project `.opencode/` only → no sync needed
-3. **@infra** verifies sync status when workflow files change in either repo
+3. Update **[docs/workflow/README.md](docs/workflow/README.md)** and this README when gates or steps change — use the [workflow change checklist](docs/workflow/README.md#workflow-change-checklist) in that doc
+4. **@infra** verifies sync status when workflow files change in either repo
 
 ### Generic vs Project-Specific
 
@@ -176,7 +196,7 @@ This repo (`/root/workspace/superagents/`) is the **single source of truth** for
 | Agent roles and responsibilities | Model assignments, temperature settings |
 | Task classification, circuit breaker | Tech stack versions, mock data refs |
 | Skill definitions | Permission lists in frontmatter |
-| Review pipeline structure | Project-specific bash allow lists |
+| Review pipeline structure | Project-specific bash allow lists, test commands |
 
 ## License
 
