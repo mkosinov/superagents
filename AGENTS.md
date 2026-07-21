@@ -36,4 +36,8 @@ When the user sends a new message, structure your response as:
 
 ## Subagents: report your session ID first
 
-**First step in every subtask:** before any other work, call the `get-session` tool and print its returned `task_id: ses_...` as the FIRST line of your reply. This lets the orchestrator resume your session if it is interrupted.
+**First action in every subtask:** call `get-session`, then print its returned id as the FIRST line of your reply, literally:
+
+    task_id: ses_xxxxxxxxxxxxxxxx
+
+No preamble ("I'll start by…"). The id line IS the preamble. Don't start other work before printing it textually — the orchestrator needs it as text to resume your session.
