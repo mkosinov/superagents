@@ -1,7 +1,30 @@
 # SuperAgents Workflow
 
-> **System:** SuperAgents — @architect (controller) + subagents (implementers + reviewers)
-> **Version:** 3.2
+> **Audience:** humans — product owners, tech leads, and anyone reviewing how SuperAgents runs a feature from idea to merge.
+>
+> **System:** @architect (controller) + subagent implementers + two-stage review
+>
+> **Version:** 3.2 · **Last aligned with skills/scripts:** 2026-07-21
+
+**Start here from the repo root:** [README.md](../../README.md) (overview, agents, principles).
+
+Agents **execute** [`agents/architect.md`](../../agents/architect.md) and **skills** under `skills/` — not this file. When the workflow changes, update architect, the affected skills, this document, and the root README together.
+
+## At a glance
+
+| Phase | Gate | Who decides | Skill (architect invokes) |
+|-------|------|-------------|---------------------------|
+| 1. Design & spec | G1a, G1b | **Human** | `brainstorming` |
+| 2. Plan | G2 | **Human** | `writing-plans` |
+| 3. Isolated workspace | G3 | Auto (ask if tests fail) | `using-git-worktrees` → **`scripts/create-worktree.sh`** |
+| 4. Implementation loop | G4–G6 | Auto | `subagent-driven-development` |
+| 4.5 Visual check (UI features) | G4.5 | Auto, soft block on fail | `scripts/visual-compliance-check.sh` |
+| 5. Docs on branch | — | Auto | dispatch `@docser` |
+| 6. Finish | G7 | **Human** | `finishing-a-development-branch` |
+
+**After merge / polish:** [`fast-track-protocol`](../../skills/fast-track-protocol/SKILL.md) (lighter path, architect still delegates).
+
+**Unsure which agent to dispatch?** Architect may use [`find-specialist`](../../skills/find-specialist/SKILL.md) (not a gate).
 
 ## Legend
 
@@ -57,12 +80,14 @@
 ║  STEP 3: GIT WORKTREE  (Auto Gate G3)                       ║
 ╚══════════════════════════════════════════════════════════════╝
          │
-         │ 1. Invoke skill `using-git-worktrees`
-         │ 2. git worktree add .worktrees/feat-<name> -b feat-<name>
-         │ 3. cd .worktrees/feat-<name>
-         │ 4. cd frontend && npm install / cd backend && uv sync / pip install
-         │ 5. Run tests → verify clean baseline
-         │    npm run test:all  # vitest + playwright (browsers pre-installed in image)
+         │ 1. Invoke skill `using-git-worktrees` (or follow it if already loaded)
+         │ 2. From repository root — run script (do not hand-roll worktree/deps):
+         │      ./scripts/create-worktree.sh <branch-name>
+         │    → creates .worktrees/<branch>, copies env files, sets up deps
+         │ 3. cd .worktrees/<branch-name>
+         │ 4. Confirm .worktrees/ is gitignored (skill Step 2)
+         │ 5. Run project test suite → clean baseline
+         │    (commands are project-specific: pnpm test, pytest, cargo test, …)
          │
          ▼  [G3: TESTS PASS]  (if fail → ask user)
          │
@@ -96,7 +121,9 @@
     │   If diff touches UI │
     │   (.tsx, .css,       │
     │   tailwind.config)   │
-    │   → run `test:all`   │
+    │   → full visual test │
+    │   suite (example:    │
+    │   Memo: `test:all`)  │
     └──────────┬──────────┘
          │
          ▼
@@ -141,8 +168,10 @@
           │ │                                          │
           │ │   Stage 2: @code-quality-reviewer         │
           │ │     Reads diff file + runs test suite    │
-          │ │     UI diff → `npm run test:all`          │
-          │ │     Else → `npm run test` (vitest only)   │
+          │ │     UI diff → full visual tests         │
+          │ │       (example Memo: `npm run test:all`)  │
+          │ │     Else → unit tests only              │
+          │ │       (example Memo: `npm run test`)    │
           │ │     If ❌ → implementer fixes → re-review │
           │ │     If ✅ → task complete                 │
           │ └─────────────────────────────────────────┘
@@ -194,8 +223,8 @@
 ╚══════════════════════════════════════════════════════════════╝
          │
          │ 1. Invoke skill `finishing-a-development-branch`
-         │ 2. Run final tests
-         │    npm run test:all  # vitest + playwright
+         │ 2. Run final tests (project-specific;
+         │    example Memo: `npm run test:all`)
          │ 3. Present 4 options:
          │
          ▼  [G7: USER CHOOSES]
@@ -210,6 +239,33 @@
 └────────┘ └──────────┘ └──────────┘ └──────────┘             │
 ```
 
+> **Diagram note:** Commands shown as *example (Memo)* illustrate one reference stack (Next.js + vitest/playwright). Your project uses its own test commands in the `.opencode/` copy of agents/skills — not defined in this framework repo.
+
+## Alternate path: Fast Track Protocol (FasTP)
+
+**Not a gate.** Used after merge or when the user sends a stream of small fixes/polish in chat — **not** for new features (those use Steps 1–7 above).
+
+```
+User: post-merge fixes / UI polish / wiring tweaks
+         │
+         ▼
+┌────────────────────────────────────────┐
+│ @architect invokes `fast-track-protocol`│
+│ • Skip G1–G2 (no new spec/plan)         │
+│ • Still dispatches coders (no self-code)│
+│ • UI changes → visual verification still│
+│   mandatory (per skill)                 │
+│ • Local WIP commits until user signals  │
+│   Phase 2 wrap-up ("коммитим", ship…)   │
+└────────────────────────────────────────┘
+         │
+         │ grows into real feature?
+         ▼
+    STOP FasTP → back to Step 1 (brainstorming)
+```
+
+Runtime: [`skills/fast-track-protocol/SKILL.md`](../../skills/fast-track-protocol/SKILL.md) + rules in [`agents/architect.md`](../../agents/architect.md) (Fast Track Protocol Skill).
+
 ## Quality Gates Summary
 
 ```
@@ -219,7 +275,7 @@ G2 ─── Plan Approval ─────────── Human ── Plan w
 G3 ─── Clean Baseline ────────── Auto ─── Tests pass on empty worktree
 G4 ─── TDD Compliance ────────── Auto ─── Implementer self-check
 G4a ── Architect Spot-Check ──── Auto ─── Diff ≤5 lines (trivial only)
-G4.5 ─ Visual Compliance ─────── Auto ─── Screenshots + DOM checks match design spec
+G4.5 ─ Visual Compliance ─────── Auto ─── UI phases only; skip if no UI (see below)
 G5 ─── Spec Compliance ───────── Auto ─── Code matches plan (reviewer)
 G6 ─── Code Quality + Tests ──── Auto ─── Clean code, tests pass
 G6a ── Review Loop Limit ─────── Auto ─── Max 3 iterations → escalate
@@ -302,14 +358,28 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 
 ## Visual Compliance Gate (Step 4.5)
 
-**Why:** Prevents UI mismatch incidents (e.g. "Календарь-линия" implemented instead of "Сегодня / Завтра / Календарь" tabs). Caught by user manually — now automated.
+**Why:** Prevents UI mismatch (wrong tabs, missing controls). Catches what unit tests often miss — layout and visible DOM.
 
 **What it does:**
 1. **Screenshot capture** — Playwright captures key page states (mobile 390x844 by default, desktop optional)
 2. **Element presence checks** — Verifies DOM elements from the spec exist and are visible
 3. **Report generation** — Markdown report with pass/fail status and screenshot paths
 
-**Spec integration:** Design specs should include a `## Visual Compliance Checks` section:
+### When to run G4.5 vs skip
+
+| Situation | Step 4.5 |
+|-----------|----------|
+| Phase changes **user-visible UI** (pages, components, styles users see) | **Run** after all tasks in that phase — once per phase, not per task |
+| Design spec has **`## Visual Compliance Checks`** with real checklist items | **Run** — script reads that section |
+| Phase is **backend/API/CLI/data only** — no UI surface in scope | **Skip** — go Step 4 → Step 5; do not run the script |
+| Spec explicitly says **Visual Compliance N/A** (e.g. infra skill, no UI) | **Skip** — document in spec why N/A |
+| **Mixed phase** (API + UI) | **Run** if any UI shipped; checks cover UI portion of spec |
+
+**Architect rule of thumb:** If Step 1 spec never needed a Visual Compliance section and no `.tsx`/user-facing CSS was in the plan, skip 4.5. If UI was in scope, G1 spec should have included checks; missing section on a UI feature is a spec gap — add checks or ask the user before skipping.
+
+**Per-task vs phase:** Implementers may run narrower visual/unit tests **per task** when UI files change (see Step 4 diagram). **G4.5** is the **phase-level** gate with `visual-compliance-check.sh` and the design spec file — one run before documentation (Step 5).
+
+**Spec integration (UI features):** Design specs should include a `## Visual Compliance Checks` section:
 
 ```markdown
 ## Visual Compliance Checks
@@ -320,7 +390,7 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 - [ ] Clicking a filter pill highlights it and filters the list
 ```
 
-**Execution:**
+**Execution (example — Memo, Next.js on :3000):**
 ```bash
 /root/workspace/superagents/scripts/visual-compliance-check.sh \
   http://localhost:3000 \
@@ -333,21 +403,30 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 - **PASS** → auto-proceed to Step 5
 - **FAIL** → soft block (user can override). User chooses: fix/re-run, override, or abort
 
-## Implementation Points
+## Workflow change checklist
 
-**This document describes the workflow conceptually. The actual execution is embedded in agent and skill files. See the main SuperAgents repository for source files.**
+When behavior of a step or gate changes, update in order:
 
-| Workflow Element | File |
-|-----------------|------|
-| Step 3 (G3 baseline test) | `agents/architect.md` Step 3 |
-| Step 4b (implementer prompt) | `agents/architect.md` Step 4b |
-| Step 4d (review test run) | `agents/architect.md` Stage 2 review |
-| Step 4.5 (visual compliance) | `scripts/visual-compliance-check.sh` |
-| Quality reviewer tests | `agents/code-quality-reviewer.md` |
-| Worktree baseline test | `skills/using-git-worktrees/SKILL.md` Step 4 |
-| Review pipeline | `skills/subagent-driven-development/SKILL.md` |
+1. **`agents/architect.md`** — steps, triggers, gate rules (architect follows this through the flow)
+2. **Affected `skills/*/SKILL.md`** — procedure invoked at that step
+3. **`scripts/`** — if automation changes
+4. **`docs/workflow/README.md`** — human diagram and gates (this file)
+5. **[README.md](../../README.md)** — if gates, skills list, or onboarding summary changes
+6. **Project repos** — sync generic changes into `.opencode/`; restart agent runtime if required
 
-**Rule:** When this workflow changes, ALL agent and skill files MUST be synchronized. The system executes agent files, not this document.
+## Documentation map (keep in sync)
+
+| What | Human-readable | Runtime (agents execute) |
+|------|----------------|---------------------------|
+| Full flow & gates | **This file** | — |
+| Overview & onboarding | [README.md](../../README.md) | — |
+| Orchestration steps | — | [agents/architect.md](../../agents/architect.md) |
+| Worktree create/remove | — | [skills/using-git-worktrees/SKILL.md](../../skills/using-git-worktrees/SKILL.md), [scripts/create-worktree.sh](../../scripts/create-worktree.sh), [scripts/remove-worktree.sh](../../scripts/remove-worktree.sh) |
+| Dev loop & reviews | — | [skills/subagent-driven-development/SKILL.md](../../skills/subagent-driven-development/SKILL.md) |
+| Visual gate | Step 4.5 above | [scripts/visual-compliance-check.sh](../../scripts/visual-compliance-check.sh) |
+| Reviewer behavior | Agent table above | [agents/spec-reviewer.md](../../agents/spec-reviewer.md), [agents/code-quality-reviewer.md](../../agents/code-quality-reviewer.md) |
+
+Test commands and app paths in diagrams may show *example (Memo)*; each project configures its own commands in its `.opencode/` agent/skill copies.
 
 **Container restart required** after any `agents/*.md` or `skills/**/SKILL.md` changes.
 
