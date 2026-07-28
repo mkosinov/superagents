@@ -243,6 +243,17 @@ git worktree prune  # Self-healing: clean up any stale registrations
 
 **Otherwise:** The host environment (harness) owns this workspace. Do NOT remove it.
 
+### Step 7: Report Board-Update Facts to @manager (mandatory)
+
+After a successful merge, the architect does NOT touch the GH Project board — board updates are @manager's decision and responsibility. The architect's only duty: include this block in the DONE report so the manager has the facts:
+
+```
+## Board Update Needed
+- Issue: #N (or "no issue — FasTP fix without issue")
+- Next Up: was 1|2|3|not in queue
+```
+
+
 ## Quick Reference
 
 | Flow | Trigger | Merge | Push | Keep Worktree | Cleanup Branch |

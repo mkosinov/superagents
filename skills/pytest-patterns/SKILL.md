@@ -384,6 +384,20 @@ def test_zero_amount_should_be_rejected(self, api_client, create_record):
 
 `strict=True` means: if the test unexpectedly passes (validation was added), CI fails and you update the marker.
 
+### Rule: skip/xfail requires a GH issue link
+
+Any `@pytest.mark.skip`, `@pytest.mark.xfail`, `pytest.skip()`, or `pytest.xfail()` that disables a test **must reference a GitHub issue** — create one if it doesn't exist yet:
+
+```python
+# GOOD
+@pytest.mark.xfail(reason="GH #123: add gt=0 validation to PaymentCreate schema", strict=True)
+
+# BAD — no issue link, will never be revisited
+@pytest.mark.skip(reason="flaky on CI")
+```
+
+Conditional skips (e.g. `pytest.importorskip`, skip by missing fixture data) don't need a link. CI job `skip-tracker` (`scripts/check_skipped_tests.py`) warns when a linked issue is closed but the test is still skipped — that's the signal to re-enable it.
+
 ---
 
 ## Enum Validation

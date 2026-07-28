@@ -41,6 +41,14 @@ BEFORE writing any E2E test:
 AFTER writing code:
   RUN the relevant test command (see Running Tests)
   FIX compilation errors before declaring done
+
+NEVER disable a test without a GitHub issue link:
+  test.skip(true, 'GH #123')        ← GOOD — tracked, CI warns when #123 closes
+  test.fixme('GH #124: flaky …')    ← GOOD
+  test.skip(true, 'waiting for X')  ← BAD — no issue, gets lost
+  Conditional skips inside test body (missing seed data: if (!row) { test.skip(); return; })
+  are fine without a link.
+  CI job `skip-tracker` (scripts/check_skipped_tests.py) checks linked issue status.
 ```
 
 ---
