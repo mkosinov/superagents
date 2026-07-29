@@ -48,13 +48,15 @@ You MUST dispatch the `researcher-agent` subagent (via the task tool) at least o
 
 ```markdown
 ## Findings
-- [BLOCKER] <what> — <why> — <where in spec: section/quote> — <evidence tag>
+- [BLOCKER] <what> — <why> — <where in spec: section/quote> [VERIFIED via research | SELF-ASSESSED]
 - [MAJOR] ...
 - [MINOR] ...
 
 ## Verdict
 SOUND | SOUND_WITH_CONCERNS | NEEDS_REVISION
 ```
+
+The evidence tag goes INSIDE the finding line appended to the `<where>` field (same 3-field em-dash structure as the other 4 panelists — the architect aggregates all 5 reports and format consistency matters). If researcher-agent was unavailable, append the verdict label with `(researcher unavailable — all findings SELF-ASSESSED)`.
 
 Every finding MUST carry a `[VERIFIED via research]` or `[SELF-ASSESSED]` tag. Findings without research backing on topics where research was possible are not acceptable.
 
