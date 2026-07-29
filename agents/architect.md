@@ -354,7 +354,13 @@ Actions:
    - Example: `- [ ] "Сегодня" tab is visible and clickable on main page`
    - These checks feed the automated Visual Compliance Gate (Step 4.5)
 5. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
-6. Run spec self-review (placeholder scan, consistency, scope, ambiguity)
+ 6. Run spec self-review (placeholder scan, consistency, scope, ambiguity)
+ 7. Run **Spec Panel Review** (see brainstorming skill — skip for trivial specs < ~50 lines):
+    - Dispatch all 5 panelists (`spec-review-completeness`, `spec-review-feasibility`, `spec-review-consistency`, `spec-review-simplicity`, `spec-review-best-practices`) in parallel, each with the spec file path.
+    - Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note agreement across perspectives.
+    - Present one consolidated report next to the spec; the user decides fix / dismiss / approve. The panel never edits the spec itself.
+    - Apply the retry → partial skip → full skip availability policy from the brainstorming skill.
+    - If user requests spec changes → revise, re-commit, re-run the panel.
 
 **[GATE G1b] Written Spec Approval (HARD BLOCK)**
 - Present the written spec file to user: "Spec written and committed to `<path>`. Please review the file and confirm: (1) you have read it, and (2) you approve it as the basis for implementation."
@@ -382,15 +388,7 @@ Actions:
      - **Architect fixes the PLAN itself** — this is the architect's own domain (planning, NOT implementation). Editing a plan doc is allowed; writing production code is NOT.
      - Re-commit the plan, re-dispatch spec-reviewer in Plan Review Mode.
    - If still ❌ after 3 iterations → **escalate to user** with a summary of the unresolved plan issues.
-    - **Controller-never-implements still holds:** fixing a plan document is allowed; touching .ts/.tsx/.py/.css/.sql is NOT.
-
-### Spec Panel aggregation (brainstorming step)
-
-When running the Spec Panel Review (see brainstorming skill):
-- Dispatch all 5 panelists in parallel, each with the spec file path.
-- Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note agreement across perspectives.
-- Present one consolidated report next to the spec; the user decides fix / dismiss / approve. The panel never edits the spec itself.
-- Apply the retry → partial skip → full skip availability policy from the brainstorming skill.
+     - **Controller-never-implements still holds:** fixing a plan document is allowed; touching .ts/.tsx/.py/.css/.sql is NOT.
 
 7. **[GATE G2] Asymmetric user gate — present by BEHAVIOR, not code:**
    - **Frontend features:** Present to the user ONLY the **behavioral delta** — how the feature will behave for the user, mapped to the spec's acceptance criteria (use the plan's `## Behavioral Delta` section, see writing-plans skill). Do NOT dump code, file names, or the task breakdown. The user approves by BEHAVIOR and relies on spec-reviewer (Step 2.6) for engineering correctness.
