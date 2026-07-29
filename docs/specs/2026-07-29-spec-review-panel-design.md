@@ -122,9 +122,12 @@ Context/output limits are placeholders to be verified against omniroute's actual
 
 ## Error handling
 
-- **Panelist fails / times out / model quota exhausted across all 3 accounts:** architect notes the failure in the consolidated report ("perspective X unavailable") and proceeds with the remaining reports. User decides whether that's acceptable or to retry later.
+Availability policy: **retry → partial skip → full skip**.
+
+- **Panelist fails or quota exhausted:** the architect retries the dispatch up to 2 more times (3 attempts total, short delay between). If still failing → the perspective is **skipped**, marked in the consolidated report as "perspective X unavailable (quota exhausted / error)", and the panel proceeds with the remaining reports. The user decides whether the partial panel is acceptable or wants to wait and re-run.
+- **All 5 panelists unavailable (e.g., all zen quotas exhausted):** the entire panel is **skipped**. The architect explicitly warns the user ("spec panel skipped — all free models unavailable, spec not independently reviewed") and proceeds straight to the user review gate. The user may approve anyway or postpone until quotas reset.
 - **Researcher-agent unavailable for best-practices:** the best-practices agent reports with all findings tagged `[SELF-ASSESSED]` and notes the research failure in its verdict.
-- **Empty findings from all 5:** consolidated report states "all perspectives SOUND" and the flow proceeds to user review.
+- **Empty findings from all available panelists:** consolidated report states "all perspectives SOUND" and the flow proceeds to user review.
 
 ## Testing
 
@@ -132,6 +135,7 @@ Context/output limits are placeholders to be verified against omniroute's actual
 - Verify model routing: check omniroute call logs that requests went to the expected free models.
 - Verify skip rule on a trivial spec.
 - Verify re-run flow: request a spec change, confirm the panel re-runs on the revision.
+- Verify availability policy: simulate one failing model (partial skip with warning) and all-failing (full skip with explicit warning before user review gate).
 
 ---
 
