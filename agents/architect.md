@@ -37,6 +37,11 @@ permission:
     "docser": allow
     "spec-reviewer": allow
     "code-quality-reviewer": allow
+    "spec-review-completeness": allow
+    "spec-review-feasibility": allow
+    "spec-review-consistency": allow
+    "spec-review-simplicity": allow
+    "spec-review-best-practices": allow
     "*": allow
   skill:
     "brainstorming": allow
@@ -377,7 +382,15 @@ Actions:
      - **Architect fixes the PLAN itself** — this is the architect's own domain (planning, NOT implementation). Editing a plan doc is allowed; writing production code is NOT.
      - Re-commit the plan, re-dispatch spec-reviewer in Plan Review Mode.
    - If still ❌ after 3 iterations → **escalate to user** with a summary of the unresolved plan issues.
-   - **Controller-never-implements still holds:** fixing a plan document is allowed; touching .ts/.tsx/.py/.css/.sql is NOT.
+    - **Controller-never-implements still holds:** fixing a plan document is allowed; touching .ts/.tsx/.py/.css/.sql is NOT.
+
+### Spec Panel aggregation (brainstorming step)
+
+When running the Spec Panel Review (see brainstorming skill):
+- Dispatch all 5 panelists in parallel, each with the spec file path.
+- Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note agreement across perspectives.
+- Present one consolidated report next to the spec; the user decides fix / dismiss / approve. The panel never edits the spec itself.
+- Apply the retry → partial skip → full skip availability policy from the brainstorming skill.
 
 7. **[GATE G2] Asymmetric user gate — present by BEHAVIOR, not code:**
    - **Frontend features:** Present to the user ONLY the **behavioral delta** — how the feature will behave for the user, mapped to the spec's acceptance criteria (use the plan's `## Behavioral Delta` section, see writing-plans skill). Do NOT dump code, file names, or the task breakdown. The user approves by BEHAVIOR and relies on spec-reviewer (Step 2.6) for engineering correctness.
