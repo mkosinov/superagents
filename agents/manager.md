@@ -87,6 +87,8 @@ task(subagent_type: "architect", prompt: |
   Run the DESIGN phase per your spec: write design spec → G1b (NEEDS_APPROVAL) →
   plan + plan review → G2 (NEEDS_APPROVAL) → worktree + baseline.
   Stop and report NEEDS_APPROVAL at each gate.
+  DESIGN-phase doc commits are pushed to main immediately after gate approval
+  (spec after G1b, plan after G2) — never left local (prevents divergent main at finishing).
 )
 ```
 
@@ -94,8 +96,8 @@ task(subagent_type: "architect", prompt: |
 
 Handle its reports:
 
-- **NEEDS_APPROVAL (G1b):** present spec path to user: "Spec at `<path>`. Read it and confirm approval as basis for implementation." On approval → resume same task_id: "G1b approved. Proceed to plan." On changes → resume with the change list.
-- **NEEDS_APPROVAL (G2):** present the behavioral delta (frontend) or delta + plan path offer (backend). On approval → resume: "G2 approved. Proceed to worktree."
+- **NEEDS_APPROVAL (G1b):** present spec path to user: "Spec at `<path>`. Read it and confirm approval as basis for implementation." On approval → resume same task_id: "G1b approved. Proceed to plan." On changes → resume with the change list. **After approval, confirm the spec commit was pushed to main** (architect is instructed to push as the first step after resuming on "G1b approved"; verify with `git status` / `git log origin/main..main` if unsure).
+- **NEEDS_APPROVAL (G2):** present the behavioral delta (frontend) or delta + plan path offer (backend). On approval → resume: "G2 approved. Proceed to worktree." **The architect pushes the plan commit to main as the first step on resume** — the worktree then branches off the updated main, and the feature branch diff contains only implementation commits.
 - **DONE:** record worktree path, branch, baseline in scratchpad. Tell the user: "Ready for implementation. Say the word to start the dev loop."
 - **BLOCKED:** present the blocker to the user with the architect's summary.
 

@@ -354,6 +354,10 @@ Actions:
    - Example: `- [ ] "Сегодня" tab is visible and clickable on main page`
    - These checks feed the automated Visual Compliance Gate (Step 4.5)
 5. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
+   - **DESIGN-phase docs rule:** the spec commit stays LOCAL until G1b approval — do NOT push
+     before the gate (the user may request changes). After G1b passes, push it immediately
+     (see Step 2 action 0). NEVER leave the approved commit local: unpushed spec/plan commits
+     on main cause a divergent local main at finishing time.
  6. Run spec self-review (placeholder scan, consistency, scope, ambiguity)
  7. Run **Spec Panel Review** (see brainstorming skill — skip for trivial specs < ~50 lines):
     - Dispatch all 5 panelists (`spec-review-completeness`, `spec-review-feasibility`, `spec-review-consistency`, `spec-review-simplicity`, `spec-review-best-practices`) in parallel, each with the spec file path.
@@ -372,10 +376,14 @@ Actions:
 Trigger: **Written spec explicitly approved by user (G1b passed).**
 **Pre-condition check:** Before invoking writing-plans, verify that user explicitly confirmed approval of the written spec file. If unsure — stop and ask user to confirm.
 Actions:
+0. **Push the approved spec commit to main** (if not yet pushed): `git push origin main` (or the
+   current base branch). Verify with `git status` that main is no longer ahead of origin.
 1. Invoke skill `writing-plans`
 2. Create bite-sized implementation plan: exact file paths, exact code blocks, exact commands, no placeholders
 3. **Classify each task:** trivial / small / standard / large (see Section 13)
 4. Save to `docs/plans/YYYY-MM-DD-<feature>-plan.md` and commit it (`git add docs/plans/... && git commit -m "docs: add plan for <feature>"`).
+   Do NOT push yet — the user may request changes at G2. Push immediately after G2 approval
+   (see Step 3 action 0).
 5. **Architect self-review:** scan for TBD, TODO, "implement later", vague requirements. Fix inline.
 
 6. **Plan Review (automated — runs BEFORE the user gate):**
@@ -400,6 +408,9 @@ Actions:
 ### Step 3: Git Worktree (Auto Gate G3)
 Trigger: Plan approved.
 Actions:
+0. **Push the approved plan commit to main**: `git push origin main`. Verify with `git status`
+   that main is no longer ahead of origin — the worktree must branch off the up-to-date main so
+   the feature branch diff contains only implementation commits.
 1. Invoke skill `using-git-worktrees` and follow it — **run `./scripts/create-worktree.sh <branch-name>` from repo root** (no manual `git worktree add`, env copy, or node_modules wiring).
 2. `cd .worktrees/<branch-name>` per script output.
 3. Complete skill Step 2 (`.worktrees/` in `.gitignore`) if needed.

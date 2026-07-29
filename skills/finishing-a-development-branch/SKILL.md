@@ -128,6 +128,10 @@ if gh pr checks --watch; then
   # Update local main
   git checkout <base-branch>
   git pull origin <base-branch>
+  # NOTE: spec/plan doc commits are pushed to main at G1b/G2 approval time, so this pull is
+  # normally a clean fast-forward. If it FAILS because local main has diverged (unpushed doc
+  # commits from an older workflow), STOP and contact the user — do NOT `reset --hard` silently
+  # (risks losing unpushed commits).
 else
   echo "❌ CI checks failed (red). NOT auto-merging."
   echo "PR: $PR_URL — report to user. Preserve worktree for fixes."
@@ -277,6 +281,8 @@ After a successful merge, the architect does NOT touch the GH Project board — 
 - Remove a worktree before confirming merge success
 - Clean up worktrees you didn't create (provenance check)
 - Run `git worktree remove` from inside the worktree
+- `reset --hard` local main on a divergent pull — unpushed DESIGN-phase doc commits should not
+  exist (they are pushed at G1b/G2); if they do, stop and ask the user
 
 **Always:**
 - Verify tests before finishing
