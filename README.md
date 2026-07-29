@@ -20,6 +20,7 @@ Capabilities:
 - **Documentation on the feature branch** before finish
 - **Resumable sessions** via `.opencode/scratchpad.md`
 - **Fast Track Protocol** for post-merge polish without full G1–G2
+- **Spec review panel** — 5 parallel free-model perspectives review every spec before user approval
 - **Reflection mode** for workflow self-analysis (`/reflect`, `skills/reflect/`)
 
 ## Workflow guide (detailed)

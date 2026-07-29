@@ -15,6 +15,8 @@ mkdir -p .opencode/agents
 cp /root/workspace/superagents/agents/*.md .opencode/agents/
 ```
 
+This includes the 5 spec review panel agents (`spec-review-*.md`) used by the brainstorming skill's Spec Panel Review step.
+
 ## Step 2: Copy Skills
 
 ```bash
@@ -55,7 +57,25 @@ cp /root/workspace/superagents/templates/reviewers/*.md .opencode/skills/reviewe
 }
 ```
 
-## Step 5: Create Project Directories
+## Step 5: Configure Spec Review Panel models
+
+The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-review-*.md`) needs its configured model to be resolvable by the project's providers.
+
+Reference default (memo project): free OpenCode Zen models via the `omniroute` provider:
+
+| Panelist | Model |
+|----------|-------|
+| spec-review-completeness | `omniroute/opencode-zen/big-pickle` |
+| spec-review-feasibility | `omniroute/opencode-zen/mimo-v2.5-free` |
+| spec-review-consistency | `omniroute/opencode-zen/nemotron-3-ultra-free` |
+| spec-review-simplicity | `omniroute/opencode-zen/deepseek-v4-flash-free` |
+| spec-review-best-practices | `omniroute/opencode-zen/ling-3.0-flash-free` |
+
+**Model substitution:** to swap a panelist's model, edit the `model:` line in the corresponding `.opencode/agents/spec-review-*.md`. Reserve pool in the zen tier: `opencode-zen/north-mini-code-free`, `opencode-zen/laguna-s-2.1-free` — or use any capable model available to the project.
+
+If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
+
+## Step 6: Create Project Directories
 
 ```bash
 mkdir -p docs/specs docs/plans
@@ -63,7 +83,7 @@ mkdir -p .worktrees
 echo ".worktrees/" >> .gitignore
 ```
 
-## Step 6: Create Scratchpad
+## Step 7: Create Scratchpad
 
 ```bash
 cat > .opencode/scratchpad.md << 'EOF'
@@ -84,7 +104,7 @@ cat > .opencode/scratchpad.md << 'EOF'
 EOF
 ```
 
-## Step 7: Restart OpenCode Container
+## Step 8: Restart OpenCode Container
 
 ```bash
 cd /root/docker && docker compose down opencode && docker compose up -d opencode
@@ -92,7 +112,7 @@ cd /root/docker && docker compose down opencode && docker compose up -d opencode
 
 **Required:** Container caches agents and skills at startup. Restart after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.
 
-## Step 8: Start Workflow
+## Step 9: Start Workflow
 
 Invoke `@architect` agent and request a new feature. The workflow begins at **G1 (Brainstorming)**.
 
