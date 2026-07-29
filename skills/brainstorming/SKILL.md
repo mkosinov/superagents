@@ -31,16 +31,17 @@ You MUST create a task for each of these items and complete them in order:
 4. **Present design sections** — in sections scaled to their complexity, get user approval after each section. **Must include a `## User Scenarios` section** listing 3-7 user tasks the feature enables. Each scenario maps to an E2E test (see testing-strategy-v2 / User Scenario workflow).
 5. **Write design doc** — save to `docs/specs/YYYY-MM-DD-<topic>-design.md` and commit
 6. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope
-7. **User reviews written spec** — ask user to review the spec file before proceeding
-8. **Get EXPLICIT written spec approval** — user must confirm they reviewed the file and approve it as-is
-9. **Transition to implementation** — ONLY after step 8, invoke writing-plans skill to create implementation plan
+7. **Spec Panel Review** — run the 5-perspective spec review panel (see "Spec Panel Review" section below), present consolidated findings with the spec
+8. **User reviews written spec** — ask user to review the spec file before proceeding
+9. **Get EXPLICIT written spec approval** — user must confirm they reviewed the file and approve it as-is
+10. **Transition to implementation** — ONLY after step 9, invoke writing-plans skill to create implementation plan
 
-**CRITICAL:** Steps 4 and 8 are TWO SEPARATE approvals. Step 4 is "design concept looks right". Step 8 is "the written spec file is correct and I approve it for implementation". Do NOT skip step 8.
+**CRITICAL:** Steps 4 and 9 are TWO SEPARATE approvals. Step 4 is "design concept looks right". Step 9 is "the written spec file is correct and I approve it for implementation". Do NOT skip step 9.
 
 ## Process Flow
 
 ```
-Explore project context → Ask clarifying questions → Propose 2-3 approaches → Present design sections → User approves? → Write design doc → Spec self-review → User reviews spec? → Invoke writing-plans skill
+Explore project context → Ask clarifying questions → Propose 2-3 approaches → Present design sections → User approves? → Write design doc → Spec self-review → Spec panel review → User reviews spec? → Invoke writing-plans skill
 ```
 
 **The terminal state is invoking writing-plans.** Do NOT invoke frontend-design, mcp-builder, or any other implementation skill. The ONLY skill you invoke after brainstorming is writing-plans.
@@ -99,6 +100,30 @@ After writing the spec document, look at it with fresh eyes:
 4. **Ambiguity check:** Could any requirement be interpreted two different ways?
 
 Fix any issues inline. No need to re-review — just fix and move on.
+
+**Spec Panel Review (automated — runs BEFORE the user gate):**
+
+After the spec self-review passes, run the spec review panel — 5 parallel subagents, each analyzing the spec from one perspective:
+
+| Perspective | Subagent |
+|-------------|----------|
+| Completeness | `spec-review-completeness` |
+| Feasibility | `spec-review-feasibility` |
+| Consistency | `spec-review-consistency` |
+| Simplicity / YAGNI | `spec-review-simplicity` |
+| Best Practices | `spec-review-best-practices` |
+
+1. Dispatch all 5 **in parallel** (single message, 5 Task calls). Each dispatch prompt MUST contain the spec file path and instruct the panelist to read it.
+2. Wait for all reports.
+3. Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note where perspectives agree (agreement = stronger signal).
+4. Present the consolidated report to the user alongside the spec. Ask: fix, dismiss, or approve.
+5. If the user requests changes → revise the spec → re-run the panel on the revision → back to step 4.
+
+**Skip rule:** you MAY skip the panel for trivial specs (< ~50 lines). State the skip explicitly.
+
+**Availability policy (retry → partial skip → full skip):**
+- Panelist fails → retry up to 2 more times (3 attempts total). Still failing → skip that perspective, mark "perspective X unavailable (quota exhausted / error)" in the consolidated report, proceed with the rest.
+- ALL 5 unavailable → skip the panel entirely, warn the user explicitly ("spec panel skipped — all free models unavailable, spec not independently reviewed"), proceed to the user review gate.
 
 **User Review Gate (BLOCKING):**
 After the spec review loop passes, ask the user to review the written spec before proceeding:
