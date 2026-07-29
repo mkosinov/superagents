@@ -43,8 +43,8 @@ AFTER writing code:
   FIX compilation errors before declaring done
 
 NEVER disable a test without a GitHub issue link:
-  test.skip(true, 'GH #123')        ← GOOD — tracked, CI warns when #123 closes
-  test.fixme('GH #124: flaky …')    ← GOOD
+  test.skip(true, 'GH #176')        ← GOOD — tracked, CI warns when #176 closes
+  test.fixme('GH #156: flaky …')    ← GOOD
   test.skip(true, 'waiting for X')  ← BAD — no issue, gets lost
   Conditional skips inside test body (missing seed data: if (!row) { test.skip(); return; })
   are fine without a link.
@@ -352,6 +352,7 @@ DB_PATH resolves as: `process.env.TEST_DB_PATH || 'backend/test_memo.db'`
 | 6 | `page.waitForTimeout()` for async sync | Use `expect(locator).toBeVisible({ timeout })` |
 | 7 | Mocking transitive dependencies in unit tests | Mock only direct `@/contexts/*` dependencies |
 | 8 | Using `renderWithProviders` when context mocks suffice | Use `renderWithProviders` only when testing real provider interactions |
+| 9 | Treating a local screenshot e2e pixel-diff as a regression | Check CI first: `gh run list --branch main` and `gh run view <id>`. If the `e2e-tests` job in `.github/workflows/test.yml` is green on both `main` and the PR, the diff is font/OS rendering drift — baselines are recorded in CI via `.github/workflows/update-snapshots.yml`. Don't edit the code and don't re-record baselines locally. See `docs/tests_workflow.md` → "Known caveats" (precedent: 2026-07-29, IMPL #182 — 6 local failures, CI green). |
 
 ---
 
