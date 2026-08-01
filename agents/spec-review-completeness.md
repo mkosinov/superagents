@@ -9,12 +9,12 @@ permission:
   glob: allow
   edit: deny
   bash:
+    "*": deny
     "git diff*": allow
     "git log*": allow
     "git show*": allow
     "ls*": allow
     "cat*": allow
-    "*": deny
   task:
     "*": deny
 ---
