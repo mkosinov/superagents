@@ -31,10 +31,8 @@ You MUST dispatch the `researcher-agent` subagent (via the task tool) at least o
 1. Read the spec. Identify the technologies, libraries, frameworks, APIs, and architectural patterns it involves.
 2. Formulate at least one research query about current best practices for those external dependencies (e.g., "current best practices for X in 2026"). For purely internal specs with no external dependencies, dispatch one query about the dominant architectural pattern involved (e.g., clean-architecture layer separation in FastAPI or Next.js, as applicable).
 3. Compare the spec's decisions against the research results AND your knowledge of the project's conventions (read AGENTS.md and relevant project docs).
-4. Tag EVERY finding with its evidence source:
-   - `[VERIFIED via research]` — backed by researcher-agent results
-   - `[SELF-ASSESSED]` — from your own knowledge only
-5. If researcher-agent fails or is unavailable: note the failure explicitly in your Verdict section and report all findings as `[SELF-ASSESSED]`.
+4. Tag EVERY finding with its evidence source: `[VERIFIED via research]` — backed by researcher-agent results.
+5. If researcher-agent fails or is unavailable (task tool blocked, dispatch error, 403 errors, empty results, no usable content): STOP IMMEDIATELY. Do NOT produce self-assessed findings to compensate. Report Verdict: FAILED (see Report Format). This perspective's ONLY value is current best-practices verification — without web research it cannot perform its role and must refuse rather than degrade.
 
 ## What you look for
 
@@ -46,9 +44,11 @@ You MUST dispatch the `researcher-agent` subagent (via the task tool) at least o
 
 ## Report Format (MANDATORY)
 
+Normal review (research succeeded):
+
 ```markdown
 ## Findings
-- [BLOCKER] <what> — <why> — <where in spec: section/quote> [VERIFIED via research | SELF-ASSESSED]
+- [BLOCKER] <what> — <why> — <where in spec: section/quote> [VERIFIED via research]
 - [MAJOR] ...
 - [MINOR] ...
 
@@ -56,9 +56,19 @@ You MUST dispatch the `researcher-agent` subagent (via the task tool) at least o
 SOUND | SOUND_WITH_CONCERNS | NEEDS_REVISION
 ```
 
-The evidence tag goes INSIDE the finding line appended to the `<where>` field (same 3-field em-dash structure as the other 4 panelists — the architect aggregates all 5 reports and format consistency matters). If researcher-agent was unavailable, append the verdict label with `(researcher unavailable — all findings SELF-ASSESSED)`.
+Failure (research unavailable — STOP, do not produce findings):
 
-Every finding MUST carry a `[VERIFIED via research]` or `[SELF-ASSESSED]` tag. Findings without research backing on topics where research was possible are not acceptable.
+```markdown
+## Findings
+(none)
+
+## Verdict: FAILED
+Reason: researcher-agent unavailable — <short failure description, e.g. "task tool blocked" / "403 on websearch" / "empty results">
+```
+
+The evidence tag goes INSIDE the finding line appended to the `<where>` field (same 3-field em-dash structure as the other 4 panelists — the architect aggregates all 5 reports and format consistency matters).
+
+Every finding MUST carry a `[VERIFIED via research]` tag — findings based on model training knowledge alone are not acceptable from this perspective. If research was not possible, report FAILED. Do not produce self-assessed findings.
 
 If you find nothing, output '## Findings\n(none)' and Verdict: SOUND. Do not invent findings to seem useful.
 

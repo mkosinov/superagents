@@ -122,7 +122,7 @@ After the spec self-review passes, run the spec review panel — 5 parallel suba
 **Skip rule:** you MAY skip the panel for trivial specs (< ~50 lines). State the skip explicitly.
 
 **Availability policy (retry → partial skip → full skip):**
-- Panelist fails → retry up to 2 more times (3 attempts total). Still failing → skip that perspective, mark "perspective X unavailable (quota exhausted / error)" in the consolidated report, proceed with the rest.
+- Panelist fails → retry up to 2 more times (3 attempts total). Still failing → skip that perspective, mark "perspective X unavailable (quota exhausted / error)" in the consolidated report, proceed with the rest. A panelist returning `Verdict: FAILED` in its report counts as a failing panelist under this policy (the panelist refused to produce findings because its distinguishing capability was unavailable — e.g. researcher-agent unreachable for the best-practices panelist).
 - ALL 5 unavailable → skip the panel entirely, warn the user explicitly ("spec panel skipped — all free models unavailable, spec not independently reviewed"), proceed to the user review gate.
 
 **User Review Gate (BLOCKING):**
