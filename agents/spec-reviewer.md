@@ -1,7 +1,7 @@
 ---
 description: Spec compliance reviewer. Verifies that implementer built exactly what was requested — nothing more, nothing less.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: omniroute/flash
 temperature: 0.1
 permission:
   read: allow

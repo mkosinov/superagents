@@ -1,7 +1,7 @@
 ---
 description: Project scribe — updates documentation, status files, and tracks progress after any agent completes work.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: omniroute/flash
 temperature: 0.3
 permission:
   read: allow

@@ -1,7 +1,7 @@
 ---
 description: Spec panel reviewer — best-practices perspective. Verifies spec decisions against current community/vendor best practices, using web research.
 mode: subagent
-model: omniroute/opencode-zen/ling-3.0-flash-free
+model: omniroute/panel-best-practices
 temperature: 0.1
 permission:
   read: allow

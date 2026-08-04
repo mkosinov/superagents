@@ -1,7 +1,7 @@
 ---
 description: Spec panel reviewer — simplicity/YAGNI perspective. Finds overengineering, unrequested scope, and needless complexity in spec documents.
 mode: subagent
-model: omniroute/opencode-zen/deepseek-v4-flash-free
+model: omniroute/panel-simplicity
 temperature: 0.1
 permission:
   read: allow

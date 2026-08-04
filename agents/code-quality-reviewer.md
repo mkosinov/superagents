@@ -1,7 +1,7 @@
 ---
 description: Code quality reviewer. Verifies that implementation is well-built, clean, tested, and maintainable. Also runs the test suite.
 mode: subagent
-model: opencode/deepseek-v4-flash-free
+model: omniroute/flash
 temperature: 0.1
 permission:
   read: allow

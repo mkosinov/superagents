@@ -1,7 +1,7 @@
 ---
 description: Spec panel reviewer — feasibility perspective. Finds technical risks, hidden complexity, and unrealistic assumptions in spec documents.
 mode: subagent
-model: omniroute/opencode-zen/mimo-v2.5-free
+model: omniroute/panel-feasibility
 temperature: 0.1
 permission:
   read: allow

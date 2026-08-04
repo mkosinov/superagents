@@ -1,7 +1,8 @@
 ---
-description: Workflow controller. Entry point, brainstorming, planning, subagent dispatch, quality gates, timeline, scratchpad keeper.
-mode: primary
-model: omniroute/architect
+description: Phase executor. Runs DESIGN (spec+plan+review+worktree) or IMPL (dev-loop, docs, finishing) phases dispatched by @manager. Never talks to the user directly.
+mode: all
+model: omniroute/kmc/k3-256k
+variant: max
 temperature: 0.2
 permission:
   read: allow
