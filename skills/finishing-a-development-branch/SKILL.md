@@ -119,19 +119,20 @@ echo "Waiting for CI checks to complete (may take 5-15 min)..."
 #   exit 0 = all passed, exit 1 = some failed
 if gh pr checks --watch; then
   echo "✅ All CI checks passed. Auto-merging..."
-  if ! gh pr merge --squash --delete-branch --subject "<title>" --body "Auto-merged: all CI checks passed."; then
+  # NOTE: run `gh pr merge --squash` WITHOUT --delete-branch. When finishing from inside a
+  # git worktree, --delete-branch tries to delete the LOCAL branch, which is checked out in the
+  # worktree ("branch is already checked out at ...") — the merge API call succeeds but the
+  # local cleanup fails, leaving a broken state. Likewise `git checkout <base-branch>` + `git pull`
+  # cannot run from inside the worktree (<base-branch> is checked out in the main working copy).
+  # So: merge ONLY here; do ALL branch/main/worktree cleanup as a separate step from the main
+  # working copy root (Step 6).
+  if ! gh pr merge --squash --subject "<title>" --body "Auto-merged: all CI checks passed."; then
     echo "❌ Merge command failed."
     echo "PR: $PR_URL — report to user. Preserve worktree."
     # STOP — do NOT clean up worktree.
     exit 1
   fi
-  # Update local main
-  git checkout <base-branch>
-  git pull origin <base-branch>
-  # NOTE: spec/plan doc commits are pushed to main at G1b/G2 approval time, so this pull is
-  # normally a clean fast-forward. If it FAILS because local main has diverged (unpushed doc
-  # commits from an older workflow), STOP and contact the user — do NOT `reset --hard` silently
-  # (risks losing unpushed commits).
+  echo "✅ PR merged on GitHub. Branch/main/worktree cleanup runs from the main working copy (Step 6)."
 else
   echo "❌ CI checks failed (red). NOT auto-merging."
   echo "PR: $PR_URL — report to user. Preserve worktree for fixes."
@@ -140,7 +141,7 @@ else
 fi
 ```
 
-**On success (all CI green + merged):** cleanup worktree (Step 6), delete local branch.
+**On success (all CI green + merged):** proceed to Step 6 — from the **main working copy root**: pull main (fast-forward to the merge commit), delete the remote branch, remove the worktree, then delete the local branch.
 
 **On ANY error — STOP and contact the user:**
 - Push fails → report the failure, preserve worktree.
@@ -238,12 +239,37 @@ WORKTREE_PATH=$(git rev-parse --show-toplevel)
 
 **If worktree path is under `.worktrees/`, `worktrees/`, or `~/.config/worktrees/`:** We own cleanup.
 
+All post-merge cleanup runs from the **main working copy root** (where `<base-branch>` is
+checked out). You cannot switch branches or delete the feature branch from inside the worktree
+— the feature branch is checked out there; `<base-branch>` (e.g. main) is checked out in the
+main copy. So `cd` to the main root first, then run the full sequence below.
+
+For the **default auto-merge flow** (Step 5 ran `gh pr merge --squash` WITHOUT `--delete-branch`),
+the remote branch is dangling and local main is stale — Step 6 pulls main and deletes the remote
+branch before removing the worktree and the local branch:
+
 ```bash
 MAIN_ROOT=$(git -C "$(git rev-parse --git-common-dir)/.." rev-parse --show-toplevel)
 cd "$MAIN_ROOT"
+
+# Default auto-merge flow — post-merge main update + remote branch cleanup.
+# (The "merge locally" / "discard" fallbacks in Step 5.1 merge/delete the branch in their own
+#  block — skip these two lines for those fallbacks.)
+git pull origin <base-branch>
+# NOTE: spec/plan doc commits are pushed to main at G1b/G2 approval time, so this pull is
+# normally a clean fast-forward. If it FAILS because local main has diverged (unpushed doc
+# commits from an older workflow), STOP and contact the user — do NOT `reset --hard` silently
+# (risks losing unpushed commits).
+git push origin --delete <feature-branch>   # delete the dangling remote branch
+
+# Worktree + local branch removal (default flow AND fallbacks).
+# Remove the worktree BEFORE deleting the local branch — the branch is checked out there.
 git worktree remove "$WORKTREE_PATH"
 git worktree prune  # Self-healing: clean up any stale registrations
+git branch -d <feature-branch>               # local branch safe to delete once the worktree is gone
 ```
+
+**Order matters:** remove the worktree first (frees the checked-out branch), then delete the local branch.
 
 **Otherwise:** The host environment (harness) owns this workspace. Do NOT remove it.
 
@@ -293,3 +319,4 @@ After a successful merge, the architect does NOT touch the GH Project board — 
 - Clean up worktree only on the default merge success path and the explicit merge-locally / discard fallbacks
 - `cd` to main repo root before worktree removal
 - Run `git worktree prune` after removal
+- Delete remote and local branches from the main working copy root only — never use `gh pr merge --delete-branch` from inside a worktree (the local branch is checked out there)

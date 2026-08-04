@@ -138,6 +138,50 @@ Use the least powerful model that can handle each role to conserve cost and incr
 
 **Never** ignore an escalation or force the same model to retry without changes.
 
+## Dead-Subagent Recovery
+
+When a dispatched subagent **dies without returning a usable report** (crash, context exhausted,
+or an unusable/no-op response) AND its `task_id` is known, follow this ordered recovery. Do NOT
+immediately re-dispatch a fresh task — you may discard a thousand lines of correct work that the
+dead subagent already produced.
+
+### Step 1: Resume the dead session (cheapest — try this FIRST)
+
+Resume the known `task_id` and ask it to report status and finish the task. A resume is far
+cheaper than a redo, and often the subagent already did the work — it just couldn't deliver the
+report. Pass a brief reminder of the original task and "report your status and finish."
+
+If the resume returns a usable report → proceed to the normal two-stage review (spec, then
+quality). Done.
+
+### Step 2: If resume fails — audit the worktree for partial work
+
+If the resume is unusable (context exhausted, inadequate response, session cannot continue),
+DO NOT re-dispatch a full redo yet. First inspect the worktree for partial changes left behind
+by the dead subagent:
+
+```bash
+cd <worktree>
+git status
+git diff                      # uncommitted changes
+git log origin/<base>..HEAD   # committed but unpushed work
+```
+
+### Step 3: Salvage or redo
+
+- **Partial changes look sound** (compile/test or a quick read shows a correct direction) →
+  dispatch a **fresh audit-verify-commit** task (NOT a full re-implementation): have a new
+  subagent review the existing diff, verify correctness (run tests), fix any gaps, and commit.
+  This salvages the dead subagent's work instead of redoing it.
+- **No useful work, or changes are broken** → re-dispatch the task fresh (full re-implementation).
+
+### Motivation
+
+Real incident (GH #185): a dead backend-coder had already produced ~1000 lines of correct
+edits. A `git status` / `git diff` audit revealed the work was sound, and a fresh
+audit-verify-commit task salvaged it — saving a full rework. But a **resume attempt would have
+been even cheaper** and was skipped; that is why resume is Step 1, not the audit.
+
 ## Red Flags
 
 **Never:**
