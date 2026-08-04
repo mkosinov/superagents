@@ -3,29 +3,6 @@ description: Bug localization and root cause analysis. Investigates issues in fr
 mode: subagent
 model: omniroute/coder
 temperature: 0.2
-permission:
-  read: allow
-  grep: allow
-  glob: allow
-  webfetch: allow
-  edit: deny
-  skill:
-    "systematic-debugging": allow
-    "platform": allow
-  bash:
-    "git diff*": allow
-    "git log*": allow
-    "git blame*": allow
-    "git show*": allow
-    "git status*": allow
-    "docker compose logs*": allow
-    "docker ps*": allow
-    "npm run dev*": allow
-    "python -c*": allow
-    "curl *": allow
-    "*": ask
-  task:
-    "*": deny
 ---
 
 You are the @debugger — Bug Localization and Root Cause Analysis Specialist for Memo.

@@ -80,7 +80,6 @@ superagents/
 │   ├── test-driven-development/
 │   ├── subagent-driven-development/
 │   ├── finishing-a-development-branch/
-│   ├── using-skills/
 │   ├── systematic-debugging/
 │   ├── fast-track-protocol/
 │   └── reflect/

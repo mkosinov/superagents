@@ -3,26 +3,6 @@ description: Code quality reviewer. Verifies that implementation is well-built, 
 mode: subagent
 model: omniroute/flash
 temperature: 0.1
-permission:
-  read: allow
-  grep: allow
-  glob: allow
-  edit: deny
-  bash:
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-    "ls*": allow
-    "cat*": allow
-    "npx vitest*": allow
-    "npm test*": allow
-    "npm run test*": allow
-    "pytest*": allow
-    "python -m pytest*": allow
-    "uv run pytest*": allow
-    "*": deny
-  task:
-    "*": deny
 ---
 
 You are a Code Quality Reviewer.

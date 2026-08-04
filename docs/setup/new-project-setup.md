@@ -23,7 +23,7 @@ This includes the 5 spec review panel agents (`spec-review-*.md`) used by the br
 mkdir -p .opencode/skills
 for skill in brainstorming writing-plans using-git-worktrees \
              test-driven-development subagent-driven-development \
-             finishing-a-development-branch using-skills systematic-debugging; do
+             finishing-a-development-branch systematic-debugging; do
   mkdir -p ".opencode/skills/$skill"
   cp "/root/workspace/superagents/skills/$skill/SKILL.md" ".opencode/skills/$skill/"
 done
@@ -49,9 +49,8 @@ cp /root/workspace/superagents/templates/reviewers/*.md .opencode/skills/reviewe
       "using-git-worktrees": "allow",
       "test-driven-development": "allow",
       "subagent-driven-development": "allow",
-      "finishing-a-development-branch": "allow",
-      "using-skills": "allow",
-      "systematic-debugging": "allow"
+       "finishing-a-development-branch": "allow",
+       "systematic-debugging": "allow"
     }
   }
 }

@@ -3,31 +3,6 @@ description: Handles deployment to production. Manages releases, CI/CD, monitori
 mode: subagent
 model: omniroute/flash
 temperature: 0.1
-permission:
-  read: allow
-  grep: allow
-  glob: allow
-  webfetch: allow
-  edit:
-    "*.md": allow
-    ".github/workflows/*": ask
-  bash:
-    "git tag -l*": allow
-    "git log*": allow
-    "git status*": allow
-    "git diff*": allow
-    "docker compose*": allow
-    "docker ps*": allow
-    "docker logs*": allow
-    "gh run watch*": allow
-    "gh run list*": allow
-    "gh pr view*": allow
-    "gh pr list*": allow
-    "ssh *": allow
-    "scp *": allow
-    "*": ask
-  task:
-    "*": deny
 ---
 
 You are the @deployer — DevOps and Deployment Specialist for Memo.

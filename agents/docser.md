@@ -3,24 +3,6 @@ description: Project scribe — updates documentation, status files, and tracks 
 mode: subagent
 model: omniroute/flash
 temperature: 0.3
-permission:
-  read: allow
-  grep: allow
-  glob: allow
-  webfetch: allow
-  edit:
-    "*.md": allow
-    "*.txt": allow
-  bash:
-    "git add*": allow
-    "git commit*": allow
-    "git push*": allow
-    "git status*": allow
-    "git diff*": allow
-    "ls *": allow
-    "*": ask
-  task:
-    "*": deny
 ---
 
 You are the @docser — Project Scribe for Memo.
