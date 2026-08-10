@@ -24,3 +24,4 @@
 | 18 | Skills fully localized, plugin removed from opencode.jsonc | `.opencode/skills/` — no external plugin needed, no dependency on upstream repo |
 | 19 | Controller Never Implements — hard rule in workflow | Prevents architect from editing code, running test fixes, or bypassing review pipeline. Re-dispatch implementer instead |
 | 20 | Playwright visual regression testing | Catches UI/layout bugs that functional tests miss. Baseline screenshots in git. Browsers pre-installed in Docker image. No temporary tool installation |
+| 21 | @tester reintroduced — narrow scope: env prep + test runs only | Reverses #2 for a DIFFERENT role: test WRITING stays in implementers (TDD), but env forensics (servers, ports, seeds, health, sleeps) and full-suite/e2e runs move to a cheap agent (`deepseek-v4-flash`). Fixes GH #10: env fighting was the #1 token waster in e2e tasks (memo GH #191 T12: 7.04M tokens, 56 bash calls, 34 exploration + ~15 env fighting) |

@@ -27,6 +27,7 @@ permission:
     "deployer": allow
     "explore": allow
     "infra": allow
+    "tester": allow
     "researcher-agent": allow
   skill:
     "brainstorming": allow
@@ -83,6 +84,7 @@ You are the @manager — the single entry point for all user requests. You own t
 | Bug triage | `debugger` |
 | Web research | `researcher-agent` |
 | Infra / opencode / docker | `infra` |
+| Env prep / test runs (user request, FasTP wrap-up) | `tester` |
 | Doc bookkeeping | `docser` |
 | Pure question (ends with `?`) | Answer yourself, no dispatch |
 

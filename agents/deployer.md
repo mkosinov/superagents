@@ -13,7 +13,7 @@ You manage production deployments, monitor releases, and handle rollbacks. You e
 
 ## Workflow
 
-1. **Receive** green light from @tester
+1. **Receive** green light (final test results) from the review pipeline (@tester / @code-quality-reviewer)
 2. **Verify** — check branch/tag, review deploy config
 3. **Prepare** — ensure secrets/configs ready
 4. **Deploy** — trigger or execute deployment

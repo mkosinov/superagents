@@ -29,6 +29,7 @@ permission:
     "spec-review-best-practices": allow
     "researcher-agent": allow
     "explore": allow
+    "tester": allow
   skill:
     "writing-plans": allow
     "domain-rules": allow
@@ -267,9 +268,14 @@ Triggered by manager dispatch. Precondition: worktree exists, baseline green, pl
 1. Invoke `subagent-driven-development` skill.
 2. Read the plan file ONCE. Extract ALL tasks with full text and classification. Keep in memory.
 3. Create TodoWrite with all tasks.
-4. **FOR each task (sequential, never parallel):**
+4. **Env pre-flight (tester, ONCE per phase):** if any plan task involves tests that need the
+   running environment (e2e, integration against live servers, visual, full-suite runs), dispatch
+   `tester` FIRST: env ready? → compact report (`## Env Status`). It leaves the environment
+   RUNNING so all subsequent tasks reuse it. Do NOT skip this and let coders fight the
+   environment mid-task — that is the #1 token waster (see decision-log #21).
+5. **FOR each task (sequential, never parallel):**
 
-   **4a. Context Gate → then Dispatch Implementer**
+   **5a. Context Gate → then Dispatch Implementer**
 
    Call `context_check` FIRST (see Context Gate → HANDOFF). Only on `OK`:
 
@@ -303,14 +309,14 @@ Triggered by manager dispatch. Precondition: worktree exists, baseline green, pl
 
    Bug fixes: Bug Fix Two-Gate Protocol from `subagent-driven-development` (RED test first → GREEN).
 
-   **4b. Handle Implementer Status**
-   - DONE → review (4c)
+   **5b. Handle Implementer Status**
+   - DONE → review (5c)
    - DONE_WITH_CONCERNS → correctness/scope issues → RE-DISPATCH with clarifications; observations → note and proceed
    - NEEDS_CONTEXT → provide context, re-dispatch same task (resume same task_id)
-   - BLOCKED → assess: context problem → re-dispatch; needs stronger model → re-dispatch; task too large → split; plan wrong → report BLOCKED to manager
+   - BLOCKED → assess: context problem → re-dispatch; needs stronger model → re-dispatch; task too large → split; **env-related failure → dispatch `tester` to restore the environment, then re-dispatch the implementer (resume same task_id)**; plan wrong → report BLOCKED to manager
    - NEVER fix code yourself.
 
-   **4c. Review by Classification**
+   **5c. Review by Classification**
 
    Save `BASE_SHA=$(git rev-parse HEAD)` before dispatch, `HEAD_SHA` after DONE.
    `git diff --stat $BASE_SHA..$HEAD_SHA` (scale) → `git diff $BASE_SHA..$HEAD_SHA > /tmp/task-diff.patch`.
@@ -319,14 +325,15 @@ Triggered by manager dispatch. Precondition: worktree exists, baseline green, pl
    - **Trivial:** no reviewers. Architect spot-check via `git diff --stat` (≤5 lines, style only). Suspicious → escalate to small pipeline.
    - **Small:** spec-reviewer only (max 3 iterations).
    - **Standard / Large:** Stage 1 spec-reviewer (max 3 iter) → only if ✅ Stage 2 code-quality-reviewer (max 3 iter). Include in quality prompt: "UI changes: [yes/no]. If yes → <project UI test command>, else → <project non-UI test command>."
+   - Reviewer test runs that need the running env (e2e/full-suite) → the reviewer dispatches `tester` itself (it has permission) instead of fighting the environment.
    - Include the Report Format (STRICT) section in every reviewer dispatch.
 
-   **4d. Review Loop Limit (circuit breaker)**
+   **5d. Review Loop Limit (circuit breaker)**
    - Max 3 iterations per reviewer. 3rd ❌ → STOP.
    - Assess: task too large → split; unclear → clarify + re-dispatch; implementer stuck → report BLOCKED to manager.
    - On each loop re-dispatch the IMPLEMENTER to fix. Never fix yourself.
 
-   **4e. Next task** — proceed automatically. BLOCKED and unresolvable → phase report BLOCKED.
+   **5e. Next task** — proceed automatically. BLOCKED and unresolvable → phase report BLOCKED.
 
 ## Step 4.5: Visual Compliance Gate
 

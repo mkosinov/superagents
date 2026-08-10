@@ -65,6 +65,7 @@ superagents/
 │   ├── backend-coder.md     # FastAPI implementer
 │   ├── spec-reviewer.md     # Spec compliance reviewer
 │   ├── code-quality-reviewer.md  # Quality + tests reviewer
+│   ├── tester.md            # Test env prep + test suite runs (cheap model)
 │   ├── debugger.md          # Root cause investigator
 │   ├── docser.md            # Meta documentation
 │   └── deployer.md          # DevOps / deploy
@@ -100,6 +101,7 @@ superagents/
 | **@backend-coder** | FastAPI + SQLite implementation | Subagent | API/backend tasks |
 | **@spec-reviewer** | Verify "code matches plan" | Subagent | After small/standard/large tasks |
 | **@code-quality-reviewer** | Verify "code is well-built AND tests pass" | Subagent | After spec-review passes |
+| **@tester** | Test env prep + test suite runs, compact reports | Subagent | Env-dependent test runs (e2e/full-suite), env pre-flight |
 | **@debugger** | Root cause analysis | Subagent | On BLOCKED/bugs |
 | **@docser** | Meta documentation (PLAN.md, CHANGELOG) | Subagent | After all tasks complete |
 | **@deployer** | Production deployment | Subagent | On user request |
@@ -113,6 +115,7 @@ superagents/
 5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
 6. **Diff for reviewers (hybrid)** — architect reads `git diff --stat` only; full diff goes to a file; reviewers read the file (saves architect tokens). Not “paste entire diff into architect chat.”
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
+8. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model); coders keep their contexts clean of env forensics
 8. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
 
 Full gate list and behavior: **[Workflow guide](docs/workflow/README.md)**.

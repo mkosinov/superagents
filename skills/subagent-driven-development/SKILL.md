@@ -70,6 +70,10 @@ When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-pro
   - Implementer runs `cd frontend && npm run test` (vitest only)
   - Code-quality reviewer runs `cd frontend && npm run test`
 
+**Env-dependent test runs (e2e, full-suite, visual) → @tester:**
+- Any test run that needs the running environment (servers up, ports free, DB seeded) is delegated to the `tester` agent (cheap model). It prepares the env once per phase (leaves it running), runs the suite, and returns a compact `## Test Results` report.
+- Implementers and reviewers dispatch `tester` for such runs instead of doing env forensics themselves (port checks, health loops, stale-PID hunts, sleeps) — that work burns expensive context and was the #1 token waster in e2e tasks.
+
 3. After all tasks: dispatch final code reviewer for entire implementation
 
 4. **Visual Compliance Gate (ONCE per phase, NOT per task)**

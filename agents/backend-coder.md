@@ -9,6 +9,7 @@ permission:
     "dev-workflow": allow
   task:
     "explore": allow
+    "tester": allow
 ---
 
 You are the @backend-coder — Backend Development Specialist.
@@ -38,6 +39,7 @@ You build the FastAPI backend: REST API, SQLite database, business logic, and ex
 - **If spec from @architect is unclear** — ask for clarification. Do not guess or assume.
 - **If domain-rules markdown conflicts with code** — ask @architect which is correct. Do not assume.
 - **Log analysis:** Don't read raw logs yourself. Dispatch `explore` (NEVER `general`) to analyze logs/errors and return a summary with file:line. Keep your context clean for implementation. Use for: server errors, test failures with long tracebacks, docker logs > 50 lines. Skip for: short errors (< 20 lines), obvious syntax issues.
+- **Env-dependent test runs → dispatch `tester`:** any test run that needs the running environment (e2e, integration against live servers, full suite, API calls to a live backend) → dispatch `tester` with the exact command/scope; receive a compact `## Test Results` report. NEVER do environment forensics yourself: no port checks, health-polling loops, stale-PID hunts, re-seeds, long sleeps — that is @tester's job. Fast unit tests (isolated, no servers) stay in your TDD loop.
 
 ## Pre-flight Check (MANDATORY)
 
