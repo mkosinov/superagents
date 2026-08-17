@@ -152,6 +152,26 @@ Allowed reads:
 
 Violation of this rule is the #1 cause of context blowout.
 
+## CRITICAL: Doc Working Discipline — Don't Re-Read Files You Own
+
+Specs and plans are large (a plan can be 20K+ tokens). Re-reading them wholesale inside one
+session is a top token waster (real case: one DESIGN session re-read a 78 KB plan 30× and its
+spec 12× ≈ 700K tokens, most of it re-sent context).
+
+1. **Read any doc fully at most ONCE per session.** You wrote it (with edits) — its content is
+   already in your context.
+2. **Locate by anchor, not by read.** Get the section map once: `grep '^## ' <file>` (for plans
+   `grep '^## Task' <file>` returns the task headers with line numbers). Then read ONLY the
+   needed region: `read <file> --offset <line> --limit <60>`.
+3. **Verify edits by region.** After an edit, confirm with `git diff --stat` + a targeted read
+   of the changed lines. Never re-open the whole file to check one section.
+4. **Batch review fixes.** When a reviewer/panel returns a list of issues: apply ALL accepted
+   fixes in one pass (a sequence of targeted `edit` calls), then verify once with rule 3. Do NOT
+   loop read ⇒ fix ⇒ re-read ⇒ next fix.
+5. **Never paste whole docs into reports or dispatch prompts.** Reference by path + section.
+   Only the current task's text goes to an implementer (IMPL Step 5a) — never the entire
+   plan/spec.
+
 ## CRITICAL: Controller Delegates Testing & Debugging
 
 You NEVER: run `pytest`/`npm test`/`vitest`/`playwright` directly (except the DESIGN baseline check), start dev servers, read server logs, curl endpoints.
@@ -211,7 +231,8 @@ Triggered by manager dispatch with the approved brainstorming output (design con
      the spec before G1b — the user may request changes at the gate. But NEVER leave the approved
      commit local either: unpushed spec/plan commits on main cause a divergent local main at
      finishing time. Push as soon as the manager resumes you with "G1b approved" (see Step 2).
-5. Self-review: placeholder scan, consistency, scope, ambiguity.
+5. Self-review: placeholder scan, consistency, scope, ambiguity. Apply Doc Working Discipline
+   (anchor-based spot-checks via `grep '^## '` + section reads — no full re-reads).
 6. Load skill `panel-spec-review` (dispatch protocol, agent roles, aggregation rules).
 7. **Spec Panel Review** (skip for trivial specs < ~50 lines, note the skip in the report):
    - Dispatch all 5 panelists (`spec-review-completeness`, `spec-review-feasibility`, `spec-review-consistency`, `spec-review-simplicity`, `spec-review-best-practices`) in parallel — single message, 5 Task calls. Each prompt MUST contain the spec file path and instruct the panelist to read it.
@@ -233,7 +254,8 @@ Trigger: manager resumes you with "G1b approved".
 4. Save to `docs/plans/YYYY-MM-DD-<feature>-plan.md`, commit (`docs: add plan for <feature>`).
    Do NOT push yet — the user may request changes at G2. Push immediately after G2 approval
    (see Step 3).
-5. Self-review: no TBD/TODO/"implement later".
+5. Self-review: no TBD/TODO/"implement later". Apply Doc Working Discipline (plan-task headers
+   are stable anchors: `grep '^## Task'` → read only the section under review).
 6. **Plan Review (standard/large features only; skip for trivial/small, note the skip in report):**
    - Dispatch `spec-reviewer` in **Plan Review Mode**: pass spec path + plan path; it reads both itself.
    - It validates: plan covers ALL spec requirements; tasks internally consistent; classification realistic; no engineering leaps.
@@ -267,6 +289,8 @@ Triggered by manager dispatch. Precondition: worktree exists, baseline green, pl
 
 1. Invoke `subagent-driven-development` skill.
 2. Read the plan file ONCE. Extract ALL tasks with full text and classification. Keep in memory.
+   A second full read in the same phase is forbidden (Doc Working Discipline) — the plan is
+   committed and stable; per-task text already lives in your session notes + TodoWrite.
 3. Create TodoWrite with all tasks.
 4. **Env pre-flight (tester, ONCE per phase):** if any plan task involves tests that need the
    running environment (e2e, integration against live servers, visual, full-suite runs), dispatch

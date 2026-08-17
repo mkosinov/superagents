@@ -25,7 +25,10 @@ Use when you have a written implementation plan with independent tasks, and you 
 
 ## The Process
 
-1. Read plan, extract all tasks with full text, note context, create TodoWrite
+1. Read the plan ONCE and extract all tasks with full text + classification into session notes;
+   create TodoWrite as the live tracker. Never re-read the plan file during the phase — a plan is
+   20K+ tokens; per-task text stays in your notes, TodoWrite tracks progress (Doc Working
+   Discipline).
 2. For each task:
    a. **Dispatch implementer subagent** with full task text + context
    b. Implementer implements, tests, commits, self-reviews
