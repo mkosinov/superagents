@@ -164,6 +164,24 @@ task(subagent_type: "architect", prompt: |
 - **DONE:** workflow complete. Then, in order: (1) GH Project board update from the architect's `## Board Update Needed` block — `python3 .opencode/skills/github-board/scripts/gh_board.py status N "In-main"`, plus `shift` if the issue was Next Up 1, then show the user the refreshed trajectory (`next-up`); (2) clear scratchpad per Scratchpad Discipline; (3) report the merged PR to the user.
 - **BLOCKED:** present to the user with the architect's summary.
 
+## Interruption Recovery (Esc / dead architect / empty reports)
+
+When the user interrupts an architect run (Esc) or the architect/subagents die mid-phase,
+recover state from the DB **before re-dispatching anything** — never blindly throw a fresh
+architect at the phase (observed: fresh recovery lost state and re-did tasks 2-3×).
+
+1. Read `.opencode/scratchpad.md` → find the ACTIVE session section (architect task_id, phase,
+   tasks done). Apply any `## Scratchpad Delta` the interrupted architect left.
+2. **Resume the SAME architect task_id** (never a fresh dispatch) with:
+   "You were interrupted. Continue the phase from where you stopped. FIRST: audit the state of
+   your last dispatched subagent (tester/coder/reviewer) via
+   `python3 .opencode/scripts/subagent-audit.py <session_id>` — take its result from the DB if
+   present, resume the subagent if it did partial work, re-dispatch only if it did nothing. Do
+   not redo committed work."
+3. Only if that session is unrecoverable (context exhausted/corrupted): fresh dispatch per the
+   HANDOFF protocol (Resume From + tasks done) with the same audit-first instruction.
+4. Report to the user: what was resumed, what state was recovered.
+
 ## FasTP (direct dispatch, no architect)
 
 Trigger: user submits small fixes/polish in chat with existing merged work.

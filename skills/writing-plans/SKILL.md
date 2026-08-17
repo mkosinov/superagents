@@ -88,6 +88,24 @@ Each task must include:
 - **No placeholders** — no "TBD", "TODO", "implement later"
 - **Exact commands with expected output**
 
+### Task Header Format — grep-able anchors
+
+Every task MUST start with a stable, unique header that can be located by grep without reading
+the file (architects read plans section-wise — this format is what makes that cheap):
+
+```markdown
+## Task N: <short unique name>
+### Classification: trivial | small | standard | large
+```
+
+- Use exactly `## Task N:` (level-2 heading), `### Classification:` immediately after.
+- Keep the name short and unique — it is the anchor for section-scoped reads.
+- Do NOT duplicate a task's full text anywhere else in the plan. Each task text appears exactly
+  once, so a section read by header is guaranteed complete.
+- Cross-reference other tasks by `Task N`, never by pasting their content.
+- After the plan is committed these headers are stable — do not renumber or rename them during
+  review-fix loops (breaks anchors, TodoWrite tracking, and resume handoffs).
+
 ### Required Docs Section
 
 Every task MUST have a `### Required Docs` section listing which docs the implementer needs to read. This is the **primary mechanism** for context transfer from architect to implementer.
@@ -138,7 +156,7 @@ See testing-strategy-v2 for full context.
 
 **Task template:**
 ```markdown
-### Task N: Add [field] to [model]
+## Task N: Add [field] to [model]
 
 **Schema change:**
 - Model: `backend/src/models/[model].py`
@@ -160,7 +178,7 @@ See testing-strategy-v2 for full context.
 
 **Example:**
 ```markdown
-### Task 3: Add sort_order to Master and Location models
+## Task 3: Add sort_order to Master and Location models
 
 **Schema change:**
 - Models: `backend/src/models/master.py`, `backend/src/models/location.py`

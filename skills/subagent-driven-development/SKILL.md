@@ -25,7 +25,10 @@ Use when you have a written implementation plan with independent tasks, and you 
 
 ## The Process
 
-1. Read plan, extract all tasks with full text, note context, create TodoWrite
+1. Read the plan ONCE and extract all tasks with full text + classification into session notes;
+   create TodoWrite as the live tracker. Never re-read the plan file during the phase — a plan is
+   20K+ tokens; per-task text stays in your notes, TodoWrite tracks progress (Doc Working
+   Discipline).
 2. For each task:
    a. **Dispatch implementer subagent** with full task text + context
    b. Implementer implements, tests, commits, self-reviews
@@ -145,9 +148,33 @@ Use the least powerful model that can handle each role to conserve cost and incr
 ## Dead-Subagent Recovery
 
 When a dispatched subagent **dies without returning a usable report** (crash, context exhausted,
-or an unusable/no-op response) AND its `task_id` is known, follow this ordered recovery. Do NOT
-immediately re-dispatch a fresh task — you may discard a thousand lines of correct work that the
-dead subagent already produced.
+an EMPTY task_result, or an unusable/no-op response) AND its task_id is known, follow this
+ordered recovery. Do NOT immediately re-dispatch a fresh task — you may discard a thousand lines
+of correct work that the dead subagent already produced.
+
+### Step 0: Empty/no-op result → DB audit first (zero token cost)
+
+An empty task_result does NOT mean "no work". Subagents often complete real work (reads, edits,
+commits, test runs) yet the final report text never materializes. Before re-dispatching or even
+resuming, read the session's actual state from the DB — this costs 0 tokens:
+
+    python3 .opencode/scripts/subagent-audit.py <session_id>
+
+(script: `superagents/scripts/subagent-audit.py`, canonical; synced to each project's
+`.opencode/scripts/`. Opens `~/.local/share/opencode/opencode.db` read-only — safe while opencode
+is running.) The digest tells you which branch to take:
+
+- **final assistant text present** (delivery/transport bug only) → use that text as the report and
+  proceed to the normal review. 0 extra tokens.
+- **git commits / test results in DB, no final text** → work was done: resume (Step 1, cheap) or
+  audit-verify-commit (Step 3). Never a fresh redo of committed work.
+- **worked but no final report** (tool calls ran, no final text) → resume the same session to
+  finish and report (Step 1) — resuming is ~1 cheap turn.
+- **no work at all** (no tool calls, only the prompt) → fresh re-dispatch is fine.
+
+Applies to ALL roles — coders, reviewers, testers, explore, docser, panelists. The recoverable
+artifact differs by role (coder → commits/tests; reviewer → final text; tester → pty/test
+verdict), but the ladder is the same.
 
 ### Step 1: Resume the dead session (cheapest — try this FIRST)
 
