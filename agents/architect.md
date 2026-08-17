@@ -302,9 +302,15 @@ Triggered by manager dispatch. Precondition: worktree exists, baseline green, pl
 3. Create TodoWrite with all tasks.
 4. **Env pre-flight (tester, ONCE per phase):** if any plan task involves tests that need the
    running environment (e2e, integration against live servers, visual, full-suite runs), dispatch
-   `tester` FIRST: env ready? → compact report (`## Env Status`). It leaves the environment
-   RUNNING so all subsequent tasks reuse it. Do NOT skip this and let coders fight the
-   environment mid-task — that is the #1 token waster (see decision-log #21).
+   `tester` FIRST with `## Request: PRE_FLIGHT`: env ready? → compact report (`## Env Status`). It
+   leaves the environment RUNNING (and records it in `.opencode/state/env.json`) so all subsequent
+   tasks reuse it. Do NOT skip this and let coders fight the environment mid-task — that is the #1
+   token waster (see decision-log #21).
+   **On phase RESUME:** dispatch `tester` with `## Request: CHECK` (health-check of
+   `.opencode/state/env.json`) before any full pre-flight — full PRE_FLIGHT only if CHECK shows the
+   env is down. Never run a full pre-flight twice while the env is healthy.
+   **On `## Status: TEST_TIMEOUT` from a suite:** decide (bump cap / investigate hang / re-run the
+   shard) — never auto-repeat the run; tester reports timeouts, it does not self-retry.
 5. **FOR each task (sequential, never parallel):**
 
    **5a. Context Gate → then Dispatch Implementer**
