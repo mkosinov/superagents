@@ -240,6 +240,14 @@ Triggered by manager dispatch with the approved brainstorming output (design con
    - Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note agreement across perspectives (agreement = stronger signal).
    - The panel never edits the spec itself — you apply any accepted fixes.
    - Availability policy (retry → partial skip → full skip): a failing panelist gets 1 retry (2 attempts total); still failing → skip that perspective, mark "perspective X unavailable" in the consolidated report. ALL 5 unavailable → skip the panel entirely, state this explicitly in the report. A panelist returning `Verdict: FAILED` in its report counts as a failing panelist under this policy (the panelist refused to produce findings because its distinguishing capability was unavailable).
+     - **Empty panelist result (replaces the blind retry):** run
+       `python3 .opencode/scripts/subagent-audit.py <task_id>` FIRST. If it shows a final report
+       text (delivery bug) → use it, no retry. If it shows work but no report → resume the same
+       task_id once ("finish your review and report") — resuming is ~1 cheap turn vs a fresh
+       re-dispatch that pays for full context reload. Only if the resume also fails → skip that
+       perspective per the policy above. **Fresh re-dispatch of a panelist whose run returned
+       empty is FORBIDDEN** (observed: 3 of 4 fresh re-dispatches returned empty again, ~1M tokens
+       burned).
 8. **Gate G1b** → report NEEDS_APPROVAL with the spec path AND the consolidated panel report (fix/dismiss/approve is the user's call via the manager). If the user requests spec changes → revise, re-commit, re-run the panel, then re-report NEEDS_APPROVAL. Stop.
 
 ## Step 2: Plan + Plan Review
