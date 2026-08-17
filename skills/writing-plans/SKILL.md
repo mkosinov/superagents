@@ -156,7 +156,7 @@ See testing-strategy-v2 for full context.
 
 **Task template:**
 ```markdown
-### Task N: Add [field] to [model]
+## Task N: Add [field] to [model]
 
 **Schema change:**
 - Model: `backend/src/models/[model].py`
@@ -178,7 +178,7 @@ See testing-strategy-v2 for full context.
 
 **Example:**
 ```markdown
-### Task 3: Add sort_order to Master and Location models
+## Task 3: Add sort_order to Master and Location models
 
 **Schema change:**
 - Models: `backend/src/models/master.py`, `backend/src/models/location.py`

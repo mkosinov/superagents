@@ -241,7 +241,7 @@ Triggered by manager dispatch with the approved brainstorming output (design con
    - The panel never edits the spec itself — you apply any accepted fixes.
    - Availability policy (retry → partial skip → full skip): a failing panelist gets 1 retry (2 attempts total); still failing → skip that perspective, mark "perspective X unavailable" in the consolidated report. ALL 5 unavailable → skip the panel entirely, state this explicitly in the report. A panelist returning `Verdict: FAILED` in its report counts as a failing panelist under this policy (the panelist refused to produce findings because its distinguishing capability was unavailable).
      - **Empty panelist result (replaces the blind retry):** run
-       `python3 .opencode/scripts/subagent-audit.py <task_id>` FIRST. If it shows a final report
+       `python3 .opencode/scripts/subagent-audit.py <session_id>` FIRST. If it shows a final report
        text (delivery bug) → use it, no retry. If it shows work but no report → resume the same
        task_id once ("finish your review and report") — resuming is ~1 cheap turn vs a fresh
        re-dispatch that pays for full context reload. Only if the resume also fails → skip that

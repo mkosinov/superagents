@@ -7,8 +7,8 @@ return an EMPTY task_result even though it did real work. Before re-dispatching
 session actually did. Zero token cost — pure SQL.
 
 Usage:
-    python3 subagent-audit.py <session_id> [--tail N] [--json]
-    python3 subagent-audit.py --project-sessions           # last 10 sessions of this project
+    python3 subagent-audit.py <session_id> [--json]
+    python3 subagent-audit.py --project-sessions           # last 10 sessions of current project dir
 
 session_id examples: ses_ffbafe64fffeOX12Lr0lgZmZKJ
 DB (default): ~/.local/share/opencode/opencode.db  (override: $OPENCODE_DB)
@@ -66,7 +66,7 @@ def extract_parts(conn, session_id):
     meta = run(conn, """
         SELECT id, COALESCE(agent,''), COALESCE(title,''), COALESCE(model,''),
                time_created, time_updated, tokens_input, tokens_output,
-               tokens_cache_read, tokens_reasoning
+               tokens_cache_read
         FROM session WHERE id = ?
     """, (session_id,))
     if not meta:
@@ -88,7 +88,20 @@ def parse_part(raw):
         return {"type": "unknown"}
 
 
-def build_digest(m, parts, tail, tail_texts, json_out=False):
+def is_pty_event(text):
+    """True if a text part is an actual pty_exited notification.
+
+    opencode injects the notification as its OWN text part that starts with the
+    opening tag, e.g. "<pty_exited>\\nID: pty_...\\nExit Code: 0...</pty_exited>
+    \\n\\nUse pty_read to check the full output.". Dispatch/instruction text that
+    merely MENTIONS the tag (usually inside backticks, e.g. "waiting for
+    `<pty_exited>`") must NOT be counted as a signal. Pragmatic heuristic:
+    require the part to START with the tag and contain the closing tag.
+    """
+    return text.startswith("<pty_exited>") and "</pty_exited>" in text
+
+
+def build_digest(m, parts, tail_texts):
     out = {"session_id": m[0]}
     text_parts, bash_cmds, git_cmds, test_lines, ptys, tasks = [], [], [], [], [], []
     text_positions = []       # (index_in_parts, ts, text) — for ordering decisions
@@ -104,8 +117,8 @@ def build_digest(m, parts, tail, tail_texts, json_out=False):
             if text:
                 text_parts.append((ts, text))
                 text_positions.append((idx, ts, text))
-                # pty_exited notifications arrive embedded in text parts
-                if "<pty_exited>" in text:
+                # pty_exited notifications arrive as their own text parts
+                if is_pty_event(text):
                     ptys.append(text)
                 low = text.lower()
                 if ("passed" in low or " failed" in low or "pass" in low) and any(c.isdigit() for c in text):
@@ -129,11 +142,11 @@ def build_digest(m, parts, tail, tail_texts, json_out=False):
             pass
 
     # a genuine final report = a text that came AFTER the LAST tool call and is
-    # not a pty notification and not a re-injected dispatch prompt
+    # not a pty notification and not a re-injected resume prompt
     final_texts = [
         (ts, text) for idx, ts, text in text_positions
-        if idx > last_tool_index and "<pty_exited>" not in text
-        and not text.startswith("You were dispatched")
+        if idx > last_tool_index and not is_pty_event(text)
+        and "You were interrupted" not in text
     ]
 
     ts_start, ts_end = m[4], m[5]
@@ -161,7 +174,7 @@ def build_digest(m, parts, tail, tail_texts, json_out=False):
             "working_notes": [
                 {"at": fmt_ts(ts), "text": txt[:200]}
                 for ts, txt in [t for t in text_parts
-                                if "<pty_exited>" not in t[1] and not t[1].startswith("You were dispatched")][-2:]
+                                if not is_pty_event(t[1]) and "You were interrupted" not in t[1]][-2:]
             ],
         },
         "tools": {
@@ -244,11 +257,18 @@ def print_human(d):
 
 
 def list_recent_sessions(conn, limit=10):
+    """List recent sessions for the CURRENT working directory's project.
+
+    The session table has a `directory` column holding the project path, so we
+    scope to the caller's project instead of mixing sessions from all repos
+    (e.g. 16 projects shared the audit DB before this filter).
+    """
+    project_dir = str(Path.cwd())
     rows = run(conn, """
         SELECT id, COALESCE(agent,''), COALESCE(title,''), time_created, tokens_input
-        FROM session ORDER BY time_created DESC LIMIT ?
-    """, (limit,))
-    print("last sessions:")
+        FROM session WHERE directory = ? ORDER BY time_created DESC LIMIT ?
+    """, (project_dir, limit))
+    print(f"last {len(rows)} sessions in {project_dir}:")
     for r in rows:
         print(f"  {r[0]}  {fmt_ts(r[3])}  {r[1]:<18} in:{r[4]:<9} {r[2][:80]}")
 
@@ -256,9 +276,9 @@ def list_recent_sessions(conn, limit=10):
 def main():
     ap = argparse.ArgumentParser(description="Recover subagent state from opencode DB")
     ap.add_argument("session_id", nargs="?", help="session id (ses_...)")
-    ap.add_argument("--tail", action="store_true", help="only show last texts (no counts)")
     ap.add_argument("--json", action="store_true", help="emit JSON")
-    ap.add_argument("--project-sessions", action="store_true", help="list recent sessions instead")
+    ap.add_argument("--project-sessions", action="store_true",
+                    help="list recent sessions of the CURRENT working-directory project (not all projects)")
     args = ap.parse_args()
 
     conn = connect()
@@ -268,7 +288,7 @@ def main():
     if not args.session_id:
         ap.error("session_id required (or use --project-sessions)")
     m, parts = extract_parts(conn, args.session_id)
-    d = build_digest(m, parts, args.tail, TAIL_TEXTS, args.json)
+    d = build_digest(m, parts, TAIL_TEXTS)
     if args.json:
         print(json.dumps(d, ensure_ascii=False, indent=1))
     else:
