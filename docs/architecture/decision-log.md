@@ -1,6 +1,6 @@
 # Decision Log
 
-> Architecture decisions for SuperAgents workflow v3.1.
+> Architecture decisions for SuperAgents workflow v3.2.
 
 | # | Decision | Rationale |
 |---|----------|-----------|
@@ -25,3 +25,4 @@
 | 19 | Controller Never Implements — hard rule in workflow | Prevents architect from editing code, running test fixes, or bypassing review pipeline. Re-dispatch implementer instead |
 | 20 | Playwright visual regression testing | Catches UI/layout bugs that functional tests miss. Baseline screenshots in git. Browsers pre-installed in Docker image. No temporary tool installation |
 | 21 | @tester reintroduced — narrow scope: env prep + test runs only | Reverses #2 for a DIFFERENT role: test WRITING stays in implementers (TDD), but env forensics (servers, ports, seeds, health, sleeps) and full-suite/e2e runs move to a cheap agent (`deepseek-v4-flash`). Fixes GH #10: env fighting was the #1 token waster in e2e tasks (memo GH #191 T12: 7.04M tokens, 56 bash calls, 34 exploration + ~15 env fighting) |
+| 22 | @manager re-introduced as separate agent from @architect | Reverses #1: @manager is the primary entry point (brainstorming, gates, scratchpad, board, phase dispatch), @architect is a phase executor (DESIGN or IMPL, never talks to user). Rationale: the merged controller was doing too many things — conversational UI, gate management, scratchpad ownership, AND phase execution. Splitting gives @manager clean ownership of user interaction and @architect clean ownership of orchestration. The architect dispatch prompt is now a single phase (`## Phase: DESIGN` or `## Phase: IMPL`), not the full workflow. |

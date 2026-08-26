@@ -1,6 +1,6 @@
 # Context Management Strategy
 
-> Two-tier context model for SuperAgents workflow v3.1.
+> Two-tier context model for SuperAgents workflow v3.2.
 
 ## Two-Tier Context Model
 

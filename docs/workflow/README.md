@@ -2,29 +2,30 @@
 
 > **Audience:** humans — product owners, tech leads, and anyone reviewing how SuperAgents runs a feature from idea to merge.
 >
-> **System:** @architect (controller) + subagent implementers + two-stage review
+> **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review
 >
 > **Version:** 3.2 · **Last aligned with skills/scripts:** 2026-07-21
 
 **Start here from the repo root:** [README.md](../../README.md) (overview, agents, principles).
 
-Agents **execute** [`agents/architect.md`](../../agents/architect.md) and **skills** under `skills/` — not this file. When the workflow changes, update architect, the affected skills, this document, and the root README together.
+Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/architect.md`](../../agents/architect.md) and **skills** under `skills/` — not this file. When the workflow changes, update manager, architect, the affected skills, this document, and the root README together.
 
 ## At a glance
 
-| Phase | Gate | Who decides | Skill (architect invokes) |
-|-------|------|-------------|---------------------------|
-| 1. Design & spec | G1a, G1b | **Human** | `brainstorming` |
-| 2. Plan | G2 | **Human** | `writing-plans` |
-| 3. Isolated workspace | G3 | Auto (ask if tests fail) | `using-git-worktrees` → **`scripts/create-worktree.sh`** |
-| 4. Implementation loop | G4–G6 | Auto | `subagent-driven-development` |
-| 4.5 Visual check (UI features) | G4.5 | Auto, soft block on fail | `scripts/visual-compliance-check.sh` |
-| 5. Docs on branch | — | Auto | dispatch `@docser` |
-| 6. Finish | G7 | **Human** | `finishing-a-development-branch` |
+| Phase | Step | Gate | Who decides | Skill |
+|-------|------|------|-------------|-------|
+| **Phase 0: Brainstorming** | — | G1a (concept) | **Human** | `brainstorming` (interactive with @manager) |
+| **DESIGN** | 1. Design spec | G1b (spec) | **Human** | `brainstorming` (spec part) + `panel-spec-review` |
+| | 2. Plan + review | G2 (plan) | **Human** | `writing-plans` |
+| | 3. Worktree + baseline | G3 | Auto (ask if tests fail) | `using-git-worktrees` → **`scripts/create-worktree.sh`** |
+| **IMPL** | 4. Implementation loop | G4–G6 | Auto | `subagent-driven-development` |
+| | 4.5 Visual check (UI features) | G4.5 | Auto, soft block on fail | `scripts/visual-compliance-check.sh` |
+| | 5. Docs on branch | — | Auto | dispatch `@docser` |
+| | 6. Finish | G7 | **Human** | `finishing-a-development-branch` |
 
-**After merge / polish:** [`fast-track-protocol`](../../skills/fast-track-protocol/SKILL.md) (lighter path, architect still delegates).
+**After merge / polish:** [`fast-track-protocol`](../../skills/fast-track-protocol/SKILL.md) (lighter path, @manager dispatches coders directly).
 
-**Unsure which agent to dispatch?** Architect may use [`find-specialist`](../../skills/find-specialist/SKILL.md) (not a gate).
+**Unsure which agent to dispatch?** @architect may use [`find-specialist`](../../skills/find-specialist/SKILL.md) (not a gate).
 
 ## Legend
 
@@ -39,30 +40,42 @@ Agents **execute** [`agents/architect.md`](../../agents/architect.md) and **skil
 ## Full Workflow
 
 ```
-┌──────────────────────────────────────────────────────────────────┐
-│                    @architect (Controller)                        │
-│  Role: Orchestrator — NEVER implements code                       │
-└──────────────────────────────────────────────────────────────────┘
-         │
-         │ new feature request
-         ▼
 ╔══════════════════════════════════════════════════════════════╗
-║  STEP 1: BRAINSTORMING  (Human Gates G1a + G1b)           ║
+║  PHASE 0: BRAINSTORMING  (@manager + user, interactive)     ║
+║  Human Gate G1a (design concept)                             ║
 ╚══════════════════════════════════════════════════════════════╝
          │
          │ 1. Read scratchpad — resume or start fresh
          │ 2. Invoke skill `brainstorming`
          │ 3. Explore context → ask clarifying questions
          │ 4. Propose 2-3 approaches → present design sections
-         │ 5. Get user approval on design concept
+         │ 5. Get user approval on design concept (G1a)
          │
          ▼  [G1a: USER APPROVES DESIGN CONCEPT]
          │
-         │ 6. Save to docs/specs/YYYY-MM-DD-<feature>-design.md
-         │ 7. Commit design doc
-         │ 8. Spec self-review (placeholder, consistency, scope)
+         │ 6. Record in scratchpad: feature name, design summary
+         │
+         ▼  dispatch @architect with Phase: DESIGN
+         │
+╔══════════════════════════════════════════════════════════════╗
+║  PHASE: DESIGN  (@architect, dispatched by @manager)         ║
+║  Steps 1-3: spec → plan → worktree                           ║
+╚══════════════════════════════════════════════════════════════╝
+         │
+╔══════════════════════════════════════════════════════════════╗
+║  STEP 1: DESIGN SPEC  (Human Gate G1b)                       ║
+╚══════════════════════════════════════════════════════════════╝
+         │
+         │ 1. Read scratchpad for manager context
+         │ 2. Write spec → docs/specs/YYYY-MM-DD-<feature>-design.md
+         │ 3. Commit spec
+         │ 4. Self-review (placeholder, consistency, scope)
+         │ 5. Spec Panel Review (5 parallel free-model perspectives)
          │
          ▼  [G1b: USER APPROVES WRITTEN SPEC (HARD BLOCK)]
+         │
+         │  @architect pushes spec commit to main, reports DONE
+         │  @manager resumes architect with "G1b approved"
          │
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 2: WRITING PLANS  (Human Gate G2)                     ║
@@ -73,23 +86,32 @@ Agents **execute** [`agents/architect.md`](../../agents/architect.md) and **skil
          │    (trivial / small / standard / large)
          │ 3. Save to docs/plans/YYYY-MM-DD-<feature>-plan.md
          │ 4. Self-review for TBD/TODO/vague
+         │ 5. Plan review (standard/large features — spec-reviewer)
          │
          ▼  [G2: USER APPROVES PLAN]
+         │
+         │  @architect pushes plan commit to main, reports DONE
+         │  @manager resumes architect with "G2 approved"
          │
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 3: GIT WORKTREE  (Auto Gate G3)                       ║
 ╚══════════════════════════════════════════════════════════════╝
          │
-         │ 1. Invoke skill `using-git-worktrees` (or follow it if already loaded)
-         │ 2. From repository root — run script (do not hand-roll worktree/deps):
-         │      ./scripts/create-worktree.sh <branch-name>
-         │    → creates .worktrees/<branch>, copies env files, sets up deps
+         │ 1. Invoke skill `using-git-worktrees`
+         │ 2. Run ./scripts/create-worktree.sh <branch-name>
          │ 3. cd .worktrees/<branch-name>
-         │ 4. Confirm .worktrees/ is gitignored (skill Step 2)
+         │ 4. Confirm .worktrees/ is gitignored
          │ 5. Run project test suite → clean baseline
-         │    (commands are project-specific: pnpm test, pytest, cargo test, …)
          │
          ▼  [G3: TESTS PASS]  (if fail → ask user)
+         │
+         │  @architect reports DESIGN DONE with worktree/branch info
+         │  @manager immediately dispatches @architect with Phase: IMPL
+         │
+╔══════════════════════════════════════════════════════════════╗
+║  PHASE: IMPL  (@architect, dispatched by @manager)           ║
+║  Steps 4-6: dev loop → visual → docs → finish                ║
+╚══════════════════════════════════════════════════════════════╝
          │
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 4: SUBAGENT-DRIVEN DEVELOPMENT  (Auto Gates G4-G6)    ║
@@ -140,7 +162,7 @@ Agents **execute** [`agents/architect.md`](../../agents/architect.md) and **skil
     └──────────────────────────────────────────────┘
          │
          │ ┌─────────────────────────────────────────┐
-         │ │ Trivial: self-review + architect        │
+         │ │ Trivial: self-review + @architect       │
          ├─│   git diff spot-check (≤5 lines)        │
          │ └─────────────────────────────────────────┘
          │
@@ -239,29 +261,29 @@ Agents **execute** [`agents/architect.md`](../../agents/architect.md) and **skil
 └────────┘ └──────────┘ └──────────┘ └──────────┘             │
 ```
 
-> **Diagram note:** Commands shown as *example (Memo)* illustrate one reference stack (Next.js + vitest/playwright). Your project uses its own test commands in the `.opencode/` copy of agents/skills — not defined in this framework repo.
+> **Diagram note:** Commands shown as *example (Memo)* illustrate one reference stack (Next.js + vitest/playwright). Your project uses its own test commands in the `.opencode/` copy of agents/skills — not defined in this framework repo. Phase 0 (Brainstorming) runs interactively in @manager; Steps 1-6 are executed by @architect (dispatched by @manager per phase).
 
 ## Alternate path: Fast Track Protocol (FasTP)
 
-**Not a gate.** Used after merge or when the user sends a stream of small fixes/polish in chat — **not** for new features (those use Steps 1–7 above).
+**Not a gate.** Used after merge or when the user sends a stream of small fixes/polish in chat — **not** for new features (that use the full DESIGN → IMPL workflow above).
 
 ```
 User: post-merge fixes / UI polish / wiring tweaks
          │
          ▼
-┌────────────────────────────────────────┐
-│ @architect invokes `fast-track-protocol`│
-│ • Skip G1–G2 (no new spec/plan)         │
-│ • Still dispatches coders (no self-code)│
-│ • UI changes → visual verification still│
-│   mandatory (per skill)                 │
-│ • Local WIP commits until user signals  │
-│   Phase 2 wrap-up ("коммитим", ship…)   │
-└────────────────────────────────────────┘
+┌────────────────────────────────────────────┐
+│ @manager invokes `fast-track-protocol`     │
+│ • Dispatches coders directly (no architect)│
+│ • Skip G1–G2 (no new spec/plan)            │
+│ • UI changes → visual verification still   │
+│   mandatory (per skill)                    │
+│ • Local WIP commits until user signals     │
+│   Phase 2 wrap-up ("коммитим", ship…)      │
+└────────────────────────────────────────────┘
          │
          │ grows into real feature?
          ▼
-    STOP FasTP → back to Step 1 (brainstorming)
+    STOP FasTP → back to Phase 0 (brainstorming)
 ```
 
 Runtime: [`skills/fast-track-protocol/SKILL.md`](../../skills/fast-track-protocol/SKILL.md) + rules in [`agents/architect.md`](../../agents/architect.md) (Fast Track Protocol Skill).
@@ -286,35 +308,53 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 ## Agent Architecture
 
 ```
-                       ┌─────────────────────┐
-                       │    @architect        │
-                       │  (primary/controller)│
-                       │  NEVER implements    │
-                       └──────────┬──────────┘
-                                  │ dispatches via task()
-          ┌───────────────────────┼──────────────────────────┐
-          │                       │                          │
-          ▼                       ▼                          ▼
-┌──────────────────┐  ┌──────────────────────┐  ┌──────────────────────┐
-│ @frontend-coder  │  │  @backend-coder      │  │  @debugger           │
-│ (implementer)    │  │  (implementer)       │  │  (investigator)      │
-│ Next.js + TDD    │  │  FastAPI + TDD       │  │  root cause analysis │
-└──────────────────┘  └──────────────────────┘  └──────────────────────┘
+               ┌──────────────────────────┐
+               │       @manager            │
+               │  (primary entry point)    │
+               │  gates, brainstorming,    │
+               │  scratchpad, board        │
+               └────────────┬─────────────┘
+                            │ dispatches via task()
+                            │ (DESIGN or IMPL phase)
+                            ▼
+               ┌──────────────────────────┐
+               │      @architect           │
+               │  (phase executor)         │
+               │  NEVER implements code    │
+               │  NEVER talks to user      │
+               └────────────┬─────────────┘
+                            │ dispatches via task()
+          ┌─────────────────┼─────────────────────────┐
+          │                 │                         │
+          ▼                 ▼                         ▼
+┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
+│ @frontend-coder  │  │  @backend-coder  │  │  @debugger       │
+│ (implementer)    │  │  (implementer)   │  │  (investigator)  │
+│ Next.js + TDD    │  │  FastAPI + TDD   │  │  root cause      │
+└──────────────────┘  └──────────────────┘  └──────────────────┘
 
-          ▼                       ▼
-┌──────────────────────┐  ┌──────────────────────┐
-│ @spec-reviewer       │  │ @code-quality-reviewer│
-│ (read-only)          │  │ (read-only + tests)   │
-│ checks: code matches │  │ checks: quality+tests │
-│ plan spec            │  │ runs full test suite  │
-└──────────────────────┘  └──────────────────────┘
+          ▼                 ▼
+┌──────────────────┐  ┌──────────────────┐
+│ @spec-reviewer   │  │@code-quality-    │
+│ (read-only)      │  │  reviewer        │
+│ checks: code     │  │ (read-only +     │
+│ matches plan     │  │  tests)          │
+└──────────────────┘  └──────────────────┘
 
-          ▼                       ▼
-┌──────────────────────┐  ┌──────────────────────┐
-│ @docser              │  │ @deployer            │
-│ (scribe, meta docs)  │  │ (devops, manual)     │
-│ PLAN.md, CHANGELOG   │  │ production deploy    │
-└──────────────────────┘  └──────────────────────┘
+          ▼                 ▼
+┌──────────────────┐  ┌──────────────────┐
+│ @docser          │  │ @deployer        │
+│ (scribe, docs)   │  │ (devops, manual) │
+│ PLAN.md,         │  │ production       │
+│ CHANGELOG        │  │ deploy           │
+└──────────────────┘  └──────────────────┘
+
+                    ▼
+          ┌──────────────────┐
+          │ @tester           │
+          │ (env prep + runs) │
+          │ cheap model       │
+          └──────────────────┘
 ```
 
 ## Task Classification & Token Budget
@@ -407,12 +447,13 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 
 When behavior of a step or gate changes, update in order:
 
-1. **`agents/architect.md`** — steps, triggers, gate rules (architect follows this through the flow)
-2. **Affected `skills/*/SKILL.md`** — procedure invoked at that step
-3. **`scripts/`** — if automation changes
-4. **`docs/workflow/README.md`** — human diagram and gates (this file)
-5. **[README.md](../../README.md)** — if gates, skills list, or onboarding summary changes
-6. **Project repos** — sync generic changes into `.opencode/`; restart agent runtime if required
+1. **`agents/manager.md`** — routing, gate handling, phase dispatch (if change affects manager behavior)
+2. **`agents/architect.md`** — steps, triggers, gate rules (architect follows this through the flow)
+3. **Affected `skills/*/SKILL.md`** — procedure invoked at that step
+4. **`scripts/`** — if automation changes
+5. **`docs/workflow/README.md`** — human diagram and gates (this file)
+6. **[README.md](../../README.md)** — if gates, skills list, or onboarding summary changes
+7. **Project repos** — sync generic changes into `.opencode/`; restart agent runtime if required
 
 ## Documentation map (keep in sync)
 
@@ -420,6 +461,7 @@ When behavior of a step or gate changes, update in order:
 |------|----------------|---------------------------|
 | Full flow & gates | **This file** | — |
 | Overview & onboarding | [README.md](../../README.md) | — |
+| Entry point + routing | — | [agents/manager.md](../../agents/manager.md) |
 | Orchestration steps | — | [agents/architect.md](../../agents/architect.md) |
 | Worktree create/remove | — | [skills/using-git-worktrees/SKILL.md](../../skills/using-git-worktrees/SKILL.md), [scripts/create-worktree.sh](../../scripts/create-worktree.sh), [scripts/remove-worktree.sh](../../scripts/remove-worktree.sh) |
 | Dev loop & reviews | — | [skills/subagent-driven-development/SKILL.md](../../skills/subagent-driven-development/SKILL.md) |
@@ -432,11 +474,13 @@ Test commands and app paths in diagrams may show *example (Memo)*; each project 
 
 ## Key Principles
 
-1. **Controller Never Implements** — @architect plans and delegates, never edits code
-2. **Two-Stage Review** — spec compliance → code quality, never one without the other
-3. **Sequential Tasks** — one implementer at a time, no parallel dispatch
-4. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
-5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
-6. **Hybrid Diff Review** — architect reads `--stat` only, passes file path to reviewers (saves ~30-40% tokens)
-7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
-8. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
+1. **Manager Owns Conversation** — @manager is the single entry point; @architect never talks to the user
+2. **Controller Never Implements** — @architect plans and delegates, never edits code
+3. **Two-Stage Review** — spec compliance → code quality, never one without the other
+4. **Sequential Tasks** — one implementer at a time, no parallel dispatch
+5. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
+6. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
+7. **Hybrid Diff Review** — @architect reads `--stat` only, passes file path to reviewers (saves ~30-40% tokens)
+8. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
+9. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model)
+10. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree

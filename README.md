@@ -2,14 +2,18 @@
 
 > A reusable agentic workflow framework for AI-driven software development.
 >
-> **System:** @architect (controller) + subagent implementers + two-stage review pipeline
+> **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review pipeline
 > **Version:** 3.2
 >
 > **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
 ## What is SuperAgents?
 
-SuperAgents orchestrates AI agents through a fixed **feature lifecycle**: design and written spec → implementation plan → isolated git worktree → sequential tasks with reviews → docs on the branch → merge or PR. Humans approve at key gates; everything between gates runs automatically.
+SuperAgents orchestrates AI agents through a fixed **feature lifecycle** split into two phases:
+- **DESIGN** — spec writing → spec review panel → plan → plan review → worktree + baseline tests
+- **IMPL** — sequential task loop with reviews → visual compliance → docs → merge or PR
+
+Humans approve at key gates (G1a/b, G2, G7); everything between gates runs automatically.
 
 Capabilities:
 
@@ -32,10 +36,12 @@ Capabilities:
 One-line map:
 
 ```
-G1a/G1b (Human) → G2 (Human) → G3 worktree (Auto) → G4–G6 dev+review (Auto) → G4.5 visual if UI (Auto) → docs → G7 (Human)
+Phase 0: Brainstorming (G1a) → Phase DESIGN: Spec (G1b) → Plan (G2) → Worktree (G3)
+                                                              ↓
+Phase IMPL: Dev loop (G4–G6) → Visual gate (G4.5) → Docs → Finish (G7)
 ```
 
-In the IDE, start **@architect** and ask for a new feature; it invokes skills (`brainstorming`, `writing-plans`, `using-git-worktrees`, …) in order.
+In the IDE, start **@manager** (or it starts automatically). It brainstorms with you, then dispatches **@architect** for each phase.
 
 ## Quick Start
 
@@ -43,15 +49,18 @@ In the IDE, start **@architect** and ask for a new feature; it invokes skills (`
 
 [New Project Setup](docs/setup/new-project-setup.md) — copy agents, skills, and templates into your repo and adjust project-specific paths and test commands.
 
-### Run Workflow (architect)
+### Run Workflow (manager → architect)
 
-| Step | Gate | Skill |
-|------|------|--------|
-| Brainstorming + spec | G1a, G1b | `brainstorming` |
-| Implementation plan | G2 | `writing-plans` |
-| Worktree + baseline tests | G3 | `using-git-worktrees` (+ `scripts/create-worktree.sh`) |
-| Tasks + reviews | G4–G6 | `subagent-driven-development` |
-| Finish (merge / PR / …) | G7 | `finishing-a-development-branch` |
+| Phase | Step | Gate | Who | Skill |
+|-------|------|------|-----|-------|
+| **Phase 0** | Brainstorming | G1a (concept) | **@manager** + user | `brainstorming` |
+| **DESIGN** | 1. Design spec | G1b (spec) | **@architect** | `brainstorming` (spec part) + `panel-spec-review` |
+| | 2. Plan + review | G2 (plan) | **@architect** | `writing-plans` |
+| | 3. Worktree + baseline | G3 | **@architect** | `using-git-worktrees` |
+| **IMPL** | 4. Dev loop + reviews | G4–G6 | **@architect** | `subagent-driven-development` |
+| | 4.5 Visual check (UI) | G4.5 | **@architect** | `visual-compliance-check.sh` |
+| | 5. Docs | — | **@architect** | dispatch `@docser` |
+| | 6. Finish | G7 (merge) | **@architect** | `finishing-a-development-branch` |
 
 Details, review tiers, and diagrams: **[Workflow guide](docs/workflow/README.md)**.
 
@@ -60,7 +69,8 @@ Details, review tiers, and diagrams: **[Workflow guide](docs/workflow/README.md)
 ```
 superagents/
 ├── agents/                  # Agent definitions (frontmatter + prompts)
-│   ├── architect.md         # Primary controller
+│   ├── manager.md           # Primary entry point — gates, brainstorming, phase dispatch
+│   ├── architect.md         # Phase executor — DESIGN or IMPL (never talks to user)
 │   ├── frontend-coder.md    # Next.js implementer
 │   ├── backend-coder.md     # FastAPI implementer
 │   ├── spec-reviewer.md     # Spec compliance reviewer
@@ -96,7 +106,8 @@ superagents/
 
 | Agent | Role | Mode | When to Dispatch |
 |-------|------|------|-----------------|
-| **@architect** | Workflow controller, planning, delegation | Primary | Entry point for all requests |
+| **@manager** | Entry point, brainstorming, gates, scratchpad, phase dispatch | Primary | Auto — starts on user request |
+| **@architect** | Phase executor — runs DESIGN or IMPL, never talks to user | All | Dispatched by @manager |
 | **@frontend-coder** | Next.js + TypeScript + Tailwind implementation | Subagent | UI/frontend tasks |
 | **@backend-coder** | FastAPI + SQLite implementation | Subagent | API/backend tasks |
 | **@spec-reviewer** | Verify "code matches plan" | Subagent | After small/standard/large tasks |
@@ -108,15 +119,16 @@ superagents/
 
 ## Key Principles
 
-1. **Controller Never Implements** — @architect plans and delegates, never edits code
-2. **Two-Stage Review** — spec compliance → code quality, never one without the other
-3. **Sequential Tasks** — one implementer at a time, no parallel dispatch
-4. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
-5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
-6. **Diff for reviewers (hybrid)** — architect reads `git diff --stat` only; full diff goes to a file; reviewers read the file (saves architect tokens). Not “paste entire diff into architect chat.”
-7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
-8. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model); coders keep their contexts clean of env forensics
-8. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
+1. **Manager Owns Conversation** — @manager is the single entry point; @architect never talks to the user
+2. **Controller Never Implements** — @architect plans and delegates, never edits code
+3. **Two-Stage Review** — spec compliance → code quality, never one without the other
+4. **Sequential Tasks** — one implementer at a time, no parallel dispatch
+5. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
+6. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
+7. **Diff for reviewers (hybrid)** — architect reads `git diff --stat` only; full diff goes to a file; reviewers read the file (saves architect tokens). Not "paste entire diff into architect chat."
+8. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
+9. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model); coders keep their contexts clean of env forensics
+10. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
 
 Full gate list and behavior: **[Workflow guide](docs/workflow/README.md)**.
 
@@ -203,7 +215,7 @@ This repo is the **single source of truth** for the SuperAgents workflow framewo
 
 ## Changelog
 
-- **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code.
+- **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code. Manager/Architect split: @manager owns conversation + gates, @architect is phase executor. Spec review panel (5 free-model perspectives). Reflection mode. Context HANDOFF protocol.
 
 ## License
 

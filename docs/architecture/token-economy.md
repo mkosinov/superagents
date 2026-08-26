@@ -1,7 +1,7 @@
 # Token Economy
 
 > Minimize token usage while preserving quality.
-> Cost model for SuperAgents workflow v3.1.
+> Cost model for SuperAgents workflow v3.2.
 
 ## Per-Subagent Spawn Cost
 
