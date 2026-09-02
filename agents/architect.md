@@ -213,6 +213,22 @@ Every reviewer dispatch prompt MUST include:
 
 Enforce it: if a subagent returns a narrative essay, treat the status at face value and note "report format violated" in your phase report.
 
+## Dead-Subagent Salvage Ladder (mandatory)
+
+Applies to ANY subagent you dispatch (coder, reviewer, tester, panelist, explore, …) that returns
+an EMPTY or unusable report (no actionable task_result). Do NOT fresh-re-dispatch blindly:
+
+1. `python3 .opencode/scripts/subagent-audit.py <session_id>` (read-only, zero tokens) → follow
+   its verdict hints:
+   - `REPORT RECOVERABLE` → take the final assistant text from the DB as the result.
+   - `WORKED BUT NO FINAL REPORT` → resume the SAME task_id (cheap), continue from where it stopped.
+   - `NO WORK DONE` → fresh re-dispatch is fine.
+2. Never fresh-re-dispatch over a session whose audit shows commits or tool calls.
+
+Rationale (Aug 2026): 107 audit invocations, repeated salvages every wave (#205 ×3, #207 ×4,
+#212 ×2, #216 ×2), zero rework when the ladder was followed; historical fresh-recovery incidents
+re-did tasks 2–3×.
+
 ---
 
 # PHASE: DESIGN
@@ -393,8 +409,12 @@ Trigger: all tasks done, tests green. Run ONCE per phase. Skip if no user-visibl
 ## Step 6: Finishing
 
 1. Invoke `finishing-a-development-branch` skill.
-2. Verify tests pass (including doc commit). Failing → report BLOCKED, do NOT fix.
-3. Auto-flow: push (background) → `gh pr create` → `gh pr checks --watch` → all green → `gh pr merge --squash --delete-branch` → update local main → cleanup worktree + local branch.
+2. Verify the local pre-push gate (fast suites only — unit/integration + typecheck/lint, per the
+   skill's Merge Gate Policy). Failing → report BLOCKED, do NOT fix.
+3. Auto-flow: push (background) → `gh pr create` → `gh pr checks --watch` → ALL green (CI is the
+   authoritative merge gate, incl. e2e shards) → `gh pr merge --squash --delete-branch` → update
+   local main → cleanup worktree + local branch. CI unavailable (quota/outage, verified with a
+   real run) → full local run incl. e2e as the merge gate (outage protocol).
 4. **Error escalation (Gate G7):** push fails / PR errors / red CI / merge errors → STOP, preserve worktree, report NEEDS_APPROVAL with PR URL and error summary.
 5. Explicit fallbacks (merge locally / keep branch / discard) — only if the manager relays an explicit user request.
 6. Report DONE: merged PR url, branch/worktree cleanup status.

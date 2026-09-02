@@ -15,14 +15,30 @@ after CI goes green. The user is **notified** before the push (fire-and-continue
 
 **Announce at start:** "I'm using the finishing-a-development-branch skill to complete this work."
 
+## Merge Gate Policy (CI-authoritative)
+
+Decision 2026-09-02 (option "B — Minimum"). Replaces the outage-era "local full run is the merge
+gate" policy: **CI is the merge gate, not a local full run.**
+
+- **DEFAULT:** CI is the authoritative merge gate — ALL jobs must be green, including the e2e
+  shards. Merge only on green CI.
+- **LOCAL pre-push gate:** fast suites only — unit/integration tests + typecheck/lint (per
+  project). **NO local e2e as a gate.**
+- **Local e2e runs remain allowed as an INVESTIGATION tool** (e.g. flake A/B classification on
+  base), never as a merge gate.
+- **FALLBACK (outage protocol):** if CI is unavailable (quota/outage — verify with a real run,
+  not assumptions), revert to the full local run **including e2e** as the merge gate.
+
 ## The Process
 
 ### Step 1: Verify Tests
 
-**Before finishing, verify tests pass:**
+**Before finishing, run the LOCAL pre-push gate (fast suites only) — per the Merge Gate Policy:**
+unit/integration tests + typecheck/lint. Do NOT run local e2e as a gate (CI owns e2e; local e2e
+is an investigation tool only). The authoritative merge gate is CI.
 
 ```bash
-# Run project's test suite
+# Fast suites only — project's unit/integration + typecheck/lint
 npm test / cargo test / pytest / go test ./...
 ```
 
@@ -117,6 +133,7 @@ echo "Waiting for CI checks to complete (may take 5-15 min)..."
 # Poll CI checks until completion
 # gh pr checks --watch blocks until all checks conclude, then:
 #   exit 0 = all passed, exit 1 = some failed
+# CI is the authoritative merge gate — wait for ALL jobs (including the e2e shards) to go green.
 if gh pr checks --watch; then
   echo "✅ All CI checks passed. Auto-merging..."
   # NOTE: run `gh pr merge --squash` WITHOUT --delete-branch. When finishing from inside a

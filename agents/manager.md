@@ -182,6 +182,22 @@ architect at the phase (observed: fresh recovery lost state and re-did tasks 2-3
    HANDOFF protocol (Resume From + tasks done) with the same audit-first instruction.
 4. Report to the user: what was resumed, what state was recovered.
 
+## Dead-Subagent Salvage Ladder (mandatory)
+
+Applies to ANY subagent you dispatch (architect, FasTP coder, explore, debugger, tester, …) that
+returns an EMPTY or unusable report (no actionable task_result). Do NOT fresh-re-dispatch blindly:
+
+1. `python3 .opencode/scripts/subagent-audit.py <session_id>` (read-only, zero tokens) → follow
+   its verdict hints:
+   - `REPORT RECOVERABLE` → take the final assistant text from the DB as the result.
+   - `WORKED BUT NO FINAL REPORT` → resume the SAME task_id (cheap), continue from where it stopped.
+   - `NO WORK DONE` → fresh re-dispatch is fine.
+2. Never fresh-re-dispatch over a session whose audit shows commits or tool calls.
+
+Rationale (Aug 2026): 107 audit invocations, repeated salvages every wave (#205 ×3, #207 ×4,
+#212 ×2, #216 ×2), zero rework when the ladder was followed; historical fresh-recovery incidents
+re-did tasks 2–3×.
+
 ## FasTP (direct dispatch, no architect)
 
 Trigger: user submits small fixes/polish in chat with existing merged work.
