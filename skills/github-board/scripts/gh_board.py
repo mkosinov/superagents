@@ -5,7 +5,7 @@ Usage:
   python3 .opencode/skills/github-board/scripts/gh_board.py next-up              — show the trajectory (Next Up 1→3)
   python3 .opencode/skills/github-board/scripts/gh_board.py set-next-up N 1|2|3|none  — set/clear queue position
   python3 .opencode/skills/github-board/scripts/gh_board.py shift                — after Next Up 1 completes: clear it, shift 2→1, 3→2
-  python3 .opencode/skills/github-board/scripts/gh_board.py status N "In Progress"  — move a card's status
+  python3 .opencode/skills/github-board/scripts/gh_board.py status N "In IMPL"         — move a card's status
 
 Project constants are hardcoded (IDs are stable for Project #3).
 """
@@ -26,8 +26,8 @@ NEXT_UP_OPTS = {"1": "ad936c13", "2": "8167d82e", "3": "ece04007"}
 
 # Статусы доски (актуальные для Project #3)
 STATUSES = [
-    "Backlog", "Specification", "Planning", "Ready for Dev", "In Progress",
-    "In Review", "Staging / QA", "PR", "In-main", "deployed",
+    "Backlog", "In Design (G1a)", "Spec OK (G1b)", "Ready to IMPL (G2)",
+    "In IMPL", "PR (G7)", "In-main", "deployed",
 ]
 
 _status_field_id = None
