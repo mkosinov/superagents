@@ -153,7 +153,7 @@ Success criteria: the container needed only the plan path + board status (no ver
 1. **Board migration — DONE 2026-09-05** (verify, don't redo): 8 gate-anchored options live and matching `STATUSES`; cards carried through the rename (2× In IMPL, 1× In Design (G1a) — the reviewer's "cards stuck on In Progress" was based on pre-captured data and is outdated). Remaining in step 4: the memo `.opencode` skill copies must be re-synced atomically (currently half-synced: chain new, touchpoints old) and the container restarted.
 2. B3: port 6 agent files to `~/.zcode/agents/` (best-practices research rewritten to host web tools; permission blocks re-expressed as zcode tool allowlists) + **smoke-test one panelist dispatch and one `gh` project write from host** (gates the pilot, §7 assumptions).
 3. B2: verified live 2026-09-05 (`next-up` via docker exec).
-4. B4: edit superagents (manager.md / architect.md / workflow README / root README) → commit (host) → **resolve unpushed `d9d5585`** → push → container pull → **atomic sync** of `memo/.opencode` github-board SKILL.md + gh_board.py → **container restart**.
+4. B4: edit superagents (manager.md / architect.md / workflow README / root README) → commit (host) → push (d9d5585 already on origin — verified 2026-09-05, nothing to resolve) → container pull → **atomic sync** of `memo/.opencode` github-board SKILL.md + gh_board.py → **container restart** (user-gated: after the #140/#142/#218 wave, on the user's signal).
 5. B5: write the host DESIGN kit (skill/AGENTS section; includes panel dispatch protocol + host availability policy).
 6. Run the pilot (§6, starting at step 0); keep a friction log; adjust B4/B5 from findings.
 7. Hygiene (optional, any time): PAT out of remote URLs; container clones' untracked files.

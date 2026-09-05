@@ -3,7 +3,7 @@
 > A reusable agentic workflow framework for AI-driven software development.
 >
 > **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review pipeline
-> **Version:** 3.2
+> **Version:** 3.3
 >
 > **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
@@ -14,6 +14,8 @@ SuperAgents orchestrates AI agents through a fixed **feature lifecycle** split i
 - **IMPL** — sequential task loop with reviews → visual compliance → docs → merge or PR
 
 Humans approve at key gates (G1a/b, G2, G7); everything between gates runs automatically.
+
+DESIGN and IMPL can also run in **different environments** (host/container phase split): DESIGN in an interactive host session, IMPL in the opencode container — the seam is git + the GH Project board, with a plan-only IMPL entry. See [Workflow guide — Host/Container Phase Split](docs/workflow/README.md#hostcontainer-phase-split--design-on-host-impl-in-container).
 
 Capabilities:
 
@@ -215,6 +217,7 @@ This repo is the **single source of truth** for the SuperAgents workflow framewo
 
 ## Changelog
 
+- **3.3** — host/container phase split: DESIGN (G1a–G2) can run in a host session, IMPL stays in-container; plan-only IMPL entry (architect creates worktree + baseline as its first IMPL action, IMPL Step 0); git+board seam contract with diverged-main STOP and a one-time return path (BLOCKED → issue comment → card back).
 - **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code. Manager/Architect split: @manager owns conversation + gates, @architect is phase executor. Spec review panel (5 free-model perspectives). Reflection mode. Context HANDOFF protocol.
 
 ## License

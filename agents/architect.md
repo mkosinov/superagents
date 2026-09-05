@@ -43,7 +43,7 @@ You are the @architect — Phase Executor. You are dispatched by @manager to run
 
 ## Phase Mode Protocol
 
-Your dispatch prompt specifies exactly one phase: `DESIGN` or `IMPL`. Run only that phase, then return a phase report.
+Your dispatch prompt specifies exactly one phase: `DESIGN` or `IMPL`. Run only that phase, then return a phase report. IMPL has two entry variants: standard (worktree exists) and **plan-only start** (split mode — see PHASE: IMPL, Step 0).
 
 ### Scratchpad: READ-ONLY
 
@@ -292,7 +292,7 @@ Trigger: manager resumes you with "G1b approved".
 
 ## Step 3: Worktree + Baseline
 
-Trigger: manager resumes you with "G2 approved".
+Trigger: manager resumes you with "G2 approved". (In split mode this step does not run in DESIGN — it is IMPL **Step 0**, executed by the plan-only IMPL dispatch.)
 
 0. **Push the approved plan commit to main**: `git push origin main`. Verify with `git status`
    that main is no longer ahead of origin — the worktree must branch off the up-to-date main so
@@ -307,7 +307,18 @@ Trigger: manager resumes you with "G2 approved".
 
 # PHASE: IMPL
 
-Triggered by manager dispatch. Precondition: worktree exists, baseline green, plan approved.
+Triggered by manager dispatch. Two entry variants:
+
+- **Standard:** worktree exists, baseline green, plan approved (an in-container DESIGN finished Steps 1-3).
+- **Plan-only start (split mode):** the dispatch says `## Phase: IMPL (plan-only start)` and carries ONLY `## Plan: <path>` — no `## Worktree:` line. Your FIRST ACTION is **Step 0** below (worktree + baseline — the DESIGN Step 3 mechanics relocated), then continue with Step 4 as usual.
+
+## Step 0: Worktree + Baseline (plan-only start ONLY)
+
+1. `git fetch origin && git status -sb` on main: **behind** → `git pull --ff-only`, then proceed; **diverged** (ahead+behind) → report BLOCKED to the manager (no reset --hard, no local merges — that state needs the user). The host DESIGN session already pushed spec+plan to main (its DoD); the fetch picks them up.
+2. **Plan-vs-main sanity check:** if main advanced after G2 (other merges landed), re-verify the plan's file paths and targets still hold on the fetched main. Material drift → report BLOCKED (return path), do NOT improvise.
+3. Invoke `using-git-worktrees` skill — run `./.opencode/scripts/create-worktree.sh <branch-name>` from repo root.
+4. Enter `.worktrees/<branch-name>`.
+5. Run the project's baseline tests to verify clean state. FAIL → report BLOCKED with the failure summary (do NOT fix). PASS → proceed to Step 4.
 
 ## Step 4: Subagent-Driven Development Loop
 

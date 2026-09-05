@@ -4,7 +4,7 @@
 >
 > **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review
 >
-> **Version:** 3.2 · **Last aligned with skills/scripts:** 2026-07-21
+> **Version:** 3.3 · **Last aligned with skills/scripts:** 2026-09-05
 
 **Start here from the repo root:** [README.md](../../README.md) (overview, agents, principles).
 
@@ -22,6 +22,8 @@ Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/a
 | | 4.5 Visual check (UI features) | G4.5 | Auto, soft block on fail | `scripts/visual-compliance-check.sh` |
 | | 5. Docs on branch | — | Auto | dispatch `@docser` |
 | | 6. Finish | G7 | **Human** | `finishing-a-development-branch` |
+
+> **Split mode:** in the host/container phase split (below), Phase 0 through Step 2 run in a host session, and Step 3 (worktree + baseline) becomes the architect's FIRST action of IMPL (plan-only start).
 
 **After merge / polish:** [`fast-track-protocol`](../../skills/fast-track-protocol/SKILL.md) (lighter path, @manager dispatches coders directly).
 
@@ -262,6 +264,28 @@ Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/a
 ```
 
 > **Diagram note:** Commands shown as *example (Memo)* illustrate one reference stack (Next.js + vitest/playwright). Your project uses its own test commands in the `.opencode/` copy of agents/skills — not defined in this framework repo. Phase 0 (Brainstorming) runs interactively in @manager; Steps 1-6 are executed by @architect (dispatched by @manager per phase).
+
+## Host/Container Phase Split — DESIGN on host, IMPL in container
+
+Optional deployment topology (since 2026-09-05): the DESIGN phase (brainstorm G1a → spec G1b → plan G2) runs in an interactive **host session**, while the IMPL phase (worktree G3 → dev loop → visual gate → docs → finish G7) stays in the opencode **container** with @manager + @architect. The flow is single-direction: the host hands off via git, and the user tells the container manager «продолжаем траекторию #NNN» to start IMPL.
+
+| Pipeline step | Split-mode executor |
+|---|---|
+| Phase 0 brainstorm, G1a | host session (interactive) |
+| Spec + panel review, G1b | host session (panel = 1-level parallel subagents) |
+| Plan + plan review, G2 | host session |
+| Step 3 worktree + baseline (G3) | **@architect — FIRST action of IMPL** (plan-only start, IMPL Step 0) |
+| IMPL Steps 4–6, visual gate, docs, finish | container @architect (unchanged) |
+| Board status flips | DESIGN-stage flips from the host; IMPL-stage flips from @manager |
+
+**Seam contract (nothing else crosses the boundary):**
+
+1. **Git**: host DESIGN DoD = spec + plan commits **pushed to origin/main**, with ALL design decisions and cross-trajectory ordering constraints folded into the pushed artifacts — git and the board carry no session context across the seam.
+2. **Board**: the GH Project card walks `In Design (G1a) → Spec OK (G1b) → Ready to IMPL (G2)` during host DESIGN. One writer per issue — phase ownership decides.
+3. **IMPL entry**: @manager pre-flight — card at `Ready to IMPL (G2)`; `git fetch origin && git status -sb`: behind → fast-forward, **diverged → STOP + user**; plan file present on fetched main. Then the plan-only IMPL dispatch (no `## Worktree:` line — the architect creates it as its first action) and board `In IMPL`. No brainstorming, no manager-created worktrees.
+4. **Return path (one-time bounce-back, not a live channel)**: if IMPL hits a problem that invalidates the spec or the plan, @architect reports BLOCKED → @manager presents it to the user → the user decides → @manager posts a GH issue comment describing the problem and moves the card back (spec invalid → `In Design (G1a)`; spec intact, plan broken → `Spec OK (G1b)`). Worktree/branch keep-vs-discard is the user's call. The trajectory's scratchpad section closes with an Idle line: reason, new status, comment URL. The next host DESIGN session picks the issue up from the board with the issue comment as input.
+
+Explicitly NOT crossing the seam: `.opencode/scratchpad.md` (the container manager seeds its own section at IMPL start — architect's IMPL task_id + "gates G1a/G1b/G2 passed per board" + plan path), `.opencode/` skills and agents, worktrees, env state.
 
 ## Alternate path: Fast Track Protocol (FasTP)
 
