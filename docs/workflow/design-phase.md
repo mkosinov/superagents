@@ -6,7 +6,7 @@
 >
 > **Input:** an issue picked from the GitHub Project board. **Output:** an approved spec + plan, **pushed to origin/main**. The [IMPL phase](impl-phase.md) picks it up in the opencode container.
 >
-> **Version:** 3.5 · **Last aligned:** 2026-09-06
+> **Version:** 3.6 · **Last aligned:** 2026-09-06
 
 Executors: the project's `.zcode/` — skill **`design-phase`** (the actual protocol this page summarizes), agents **`spec-panel-*`** ×5 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
 
@@ -31,9 +31,12 @@ Legend: **Human** = requires a user decision (pause); `▼` = automatic transiti
          │    behind → pull --ff-only; diverged → STOP + user),
          │    board next-up, user picks an issue
          │ 2. Card → "In Design (G1a)"
-         │ 3. Explore context → clarifying questions
-         │ 4. Propose 2-3 approaches → present concept:
-         │    what we build / what we deliberately do NOT
+         │ 3. Scout: dispatch read-only explorer subagent(s)
+         │    (zcode: `Explore`; opencode: `explorer`) → compact
+         │    fact sheet, every claim cited file:line
+         │ 4. Session reads the scout report → clarifying
+         │    questions → propose 2-3 approaches → present
+         │    concept: what we build / what we deliberately do NOT
          │
          ▼  [G1a: USER APPROVES THE CONCEPT]
          │
@@ -68,6 +71,12 @@ Legend: **Human** = requires a user decision (pause); `▼` = automatic transiti
          ▼  HANDOFF: user tells the container manager
              «продолжаем траекторию #NNN». Nothing else crosses.
 ```
+
+## Scout (pre-G1a recon)
+
+All fact gathering before G1a — the issue and its dependencies, the code under change, consumers, existing patterns — is done by **dispatched read-only explorer subagents** (zcode built-in `Explore`; the opencode counterpart is `explorer`; both default to cheap models), never by the main session. Default is **one** scout; for wide scope (many subsystems or dependency issues) dispatch several in parallel, one per zone — each returns the same compact contract for its zone, and the session reads the reports as-is, no raw merging. A scout returns a **compact fact sheet**: current file size/structure vs the issue's claims, every finding confirmed/denied with `file:line`, dependency issues state (open/closed + one-line delta), consumer inventory, patterns to reuse.
+
+The main session keeps: pre-flight git, board flips, reading the scout report — plus targeted single look-ups (one grep, one file section) when the G1a dialogue asks for them. Bulk recon is scout-only: the main window is the expensive one and it has to stay lean from G1a through G2 (issue #14: an in-session recon cost ~10 tool calls and a 577-line file read to produce a ~40-line concept — the raw output then rode the window for the rest of the session).
 
 ## Board during DESIGN
 
