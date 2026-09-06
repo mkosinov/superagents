@@ -107,11 +107,11 @@ After the spec self-review passes, run the spec review panel — 5 parallel suba
 
 | Perspective | Subagent |
 |-------------|----------|
-| Completeness | `spec-review-completeness` |
-| Feasibility | `spec-review-feasibility` |
-| Consistency | `spec-review-consistency` |
-| Simplicity / YAGNI | `spec-review-simplicity` |
-| Best Practices | `spec-review-best-practices` |
+| Completeness | `spec-panel-completeness` |
+| Feasibility | `spec-panel-feasibility` |
+| Consistency | `spec-panel-consistency` |
+| Simplicity / YAGNI | `spec-panel-simplicity` |
+| Best Practices | `spec-panel-best-practices` |
 
 1. Dispatch all 5 **in parallel** (single message, 5 Task calls). Each dispatch prompt MUST contain the spec file path and instruct the panelist to read it.
 2. Wait for all reports.

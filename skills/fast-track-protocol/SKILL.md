@@ -293,7 +293,7 @@ Phase 2 is triggered when the user signals wrap-up ("коммитим", "Phase 2
 
 1. **Visual verification final pass** (whole branch, all changes since last Phase 2)
 2. `code-quality-reviewer` — review the final code
-3. `spec-reviewer` — verify compliance with **the original task description** (not a written spec — FasTP doesn't create one). Each commit's WIP message should match the task title.
+3. `code-compliance-reviewer` — verify compliance with **the original task description** (not a written spec — FasTP doesn't create one). Each commit's WIP message should match the task title.
 4. **Tests** — run project's test suite, fix breakages
 5. `docser` — update CHANGELOG, project docs, status
 6. Commit (final, not WIP) / open or update PR
@@ -513,7 +513,7 @@ A single source of truth for what is and isn't allowed in Phase 1.
 - **Bypass pre-commit hooks with --no-verify** (Phase 1 doesn't push anyway)
 - **Push to remote** (wait for Phase 2)
 - **Merge to main / update PR** (Phase 2)
-- **Run `code-quality-reviewer`, `spec-reviewer`, or `docser`** in Phase 1
+- **Run `code-quality-reviewer`, `code-compliance-reviewer`, or `docser`** in Phase 1
 - **Modify tests** in Phase 1 (test changes go in Phase 2)
 - **Update README / API docs / CHANGELOG** in Phase 1 (Phase 2 / docser)
 - **Cold-start a subagent session** when reuse is appropriate (see "Subagent Session Reuse")

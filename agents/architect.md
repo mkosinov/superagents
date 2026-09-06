@@ -20,13 +20,14 @@ permission:
     "backend-coder": allow
     "debugger": allow
     "docser": allow
-    "spec-reviewer": allow
+    "plan-reviewer": allow
+    "code-compliance-reviewer": allow
     "code-quality-reviewer": allow
-    "spec-review-completeness": allow
-    "spec-review-feasibility": allow
-    "spec-review-consistency": allow
-    "spec-review-simplicity": allow
-    "spec-review-best-practices": allow
+    "spec-panel-completeness": allow
+    "spec-panel-feasibility": allow
+    "spec-panel-consistency": allow
+    "spec-panel-simplicity": allow
+    "spec-panel-best-practices": allow
     "researcher-agent": allow
     "explore": allow
     "tester": allow
@@ -251,7 +252,7 @@ Triggered by manager dispatch with the approved brainstorming output (design con
    (anchor-based spot-checks via `grep '^## '` + section reads — no full re-reads).
 6. Load skill `panel-spec-review` (dispatch protocol, agent roles, aggregation rules).
 7. **Spec Panel Review** (skip for trivial specs < ~50 lines, note the skip in the report):
-   - Dispatch all 5 panelists (`spec-review-completeness`, `spec-review-feasibility`, `spec-review-consistency`, `spec-review-simplicity`, `spec-review-best-practices`) in parallel — single message, 5 Task calls. Each prompt MUST contain the spec file path and instruct the panelist to read it.
+   - Dispatch all 5 panelists (`spec-panel-completeness`, `spec-panel-feasibility`, `spec-panel-consistency`, `spec-panel-simplicity`, `spec-panel-best-practices`) in parallel — single message, 5 Task calls. Each prompt MUST contain the spec file path and instruct the panelist to read it.
    - Follow the dispatch protocol from the `panel-spec-review` skill: spec must be self-contained, do NOT instruct panel agents to run `gh`/`webfetch`/network access.
    - Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note agreement across perspectives (agreement = stronger signal).
    - The panel never edits the spec itself — you apply any accepted fixes.
@@ -281,7 +282,7 @@ Trigger: manager resumes you with "G1b approved".
 5. Self-review: no TBD/TODO/"implement later". Apply Doc Working Discipline (plan-task headers
    are stable anchors: `grep '^## Task'` → read only the section under review).
 6. **Plan Review (standard/large features only; skip for trivial/small, note the skip in report):**
-   - Dispatch `spec-reviewer` in **Plan Review Mode**: pass spec path + plan path; it reads both itself.
+   - Dispatch `plan-reviewer`: pass spec path + plan path; it reads both itself.
    - It validates: plan covers ALL spec requirements; tasks internally consistent; classification realistic; no engineering leaps.
    - Max 3 iterations. On ❌ you fix the PLAN yourself (planning is your domain) → re-commit → re-dispatch.
    - Still ❌ after 3 → report BLOCKED with the unresolved issues.
@@ -388,8 +389,8 @@ Triggered by manager dispatch. Two entry variants:
    Pass the FILE PATH to reviewers, never the diff content.
 
    - **Trivial:** no reviewers. Architect spot-check via `git diff --stat` (≤5 lines, style only). Suspicious → escalate to small pipeline.
-   - **Small:** spec-reviewer only (max 3 iterations).
-   - **Standard / Large:** Stage 1 spec-reviewer (max 3 iter) → only if ✅ Stage 2 code-quality-reviewer (max 3 iter). Include in quality prompt: "UI changes: [yes/no]. If yes → <project UI test command>, else → <project non-UI test command>."
+   - **Small:** code-compliance-reviewer only (max 3 iterations).
+   - **Standard / Large:** Stage 1 code-compliance-reviewer (max 3 iter) → only if ✅ Stage 2 code-quality-reviewer (max 3 iter). Include in quality prompt: "UI changes: [yes/no]. If yes → <project UI test command>, else → <project non-UI test command>."
    - Reviewer test runs that need the running env (e2e/full-suite) → the reviewer dispatches `tester` itself (it has permission) instead of fighting the environment.
    - Include the Report Format (STRICT) section in every reviewer dispatch.
 
@@ -441,7 +442,7 @@ Trigger: all tasks done, tests green. Run ONCE per phase. Skip if no user-visibl
 | **Standard** | Multi-file, logic, state, API with validation, DB model | Component with state, POST endpoint | Two-stage (≤3 loops each) |
 | **Large** | Architecture change, new subsystem, breaking, >200 lines | Auth system, framework migration | Two-stage + final full-feature review |
 
-Rules: default to standard; downgrade only if ALL criteria met; trivial spot-check exceeding 5 lines/logic → escalate to small; spec-reviewer finding >3 issues on "small" → re-classify standard.
+Rules: default to standard; downgrade only if ALL criteria met; trivial spot-check exceeding 5 lines/logic → escalate to small; code-compliance-reviewer finding >3 issues on "small" → re-classify standard.
 
 ## Error Handling & Retry
 

@@ -4,7 +4,7 @@
 >
 > **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review
 >
-> **Version:** 3.3 · **Last aligned with skills/scripts:** 2026-09-05
+> **Version:** 3.4 · **Last aligned with skills/scripts:** 2026-09-06
 
 **Start here from the repo root:** [README.md](../../README.md) (overview, agents, principles).
 
@@ -88,7 +88,7 @@ Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/a
          │    (trivial / small / standard / large)
          │ 3. Save to docs/plans/YYYY-MM-DD-<feature>-plan.md
          │ 4. Self-review for TBD/TODO/vague
-         │ 5. Plan review (standard/large features — spec-reviewer)
+         │ 5. Plan review (standard/large features — plan-reviewer)
          │
          ▼  [G2: USER APPROVES PLAN]
          │
@@ -169,12 +169,12 @@ Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/a
          │ └─────────────────────────────────────────┘
          │
           │ ┌─────────────────────────────────────────┐
-          │ │ Small: spec-review only (max 3 loops)   │
+          │ │ Small: compliance only (max 3 loops)  │
           ├─│                                          │
           │ │   git diff --stat BASE..HEAD (see scale) │
           │ │   git diff BASE..HEAD > /tmp/diff.patch  │
           │ │   Pass FILE PATH to reviewer prompt      │
-          │ │   Dispatch @spec-reviewer                 │
+          │ │   Dispatch @code-compliance-reviewer     │
           │ │   If ❌ → re-dispatch implementer         │
           │ └─────────────────────────────────────────┘
           │
@@ -185,7 +185,7 @@ Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/a
           │ │   git diff --stat (see scale)            │
           │ │   git diff > /tmp/task-diff.patch        │
           │ │                                          │
-          │ │   Stage 1: @spec-reviewer                 │
+          │ │   Stage 1: @code-compliance-reviewer     │
           │ │     Reads diff file independently        │
           │ │     If ❌ → implementer fixes → re-review │
           │ │     If ✅ → Stage 2                       │
@@ -322,7 +322,7 @@ G3 ─── Clean Baseline ────────── Auto ─── Tests 
 G4 ─── TDD Compliance ────────── Auto ─── Implementer self-check
 G4a ── Architect Spot-Check ──── Auto ─── Diff ≤5 lines (trivial only)
 G4.5 ─ Visual Compliance ─────── Auto ─── UI phases only; skip if no UI (see below)
-G5 ─── Spec Compliance ───────── Auto ─── Code matches plan (reviewer)
+G5 ─── Code Compliance ───────── Auto ─── Code matches plan (code-compliance-reviewer)
 G6 ─── Code Quality + Tests ──── Auto ─── Clean code, tests pass
 G6a ── Review Loop Limit ─────── Auto ─── Max 3 iterations → escalate
 G6b ── Controller Never Implem.─ Auto ─── Architect did not edit code
@@ -358,12 +358,12 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 └──────────────────┘  └──────────────────┘  └──────────────────┘
 
           ▼                 ▼
-┌──────────────────┐  ┌──────────────────┐
-│ @spec-reviewer   │  │@code-quality-    │
-│ (read-only)      │  │  reviewer        │
-│ checks: code     │  │ (read-only +     │
-│ matches plan     │  │  tests)          │
-└──────────────────┘  └──────────────────┘
+┌────────────────────────┐  ┌──────────────────┐
+│ @code-compliance-      │  │@code-quality-    │
+│  reviewer (read-only)  │  │  reviewer        │
+│ checks: code matches   │  │ (read-only +     │
+│ plan                   │  │  tests)          │
+└────────────────────────┘  └──────────────────┘
 
           ▼                 ▼
 ┌──────────────────┐  ┌──────────────────┐
@@ -490,7 +490,7 @@ When behavior of a step or gate changes, update in order:
 | Worktree create/remove | — | [skills/using-git-worktrees/SKILL.md](../../skills/using-git-worktrees/SKILL.md), [scripts/create-worktree.sh](../../scripts/create-worktree.sh), [scripts/remove-worktree.sh](../../scripts/remove-worktree.sh) |
 | Dev loop & reviews | — | [skills/subagent-driven-development/SKILL.md](../../skills/subagent-driven-development/SKILL.md) |
 | Visual gate | Step 4.5 above | [scripts/visual-compliance-check.sh](../../scripts/visual-compliance-check.sh) |
-| Reviewer behavior | Agent table above | [agents/spec-reviewer.md](../../agents/spec-reviewer.md), [agents/code-quality-reviewer.md](../../agents/code-quality-reviewer.md) |
+| Reviewer behavior | Agent table above | [agents/plan-reviewer.md](../../agents/plan-reviewer.md), [agents/code-compliance-reviewer.md](../../agents/code-compliance-reviewer.md), [agents/code-quality-reviewer.md](../../agents/code-quality-reviewer.md) |
 
 Test commands and app paths in diagrams may show *example (Memo)*; each project configures its own commands in its `.opencode/` agent/skill copies.
 

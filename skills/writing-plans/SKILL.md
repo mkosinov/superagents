@@ -64,7 +64,7 @@ This structure informs the task decomposition. Each task should produce self-con
 
 Every plan MUST include a `## Behavioral Delta` subsection, placed right after the header (before the task list). This is a **plain-language** description of how the feature will behave for the end user — no code, no file names — mapped to the spec's acceptance criteria.
 
-This section is what the architect presents at the **asymmetric G2 gate**: for frontend features the user approves the feature by BEHAVIOR (relying on spec-reviewer's Plan Review for engineering correctness), not by reading plan code.
+This section is what the architect presents at the **asymmetric G2 gate**: for frontend features the user approves the feature by BEHAVIOR (relying on plan-reviewer's review for engineering correctness), not by reading plan code.
 
 **Format:**
 

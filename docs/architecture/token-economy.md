@@ -30,9 +30,9 @@ Assume average diff: 3 files changed, 200 lines, ~2K tokens of diff text.
 | Tier | Pipeline | Cost per task |
 |------|----------|---------------|
 | **Trivial** | Implementer + architect spot-check | ~4K tokens |
-| **Small** | Implementer + spec-reviewer (no fix) | ~12K tokens |
-| **Standard** | Implementer + spec-reviewer + quality-reviewer (no fix) | ~20K tokens |
-| **Large** | Implementer + spec-reviewer + quality-reviewer + final reviewer | ~30K tokens |
+| **Small** | Implementer + code-compliance-reviewer (no fix) | ~12K tokens |
+| **Standard** | Implementer + code-compliance-reviewer + quality-reviewer (no fix) | ~20K tokens |
+| **Large** | Implementer + code-compliance-reviewer + quality-reviewer + final reviewer | ~30K tokens |
 
 **With 1 fix-loop (typical):**
 
@@ -72,7 +72,7 @@ At typical model pricing, a single feature costs **~$0.40–$1.80** for subagent
 |------|-------|-----|
 | @architect | Most capable (kimi-k2.6, etc.) | Planning, delegation, context management |
 | @frontend-coder / @backend-coder | Standard (qwen3.6-plus) | Implementation, clear specs |
-| @spec-reviewer | Fast, cheap (deepseek-v4-flash) | Read-only, pattern matching |
+| @code-compliance-reviewer | Fast, cheap (deepseek-v4-flash) | Read-only, pattern matching |
 | @code-quality-reviewer | Fast, cheap (deepseek-v4-flash) | Read-only + test execution |
 | @debugger | Standard (qwen3.6-plus) | Reasoning, investigation |
 | @docser | Fast, cheap (deepseek-v4-flash) | Structured writing |

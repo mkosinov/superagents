@@ -1,6 +1,6 @@
 ---
 name: panel-spec-review
-description: Use when dispatching spec-review-* panel agents during DESIGN phase spec review. Covers dispatch protocol, agent roles, and aggregation rules.
+description: Use when dispatching spec-panel-* panel agents during DESIGN phase spec review. Covers dispatch protocol, agent roles, and aggregation rules.
 ---
 
 # Panel Spec Review
@@ -8,7 +8,7 @@ description: Use when dispatching spec-review-* panel agents during DESIGN phase
 ## When to load
 
 Architect loads this skill on DESIGN phase before dispatching
-spec-review-* panel agents. Not needed on IMPL phase.
+spec-panel-* panel agents. Not needed on IMPL phase.
 
 ## Dispatch Protocol
 
@@ -33,11 +33,11 @@ spec-review-* panel agents. Not needed on IMPL phase.
 
 | Agent | Perspective | Access |
 |-------|------------|--------|
-| `spec-review-completeness` | Holes, edge cases, missing scenarios | read/grep/glob/git-read |
-| `spec-review-consistency` | Contradictions, conflicts with code/domain rules | read/grep/glob/git-read |
-| `spec-review-feasibility` | Technical risks, hidden complexity | read/grep/glob/git-read |
-| `spec-review-simplicity` | Overengineering, unrequested scope, YAGNI | read/grep/glob/git-read |
-| `spec-review-best-practices` | Current best practices via web research | same + `task: researcher-agent` |
+| `spec-panel-completeness` | Holes, edge cases, missing scenarios | read/grep/glob/git-read |
+| `spec-panel-consistency` | Contradictions, conflicts with code/domain rules | read/grep/glob/git-read |
+| `spec-panel-feasibility` | Technical risks, hidden complexity | read/grep/glob/git-read |
+| `spec-panel-simplicity` | Overengineering, unrequested scope, YAGNI | read/grep/glob/git-read |
+| `spec-panel-best-practices` | Current best practices via web research | same + `task: researcher-agent` |
 
 All 5 are read-only leaf agents. They do NOT edit, do NOT run `gh`,
 do NOT access the network directly (except best-practices via researcher-agent).

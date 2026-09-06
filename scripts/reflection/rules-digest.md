@@ -12,7 +12,7 @@
   исходники; никогда не говорит с пользователем (кроме human-gates отчётов).
 - **coders** (frontend/backend) — имплементация + TDD; env-работа запрещена.
 - **tester** — env prep + запуск сюит; код не правит; максимум 2 repair-попытки.
-- **reviewers** (spec-reviewer + code-quality-reviewer + 5 panel-агентов) —
+- **reviewers** (plan-reviewer + code-compliance-reviewer + code-quality-reviewer + 5 panel-агентов) —
   проверяют, не фиксают; quality-reviewer обязан гонять полный сюит.
 - **debugger** — только локализация причин; **docser** — только мета-доки.
 

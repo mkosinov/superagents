@@ -15,7 +15,7 @@ mkdir -p .opencode/agents
 cp /root/workspace/superagents/agents/*.md .opencode/agents/
 ```
 
-This includes the 5 spec review panel agents (`spec-review-*.md`) used by the brainstorming skill's Spec Panel Review step.
+This includes the 5 spec review panel agents (`spec-panel-*.md`) used by the brainstorming skill's Spec Panel Review step.
 
 ## Step 2: Copy Skills
 
@@ -58,19 +58,19 @@ cp /root/workspace/superagents/templates/reviewers/*.md .opencode/skills/reviewe
 
 ## Step 5: Configure Spec Review Panel models
 
-The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-review-*.md`) needs its configured model to be resolvable by the project's providers.
+The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
 Reference default (memo project): free OpenCode Zen models via the `omniroute` provider:
 
 | Panelist | Model |
 |----------|-------|
-| spec-review-completeness | `omniroute/opencode-zen/big-pickle` |
-| spec-review-feasibility | `omniroute/opencode-zen/mimo-v2.5-free` |
-| spec-review-consistency | `omniroute/opencode-zen/nemotron-3-ultra-free` |
-| spec-review-simplicity | `omniroute/opencode-zen/deepseek-v4-flash-free` |
-| spec-review-best-practices | `omniroute/opencode-zen/ling-3.0-flash-free` |
+| spec-panel-completeness | `omniroute/opencode-zen/big-pickle` |
+| spec-panel-feasibility | `omniroute/opencode-zen/mimo-v2.5-free` |
+| spec-panel-consistency | `omniroute/opencode-zen/nemotron-3-ultra-free` |
+| spec-panel-simplicity | `omniroute/opencode-zen/deepseek-v4-flash-free` |
+| spec-panel-best-practices | `omniroute/opencode-zen/ling-3.0-flash-free` |
 
-**Model substitution:** to swap a panelist's model, edit the `model:` line in the corresponding `.opencode/agents/spec-review-*.md`. Reserve pool in the zen tier: `opencode-zen/north-mini-code-free`, `opencode-zen/laguna-s-2.1-free` — or use any capable model available to the project.
+**Model substitution:** to swap a panelist's model, edit the `model:` line in the corresponding `.opencode/agents/spec-panel-*.md`. Reserve pool in the zen tier: `opencode-zen/north-mini-code-free`, `opencode-zen/laguna-s-2.1-free` — or use any capable model available to the project.
 
 If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
 

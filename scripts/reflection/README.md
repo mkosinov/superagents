@@ -35,9 +35,11 @@ reflection-скилла (тот заморожен, backlog 2098 proposals не 
    разработку memo в opencode (где бы он ни жил), либо (b) у reflection появляется
    второй адаптер источника под новое хранилище сессий. Схема-маппинг уже в facts.py.
 4. **Open items пересекаются с миграцией**: патчи 001/002 (см.
-   `~/dev/opencode/reflection-host/proposals/2026-09-02/`) меняют
-   `agents/spec-reviewer.md` и `agents/architect.md` — НЕ трогать эти файлы
-   параллельно с миграционным синком; статус патчей: ждут accept пользователя.
+   `~/dev/opencode/reflection-host/proposals/2026-09-02/`) меняли
+   `agents/spec-reviewer.md` (2026-09-06 разделён на `agents/plan-reviewer.md` +
+   `agents/code-compliance-reviewer.md`) и `agents/architect.md` — НЕ трогать эти файлы
+   параллельно с миграционным синком; статус патчей: ждут accept пользователя
+   (при акцепте патча 001/002 переложить на новые имена файлов).
 5. **Container touch policy**: никаких правок контейнера/compose; факты читаются
    через `docker exec`, синк принятых правок — `docker cp` (golden source rule).
 

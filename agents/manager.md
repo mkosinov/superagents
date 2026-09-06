@@ -20,7 +20,8 @@ permission:
     "architect": allow
     "frontend-coder": allow
     "backend-coder": allow
-    "spec-reviewer": allow
+    "plan-reviewer": allow
+    "code-compliance-reviewer": allow
     "code-quality-reviewer": allow
     "debugger": allow
     "docser": allow

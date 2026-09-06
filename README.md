@@ -3,7 +3,7 @@
 > A reusable agentic workflow framework for AI-driven software development.
 >
 > **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review pipeline
-> **Version:** 3.3
+> **Version:** 3.4
 >
 > **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
@@ -21,7 +21,7 @@ Capabilities:
 
 - **7+ quality gates** (G1a/b, G2, G3, G4–G6, G4.5 visual, G7) — see [Workflow guide](docs/workflow/README.md)
 - **Test-Driven Development** (RED-GREEN-REFACTOR) for implementation work
-- **Two-stage review** after non-trivial tasks (spec compliance, then code quality + tests)
+- **Two-stage review** after non-trivial tasks (code compliance, then code quality + tests)
 - **Git worktree isolation** per feature via `scripts/create-worktree.sh`
 - **Documentation on the feature branch** before finish
 - **Resumable sessions** via `.opencode/scratchpad.md`
@@ -75,7 +75,8 @@ superagents/
 │   ├── architect.md         # Phase executor — DESIGN or IMPL (never talks to user)
 │   ├── frontend-coder.md    # Next.js implementer
 │   ├── backend-coder.md     # FastAPI implementer
-│   ├── spec-reviewer.md     # Spec compliance reviewer
+│   ├── plan-reviewer.md     # Plan reviewer — plan vs spec (G2, DESIGN)
+│   ├── code-compliance-reviewer.md  # Code compliance reviewer — code vs task (G5)
 │   ├── code-quality-reviewer.md  # Quality + tests reviewer
 │   ├── tester.md            # Test env prep + test suite runs (cheap model)
 │   ├── debugger.md          # Root cause investigator
@@ -112,8 +113,9 @@ superagents/
 | **@architect** | Phase executor — runs DESIGN or IMPL, never talks to user | All | Dispatched by @manager |
 | **@frontend-coder** | Next.js + TypeScript + Tailwind implementation | Subagent | UI/frontend tasks |
 | **@backend-coder** | FastAPI + SQLite implementation | Subagent | API/backend tasks |
-| **@spec-reviewer** | Verify "code matches plan" | Subagent | After small/standard/large tasks |
-| **@code-quality-reviewer** | Verify "code is well-built AND tests pass" | Subagent | After spec-review passes |
+| **@plan-reviewer** | Verify "plan faithfully expands spec" (G2, DESIGN) | Subagent | Plan review before G2 approval |
+| **@code-compliance-reviewer** | Verify "code matches plan" | Subagent | After small/standard/large tasks |
+| **@code-quality-reviewer** | Verify "code is well-built AND tests pass" | Subagent | After compliance review passes |
 | **@tester** | Test env prep + test suite runs, compact reports | Subagent | Env-dependent test runs (e2e/full-suite), env pre-flight |
 | **@debugger** | Root cause analysis | Subagent | On BLOCKED/bugs |
 | **@docser** | Meta documentation (PLAN.md, CHANGELOG) | Subagent | After all tasks complete |
@@ -217,6 +219,7 @@ This repo is the **single source of truth** for the SuperAgents workflow framewo
 
 ## Changelog
 
+- **3.4** — agent registry rename (names state the reviewed document): `spec-review-*` panel → `spec-panel-*`; `spec-reviewer` split into `plan-reviewer` (G2: plan vs spec, DESIGN) + `code-compliance-reviewer` (G5: code vs task, symmetry with code-quality-reviewer at G6); gate G5 label "Spec Compliance" → "Code Compliance". Container `.opencode` copies re-sync manually after in-flight IMPL waves.
 - **3.3** — host/container phase split: DESIGN (G1a–G2) can run in a host session, IMPL stays in-container; plan-only IMPL entry (architect creates worktree + baseline as its first IMPL action, IMPL Step 0); git+board seam contract with diverged-main STOP and a one-time return path (BLOCKED → issue comment → card back).
 - **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code. Manager/Architect split: @manager owns conversation + gates, @architect is phase executor. Spec review panel (5 free-model perspectives). Reflection mode. Context HANDOFF protocol.
 
