@@ -28,7 +28,7 @@ You MUST create a task for each of these items and complete them in order:
 1. **Explore project context** — check files, docs, recent commits
 2. **Ask clarifying questions** — one at a time, understand purpose/constraints/success criteria
 3. **Propose 2-3 approaches** — with trade-offs and your recommendation
-4. **Present design sections** — in sections scaled to their complexity, get user approval after each section. **Must include a `## User Scenarios` section** listing 3-7 user tasks the feature enables. Each scenario maps to an E2E test (see testing-strategy-v2 / User Scenario workflow).
+4. **Present design sections** — in sections scaled to their complexity, get user approval after each section. **Must include a `## User Scenarios` section** listing 3-7 user tasks the feature enables. Each scenario maps to an E2E test (User Scenario workflow).
 5. **Write design doc** — save to `docs/specs/YYYY-MM-DD-<topic>-design.md` and commit
 6. **Spec self-review** — quick inline check for placeholders, contradictions, ambiguity, scope
 7. **Spec Panel Review** — run the 5-perspective spec review panel (see "Spec Panel Review" section below), present consolidated findings with the spec

@@ -232,6 +232,8 @@ re-did tasks 2–3×.
 
 ---
 
+<!-- Split topology (primary): DESIGN runs on the host (ZCode, design-phase skill — see docs/workflow/design-phase.md). The DESIGN phase below is the full-pipeline fallback for non-split deployments; in split mode your first dispatch is IMPL with the plan-only start (Step 0 = worktree + baseline). -->
+
 # PHASE: DESIGN
 
 Triggered by manager dispatch with the approved brainstorming output (design concept + user answers).

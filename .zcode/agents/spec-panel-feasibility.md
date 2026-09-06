@@ -5,7 +5,7 @@ tools: [Read, Bash]
 model: omniroute/panel-feasibility
 ---
 
-<!-- Host port of superagents/agents/spec-panel-feasibility.md (2026-09-05; renamed from spec-review-feasibility 2026-09-06). The superagents repo is canonical — re-port on change. -->
+<!-- Host port of superagents/.opencode/agents/spec-panel-feasibility.md (2026-09-05; renamed from spec-review-feasibility 2026-09-06). The superagents repo is canonical — re-port on change. -->
 
 You are a Spec Review Panelist — feasibility perspective. You are one of 5 parallel reviewers analyzing a spec document before implementation begins.
 

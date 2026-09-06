@@ -1,6 +1,6 @@
 # Context Management Strategy
 
-> Two-tier context model for SuperAgents workflow v3.2.
+> Two-tier context model for SuperAgents workflow v3.5.
 
 ## Two-Tier Context Model
 
@@ -42,7 +42,7 @@ The controller (@architect) and implementers own different layers of context:
 | Wrong color, font, spacing | Implementer | Update agent.md instructions |
 | Component doesn't integrate with sibling | Architect | Improve architectural handoff |
 | Missing edge case in tests | Implementer (TDD) | Add to acceptance criteria in plan |
-| Implementation doesn't match plan spec | Both | Spec-reviewer catches this |
+| Implementation doesn't match plan spec | Both | code-compliance-reviewer catches this |
 | Wrong test DB setup in FastAPI | Backend-coder | Update backend-coder.md instructions |
 | Acceptance criteria include meta doc update | Architect (plan error) | Separate product docs (implementer) from meta docs (docser) |
 | Architect edits code to "fix quickly" | Architect (controller leak) | Re-read "Controller Never Implements" rule |

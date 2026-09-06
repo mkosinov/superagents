@@ -36,7 +36,7 @@ cp -R /root/workspace/superagents/.opencode/ .opencode/
 
 Adapt per project: agent bodies reference project deltas (models, test commands) — see the Customization section below and manager/architect headers.
 
-## Step 2: Shared Agent Rules (AGENTS.md)
+## Step 2: Shared Agent Rules (AGENTS.md) + container board script
 
 Both tools read `AGENTS.md` at the project root natively (zcode workspace instructions, opencode project instructions). Seed it from the canon:
 
@@ -44,13 +44,19 @@ Both tools read `AGENTS.md` at the project root natively (zcode workspace instru
 cp /root/workspace/superagents/.opencode/agents/AGENTS.md AGENTS.md
 ```
 
-Sections are universal except "Subagents: report your session ID first" — that one is opencode-only and marked as such inline.
+Sections are universal except "Subagents: report your session ID first" — that one is opencode-only and marked as such inline. (A no-session-id variant ships as `.zcode/AGENTS.seed.md` for zcode-only setups.)
+
+The container manager runs the board script from the project's `.opencode/scripts/` — seed it from the copy you adapted in Step 0:
+
+```bash
+cp .zcode/scripts/gh_board.py .opencode/scripts/gh_board.py
+```
 
 ## Step 3: Configure opencode.jsonc
 
 ```jsonc
 {
-  "default_agent": "plan",
+  "default_agent": "manager",
   "permission": {
     "skill": {
       "*": "deny",
@@ -59,8 +65,11 @@ Sections are universal except "Subagents: report your session ID first" — that
       "using-git-worktrees": "allow",
       "test-driven-development": "allow",
       "subagent-driven-development": "allow",
-       "finishing-a-development-branch": "allow",
-       "systematic-debugging": "allow"
+      "finishing-a-development-branch": "allow",
+      "systematic-debugging": "allow",
+      "fast-track-protocol": "allow",
+      "github-board": "allow",
+      "find-specialist": "allow"
     }
   }
 }
@@ -97,23 +106,10 @@ echo ".worktrees/" >> .gitignore
 ## Step 6: Create Scratchpad
 
 ```bash
-cat > .opencode/scratchpad.md << 'EOF'
-# Current Mission
-
-## Feature: [name]
-## Branch: [branch name]
-## Worktree: [path]
-
-## Workflow Status
-- [ ] Step 0: Project Reconnaissance
-- [ ] Step 1: Brainstorming (design approved)
-- [ ] Step 2: Writing Plans (plan approved)
-- [ ] Step 3: Git Worktree (created, baseline clean)
-- [ ] Step 4: Subagent-Driven Development
-- [ ] Step 5: Documentation Commit
-- [ ] Step 6: Finishing
-EOF
+touch .opencode/scratchpad.md
 ```
+
+Leave it empty. The container manager seeds its own section per trajectory at IMPL start (plan-only entry: architect's IMPL task_id + "gates G1a/G1b/G2 passed per board" + plan path). Do NOT pre-fill a legacy workflow template.
 
 ## Step 7: Restart OpenCode Container
 
@@ -125,7 +121,10 @@ cd /root/docker && docker compose down opencode && docker compose up -d opencode
 
 ## Step 8: Start Workflow
 
-Invoke `@architect` agent and request a new feature. The workflow begins at **G1 (Brainstorming)**.
+- **DESIGN phase** — on the host: open the project in ZCode and say `design` / `design #NNN` (the `design-phase` skill runs gates G1a–G2; see docs/workflow/design-phase.md).
+- **IMPL phase** — in the container: when the card is at `Ready to IMPL (G2)`, tell @manager «продолжаем траекторию #NNN» (plan-only entry; see docs/workflow/impl-phase.md).
+
+The in-container DESIGN flow (brainstorming via @manager → @architect) remains available as a fallback for non-split deployments.
 
 ## Customization
 

@@ -50,15 +50,15 @@ IMPL (container, opencode):  Worktree + baseline (G3) → Dev loop (G4–G6) →
 
 ### New Project Setup
 
-[New Project Setup](docs/setup/new-project-setup.md) — copy agents, skills, and templates into your repo and adjust project-specific paths and test commands.
+[New Project Setup](docs/setup/new-project-setup.md) — copy the `.zcode/` and `.opencode/` folders into your repo and adjust project-specific paths and test commands.
 
 ### Run Workflow (two phases, two tools)
 
 | Phase | Step | Gate | Executor | Skill |
 |-------|------|------|----------|-------|
 | **DESIGN** (host, ZCode) | 0. Brainstorming | G1a (concept) | host session + user | `design-phase` |
-| | 1. Spec + panel review | G1b (spec) | host session + `spec-panel-*` ×5 | `design-phase` + `panel-spec-review` |
-| | 2. Plan + review | G2 (plan) | host session + `plan-reviewer` | `writing-plans` |
+| | 1. Spec + panel review | G1b (spec) | host session + `spec-panel-*` ×5 | `design-phase` (panel protocol ported from `panel-spec-review`) |
+| | 2. Plan + review | G2 (plan) | host session + `plan-reviewer` | `design-phase` (conventions from `writing-plans`) |
 | **IMPL** (container, OpenCode) | 0. Worktree + baseline | G3 | @architect (first IMPL action) | `using-git-worktrees` |
 | | 4. Dev loop + reviews | G4–G6 | @architect → coders → reviewers | `subagent-driven-development` |
 | | 4.5 Visual check (UI) | G4.5 | @architect | `visual-compliance-check.sh` |
@@ -101,16 +101,16 @@ superagents/
 │   │   ├── systematic-debugging/
 │   │   ├── fast-track-protocol/
 │   │   └── reflect/
-│   └── templates/
-│       └── reviewers/       # Legacy reviewer prompt templates (pre-agents)
 ├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
+│   ├── AGENTS.seed.md       # Shared-rules variant WITHOUT session-id (zcode-only setups)
 │   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
 │   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
 │   └── scripts/gh_board.py  # GitHub Project board script
 └── docs/
     ├── workflow/            # design-phase.md + impl-phase.md (human reference)
-    ├── architecture/
-    └── setup/
+    ├── architecture/        # token-economy, context-management, decision-log, reflection-mode
+    ├── specs/ + plans/      # dated design artifacts (historical)
+    └── setup/               # new-project-setup.md
 ```
 
 ## Agents
@@ -146,7 +146,7 @@ Full gate list and behavior: [design-phase.md](docs/workflow/design-phase.md) ·
 
 ## Reflection Mode
 
-Self-analysis tool for the SuperAgents workflow. Reads `opencode.db` (read-only), runs 16 compliance checks (mapped to the 8 Key Principles), and produces human-approved improvement proposals as markdown files.
+Self-analysis tool for the SuperAgents workflow. Reads `opencode.db` (read-only), runs 17 compliance checks (5 critical / 8 warning / 4 info, mapped to the Key Principles), and produces human-approved improvement proposals as markdown files.
 
 ### How to run
 

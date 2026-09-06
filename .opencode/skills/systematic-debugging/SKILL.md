@@ -195,4 +195,4 @@ If you catch yourself thinking:
 
 ## Related skills:
 - **test-driven-development** - For creating failing test case (Phase 4, Step 1)
-- **verification-before-completion** - Verify fix worked before claiming success
+

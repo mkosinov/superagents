@@ -42,7 +42,7 @@ Report with branch state:
 From the **repository root** (not inside an existing `.worktrees/...` checkout unless Step 0 said otherwise):
 
 ```bash
-./scripts/create-worktree.sh <branch-name>
+.opencode/scripts/create-worktree.sh <branch-name>
 ```
 
 **You must run this script** — it creates `.worktrees/<branch-name>` and performs post-create setup (env, JS/Python deps). Do not duplicate that setup by hand.
@@ -86,7 +86,7 @@ pnpm test / npm run test:all / cargo test / pytest / go test ./...
 From the **repository root** (never from inside the worktree being removed):
 
 ```bash
-./scripts/remove-worktree.sh <branch-name>
+.opencode/scripts/remove-worktree.sh <branch-name>
 ```
 
 **You must run this script** — do not only `rm -rf .worktrees/...` or `git worktree remove` without the script’s guards.

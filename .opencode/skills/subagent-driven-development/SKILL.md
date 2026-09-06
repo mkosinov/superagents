@@ -5,7 +5,7 @@ description: Use when executing implementation plans with independent tasks in t
 
 # Subagent-Driven Development
 
-Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.
+Execute plan by dispatching fresh subagent per task, with two-stage review after each: code compliance review first, then code quality review.
 
 **Why subagents:** You delegate tasks to specialized agents with isolated context. By precisely crafting their instructions and context, you ensure they stay focused and succeed at their task. They should never inherit your session's context or history — you construct exactly what they need. This also preserves your own context for coordination work.
 
@@ -20,7 +20,7 @@ Use when you have a written implementation plan with independent tasks, and you 
 **vs. Executing Plans (parallel session):**
 - Same session (no context switch)
 - Fresh subagent per task (no context pollution)
-- Two-stage review after each task: spec compliance first, then code quality
+- Two-stage review after each task: code compliance first, then code quality
 - Faster iteration (no human-in-loop between tasks)
 
 ## The Process
@@ -32,8 +32,8 @@ Use when you have a written implementation plan with independent tasks, and you 
 2. For each task:
    a. **Dispatch implementer subagent** with full task text + context
    b. Implementer implements, tests, commits, self-reviews
-   c. **Dispatch spec reviewer subagent** — MUST include `## Working Directory` in prompt
-   d. If ❌ → implementer fixes → re-dispatch spec reviewer (max 3 loops)
+   c. **Dispatch code-compliance-reviewer subagent** — MUST include `## Working Directory` in prompt
+   d. If ❌ → implementer fixes → re-dispatch the reviewer (max 3 loops)
    e. Only if spec ✅ → **dispatch code quality reviewer subagent** — MUST include `## Working Directory` in prompt
    f. If ❌ → implementer fixes → re-dispatch quality reviewer (max 3 loops)
     g. If ✅ → mark task complete in TodoWrite
@@ -81,7 +81,7 @@ When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-pro
 
 4. **Visual Compliance Gate (ONCE per phase, NOT per task)**
    - Trigger: All tasks in this phase complete, all reviews passed
-   - Run `/root/workspace/superagents/.opencode/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
+   - Run `.opencode/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
    - If FAILS → soft block: report to user with screenshots, wait for decision (fix/override/abort)
    - Only proceed to Step 5 (documentation) after pass or explicit user override
 
@@ -94,7 +94,7 @@ When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-pro
 **Architect MUST verify before dispatch:**
 ```bash
 # Check that worktree exists and path is correct
-ls /root/workspace/memo/.worktrees/<actual-branch-name>/
+ls .worktrees/<actual-branch-name>/
 ```
 
 **Always pass `## Working Directory` to ALL subagents** (implementer AND reviewers):
@@ -131,7 +131,7 @@ Use the least powerful model that can handle each role to conserve cost and incr
 
 ## Handling Implementer Status
 
-**DONE:** Proceed to spec compliance review.
+**DONE:** Proceed to code compliance review.
 
 **DONE_WITH_CONCERNS:** Read concerns. If correctness/scope → address before review. If observations → note and proceed.
 
@@ -217,16 +217,16 @@ been even cheaper** and was skipped; that is why resume is Step 1, not the audit
 
 **Never:**
 - Start implementation on main/master branch without explicit user consent
-- Skip reviews (spec compliance OR code quality)
+- Skip reviews (code compliance OR code quality)
 - Proceed with unfixed issues
 - Dispatch multiple implementation subagents in parallel (conflicts)
 - Make subagent read plan file (provide full text instead)
 - Skip scene-setting context
 - Ignore subagent questions
-- Accept "close enough" on spec compliance
+- Accept "close enough" on code compliance
 - Skip review loops
 - Let implementer self-review replace actual review
-- **Start code quality review before spec compliance is ✅** (wrong order)
+- **Start code quality review before code compliance is ✅** (wrong order)
 - Move to next task while either review has open issues
 
 ## Integration

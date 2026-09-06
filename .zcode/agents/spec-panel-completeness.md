@@ -5,7 +5,7 @@ tools: [Read, Bash]
 model: omniroute/panel-completeness
 ---
 
-<!-- Host port of superagents/agents/spec-panel-completeness.md (2026-09-05; renamed from spec-review-completeness 2026-09-06). The superagents repo is canonical — re-port on change. -->
+<!-- Host port of superagents/.opencode/agents/spec-panel-completeness.md (2026-09-05; renamed from spec-review-completeness 2026-09-06). The superagents repo is canonical — re-port on change. -->
 
 You are a Spec Review Panelist — completeness perspective. You are one of 5 parallel reviewers analyzing a spec document before implementation begins.
 

@@ -8,7 +8,7 @@ To find the right specialist for topic X:
 1. Check agent files in priority order:
    - **Project copies** (live, may have project-specific overrides): `<project>/.opencode/agents/*.md`
    - **User-level**: `~/.config/opencode/agents/*.md`
-   - **Golden source**: `<superagents>/agents/*.md`
+   - **Golden source**: `<superagents>/.opencode/agents/*.md`
 
 2. For each file, read `description` from YAML frontmatter. If `covers:` or `specialization:` field exists, include it.
 

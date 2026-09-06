@@ -495,9 +495,6 @@ Same as above, but step 5-9 are replaced with verifier subagent:
  10. Brief report to user
  11. On user OK → mark todowwrite completed + WIP commit
 ```
- 11. Brief report to user
- 12. On user OK → mark todowrite completed + WIP commit
-```
 
 ---
 

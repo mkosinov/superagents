@@ -7,7 +7,7 @@ description: Use when dispatching spec-panel-* panel agents during DESIGN phase 
 
 ## When to load
 
-Architect loads this skill on DESIGN phase before dispatching
+On the split topology the host session ports this skill's body into `.zcode/skills/design-phase/` (§4); in-container this is the fallback path (architect loads it on the legacy DESIGN phase before dispatching)
 spec-panel-* panel agents. Not needed on IMPL phase.
 
 ## Dispatch Protocol

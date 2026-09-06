@@ -49,7 +49,7 @@ This structure informs the task decomposition. Each task should produce self-con
 ```markdown
 # [Feature Name] Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development (recommended) or executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** [One sentence describing what this builds]
 
@@ -128,7 +128,7 @@ Every task MUST have a `### Required Docs` section listing which docs the implem
 - If task touches UI → include `docs/design-system.md`
 - If task touches naming → include `docs/domain-rules/_overview.md` (Naming Conventions)
 - If task touches testing → include relevant skill (pytest-patterns, vitest-playwright-patterns)
-- **If task implements a User Scenario** → the DoD must include "E2E test for scenario N passes" — written as a RED-GREEN-REFACTOR cycle. See testing-strategy-v2.
+- **If task implements a User Scenario** → the DoD must include "E2E test for scenario N passes" — written as a RED-GREEN-REFACTOR cycle.
 - Be specific: add comment explaining what to look for in each doc
 
 ## E2E Coverage in DoD
@@ -146,7 +146,7 @@ Every task MUST have a `### Required Docs` section listing which docs the implem
 4. Verify E2E still passes
 5. Commit
 
-See testing-strategy-v2 for full context.
+
 
 ## Backend Tasks with Schema Changes
 
@@ -226,7 +226,7 @@ After saving the plan, offer execution choice:
 
 **1. Subagent-Driven (recommended)** - I dispatch a fresh subagent per task, review between tasks
 
-**2. Inline Execution** - Execute tasks in this session using executing-plans, batch execution with checkpoints
+**2. Inline Execution** - Execute tasks in this session task-by-task, batch execution with checkpoints
 
 **Which approach?"
 

@@ -26,7 +26,7 @@ reflect.sh status                              # health summary
 
 ## What it detects
 
-16 workflow compliance checks (5 critical, 8 warning, 3 info), mapped to SuperAgents Key Principles. Examples:
+17 workflow compliance checks (5 critical, 8 warning, 4 info), mapped to SuperAgents Key Principles. Examples:
 - `controller_never_implements` — architect editing code (Principle 1)
 - `mandatory_reviewer_for_code` — skipped reviewers (Principle 2)
 - `tdd_red_first` — first tool not a test (Principle 7)

@@ -5,7 +5,7 @@ tools: [Read, Bash]
 model: omniroute/panel-simplicity
 ---
 
-<!-- Host port of superagents/agents/spec-panel-simplicity.md (2026-09-05; renamed from spec-review-simplicity 2026-09-06). The superagents repo is canonical — re-port on change. -->
+<!-- Host port of superagents/.opencode/agents/spec-panel-simplicity.md (2026-09-05; renamed from spec-review-simplicity 2026-09-06). The superagents repo is canonical — re-port on change. -->
 
 You are a Spec Review Panelist — simplicity/YAGNI perspective. You are one of 5 parallel reviewers analyzing a spec document before implementation begins.
 
