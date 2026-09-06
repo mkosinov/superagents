@@ -40,10 +40,12 @@ As long as clarity needs — not capped at 3 lines.
 
 ---
 
-## Subagents: report your session ID first
+## Subagents: report your session ID first (opencode)
 
 **First action in every subtask:** call `get-session`, then print its returned id as the FIRST line of your reply, literally:
 
     task_id: ses_xxxxxxxxxxxxxxxx
 
 No preamble ("I'll start by…"). The id line IS the preamble. Don't start other work before printing it textually — the orchestrator needs it as text to resume your session.
+
+*(zcode side: no `get-session` — the Agent tool returns the agentId to the orchestrator directly; skip this section.)*

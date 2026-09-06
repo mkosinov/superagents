@@ -36,7 +36,17 @@ cp -R /root/workspace/superagents/.opencode/ .opencode/
 
 Adapt per project: agent bodies reference project deltas (models, test commands) — see the Customization section below and manager/architect headers.
 
-## Step 2: Configure opencode.jsonc
+## Step 2: Shared Agent Rules (AGENTS.md)
+
+Both tools read `AGENTS.md` at the project root natively (zcode workspace instructions, opencode project instructions). Seed it from the canon:
+
+```bash
+cp /root/workspace/superagents/AGENTS.md AGENTS.md
+```
+
+Sections are universal except "Subagents: report your session ID first" — that one is opencode-only and marked as such inline.
+
+## Step 3: Configure opencode.jsonc
 
 ```jsonc
 {
@@ -56,7 +66,7 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
 }
 ```
 
-## Step 3: Configure Spec Review Panel models
+## Step 4: Configure Spec Review Panel models
 
 The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
@@ -76,7 +86,7 @@ Reference default (memo project): shared omniroute gateway combos:
 
 If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
 
-## Step 4: Create Project Directories
+## Step 5: Create Project Directories
 
 ```bash
 mkdir -p docs/specs docs/plans
@@ -84,7 +94,7 @@ mkdir -p .worktrees
 echo ".worktrees/" >> .gitignore
 ```
 
-## Step 5: Create Scratchpad
+## Step 6: Create Scratchpad
 
 ```bash
 cat > .opencode/scratchpad.md << 'EOF'
@@ -105,7 +115,7 @@ cat > .opencode/scratchpad.md << 'EOF'
 EOF
 ```
 
-## Step 6: Restart OpenCode Container
+## Step 7: Restart OpenCode Container
 
 ```bash
 cd /root/docker && docker compose down opencode && docker compose up -d opencode
@@ -113,7 +123,7 @@ cd /root/docker && docker compose down opencode && docker compose up -d opencode
 
 **Required:** Container caches agents and skills at startup. Restart after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.
 
-## Step 7: Start Workflow
+## Step 8: Start Workflow
 
 Invoke `@architect` agent and request a new feature. The workflow begins at **G1 (Brainstorming)**.
 
