@@ -18,7 +18,7 @@ cp -R <superagents-checkout>/.zcode/ .zcode/
 
 Then adapt for the project:
 
-- `.zcode/scripts/gh_board.py` — create a GitHub Project for the new repo and bake its constants (`PROJECT_ID`, field/option IDs via the graphql query in the script header). Shipped values are the reference project (memo, Project #3) — replace them.
+- `.zcode/scripts/gh_board.py` AND `.opencode/scripts/gh_board.py` (identical copies) — create a GitHub Project for the new repo and bake its constants (`PROJECT_ID`, field/option IDs via the graphql query in the script header) into BOTH. Shipped values are the reference project (memo, Project #3) — replace them.
 - `.zcode/skills/design-phase/SKILL.md` — repo paths (pre-flight git directory), board statuses if your chain differs.
 - Models resolve via the shared omniroute gateway combos (`omniroute/panel-*`, `omniroute/plan-reviewer`) — machine-level user config, nothing per-project.
 
@@ -36,7 +36,7 @@ cp -R /root/workspace/superagents/.opencode/ .opencode/
 
 Adapt per project: agent bodies reference project deltas (models, test commands) — see the Customization section below and manager/architect headers.
 
-## Step 2: Shared Agent Rules (AGENTS.md) + container board script
+## Step 2: Shared Agent Rules (AGENTS.md)
 
 Both tools read `AGENTS.md` at the project root natively (zcode workspace instructions, opencode project instructions). Seed it from the canon:
 
@@ -46,11 +46,7 @@ cp /root/workspace/superagents/.opencode/agents/AGENTS.md AGENTS.md
 
 Sections are universal except "Subagents: report your session ID first" — that one is opencode-only and marked as such inline. (A no-session-id variant ships as `.zcode/AGENTS.seed.md` for zcode-only setups.)
 
-The container manager runs the board script from the project's `.opencode/scripts/` — seed it from the copy you adapted in Step 0:
-
-```bash
-cp .zcode/scripts/gh_board.py .opencode/scripts/gh_board.py
-```
+The board script ships in BOTH harness folders (`.zcode/scripts/` and `.opencode/scripts/`, identical) — no extra step. When you adapt the board constants in Step 0, edit both copies (or edit one and copy over).
 
 ## Step 3: Configure opencode.jsonc
 
