@@ -31,7 +31,7 @@ DESIGN (гейты G1a/G1b/G2) — эта интерактивная хост-с
 ## 3. Артефакты
 
 - Спека: `docs/specs/YYYY-MM-DD-<feature>-design.md`. **Self-contained ДО панели**: панель не ходит в GH issues — проверку скоупа против issue делает главная сессия сама и вшивает находки в текст спеки.
-- План: `docs/plans/YYYY-MM-DD-<feature>-plan.md` по конвенциям writing-plans (канон: `~/dev/superagents/skills/writing-plans/SKILL.md`):
+- План: `docs/plans/YYYY-MM-DD-<feature>-plan.md` по конвенциям writing-plans (канон: `~/dev/superagents/.opencode/skills/writing-plans/SKILL.md`):
   - заголовок: Goal / Architecture / Tech Stack; сразу после него секция `## Behavioral Delta`;
   - якорь каждой задачи: `## Task N: <имя>` + `### Classification: trivial|small|standard|large`; после коммита якоря не перенумеровывать;
   - в каждой задаче `### Required Docs` (domain-rules для сущностей, design-system для UI);
@@ -39,7 +39,7 @@ DESIGN (гейты G1a/G1b/G2) — эта интерактивная хост-с
   - без плейсхолдеров («TBD», «добавить валидацию» — это фейл плана).
 - Изменились доменные правила → `docs/domain-rules/` коммитится вместе со спекой.
 
-## 4. Панель (host-порт `skills/panel-spec-review`)
+## 4. Панель (host-порт — тело из `.opencode/skills/panel-spec-review`)
 
 1. Диспатч: **5 агентов параллельно**, одним сообщением Agent-инструмента:
    `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices` (файлы в `.zcode/agents/` репо, модели `omniroute/panel-*`).
@@ -78,4 +78,4 @@ python3 .zcode/scripts/gh_board.py set-next-up 176 1   # только по сл�
 - Одна DESIGN-сессия = один issue.
 - Параллельные DESIGN-сессии (разные issues, разные хост-сессии): одновременный push → `git pull --rebase`.
 - Возврат из IMPL: карточка на `In Design (G1a)` (сломана спека) или `Spec OK (G1b)` (сломан план) + комментарий в issue — это стартовая точка новой DESIGN-сессии (§1.1).
-- Агенты и скилл DESIGN-фазы живут **в этом репо**: `.zcode/agents/` + `.zcode/skills/design-phase/` (git = источник правды для memo-порта). Канон superagents `~/dev/superagents/agents/` — источник тел; изменение канона переносится правкой файлов в `.zcode/agents/` (порт помечен в шапке каждого файла). Канон v3.4 (2026-09-06): панель `spec-review-*` → `spec-panel-*`; `spec-reviewer` разделён на `plan-reviewer` (G2, хост) + `code-compliance-reviewer` (G5, только контейнер). Каталог моделей omniroute — локальный `~/.zcode/v2/config.json` (с ключами, в репо не едет).
+- Агенты и скилл DESIGN-фазы живут **в этом репо**: `.zcode/agents/` + `.zcode/skills/design-phase/` (git = источник правды для memo-порта). Канон superagents: тела — `~/dev/superagents/.opencode/agents/`, эталонный сид хост-портов — `~/dev/superagents/.zcode/agents/`; изменение канона переносится правкой файлов в `.zcode/agents/` (порт помечен в шапке каждого файла). Канон v3.4 (2026-09-06): панель `spec-review-*` → `spec-panel-*`; `spec-reviewer` разделён на `plan-reviewer` (G2, хост) + `code-compliance-reviewer` (G5, только контейнер). Каталог моделей omniroute — локальный `~/.zcode/v2/config.json` (с ключами, в репо не едет).

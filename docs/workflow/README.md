@@ -8,7 +8,7 @@
 
 **Start here from the repo root:** [README.md](../../README.md) (overview, agents, principles).
 
-Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/architect.md`](../../agents/architect.md) and **skills** under `skills/` — not this file. When the workflow changes, update manager, architect, the affected skills, this document, and the root README together.
+Agents **execute** [`.opencode/agents/manager.md`](../../.opencode/agents/manager.md) and [`.opencode/agents/architect.md`](../../.opencode/agents/architect.md) and **skills** under `.opencode/skills/` — not this file. When the workflow changes, update manager, architect, the affected skills, this document, and the root README together.
 
 ## At a glance
 
@@ -25,9 +25,9 @@ Agents **execute** [`agents/manager.md`](../../agents/manager.md) and [`agents/a
 
 > **Split mode:** in the host/container phase split (below), Phase 0 through Step 2 run in a host session, and Step 3 (worktree + baseline) becomes the architect's FIRST action of IMPL (plan-only start).
 
-**After merge / polish:** [`fast-track-protocol`](../../skills/fast-track-protocol/SKILL.md) (lighter path, @manager dispatches coders directly).
+**After merge / polish:** [`fast-track-protocol`](../../.opencode/skills/fast-track-protocol/SKILL.md) (lighter path, @manager dispatches coders directly).
 
-**Unsure which agent to dispatch?** @architect may use [`find-specialist`](../../skills/find-specialist/SKILL.md) (not a gate).
+**Unsure which agent to dispatch?** @architect may use [`.opencode/skills/find-specialist`](../../.opencode/skills/find-specialist/SKILL.md) (not a gate).
 
 ## Legend
 
@@ -310,7 +310,7 @@ User: post-merge fixes / UI polish / wiring tweaks
     STOP FasTP → back to Phase 0 (brainstorming)
 ```
 
-Runtime: [`skills/fast-track-protocol/SKILL.md`](../../skills/fast-track-protocol/SKILL.md) + rules in [`agents/architect.md`](../../agents/architect.md) (Fast Track Protocol Skill).
+Runtime: [`skills/fast-track-protocol/SKILL.md`](../../.opencode/skills/fast-track-protocol/SKILL.md) + rules in [`.opencode/agents/architect.md`](../../.opencode/agents/architect.md) (Fast Track Protocol Skill).
 
 ## Quality Gates Summary
 
@@ -456,7 +456,7 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 
 **Execution (example — Memo, Next.js on :3000):**
 ```bash
-/root/workspace/superagents/scripts/visual-compliance-check.sh \
+/root/workspace/superagents/.opencode/scripts/visual-compliance-check.sh \
   http://localhost:3000 \
   docs/specs/YYYY-MM-DD-<feature>-design.md \
   /tmp/visual-compliance \
@@ -471,8 +471,8 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 
 When behavior of a step or gate changes, update in order:
 
-1. **`agents/manager.md`** — routing, gate handling, phase dispatch (if change affects manager behavior)
-2. **`agents/architect.md`** — steps, triggers, gate rules (architect follows this through the flow)
+1. **`.opencode/agents/manager.md`** — routing, gate handling, phase dispatch (if change affects manager behavior)
+2. **`.opencode/agents/architect.md`** — steps, triggers, gate rules (architect follows this through the flow)
 3. **Affected `skills/*/SKILL.md`** — procedure invoked at that step
 4. **`scripts/`** — if automation changes
 5. **`docs/workflow/README.md`** — human diagram and gates (this file)
@@ -485,16 +485,16 @@ When behavior of a step or gate changes, update in order:
 |------|----------------|---------------------------|
 | Full flow & gates | **This file** | — |
 | Overview & onboarding | [README.md](../../README.md) | — |
-| Entry point + routing | — | [agents/manager.md](../../agents/manager.md) |
-| Orchestration steps | — | [agents/architect.md](../../agents/architect.md) |
-| Worktree create/remove | — | [skills/using-git-worktrees/SKILL.md](../../skills/using-git-worktrees/SKILL.md), [scripts/create-worktree.sh](../../scripts/create-worktree.sh), [scripts/remove-worktree.sh](../../scripts/remove-worktree.sh) |
-| Dev loop & reviews | — | [skills/subagent-driven-development/SKILL.md](../../skills/subagent-driven-development/SKILL.md) |
-| Visual gate | Step 4.5 above | [scripts/visual-compliance-check.sh](../../scripts/visual-compliance-check.sh) |
-| Reviewer behavior | Agent table above | [agents/plan-reviewer.md](../../agents/plan-reviewer.md), [agents/code-compliance-reviewer.md](../../agents/code-compliance-reviewer.md), [agents/code-quality-reviewer.md](../../agents/code-quality-reviewer.md) |
+| Entry point + routing | — | [.opencode/agents/manager.md](../../.opencode/agents/manager.md) |
+| Orchestration steps | — | [.opencode/agents/architect.md](../../.opencode/agents/architect.md) |
+| Worktree create/remove | — | [.opencode/skills/using-git-worktrees/SKILL.md](../../.opencode/skills/using-git-worktrees/SKILL.md), [.opencode/scripts/create-worktree.sh](../../.opencode/scripts/create-worktree.sh), [.opencode/scripts/remove-worktree.sh](../../.opencode/scripts/remove-worktree.sh) |
+| Dev loop & reviews | — | [.opencode/skills/subagent-driven-development/SKILL.md](../../.opencode/skills/subagent-driven-development/SKILL.md) |
+| Visual gate | Step 4.5 above | [.opencode/scripts/visual-compliance-check.sh](../../.opencode/scripts/visual-compliance-check.sh) |
+| Reviewer behavior | Agent table above | [.opencode/agents/plan-reviewer.md](../../.opencode/agents/plan-reviewer.md), [.opencode/agents/code-compliance-reviewer.md](../../.opencode/agents/code-compliance-reviewer.md), [.opencode/agents/code-quality-reviewer.md](../../.opencode/agents/code-quality-reviewer.md) |
 
 Test commands and app paths in diagrams may show *example (Memo)*; each project configures its own commands in its `.opencode/` agent/skill copies.
 
-**Container restart required** after any `agents/*.md` or `skills/**/SKILL.md` changes.
+**Container restart required** after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.
 
 ## Key Principles
 

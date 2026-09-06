@@ -6,7 +6,7 @@ description: Manage GitHub Project board — read the Next Up trajectory at sess
 Managing the GitHub Project board is the **@manager's responsibility**, same as the scratchpad.
 
 **Project:** configure per project — set `PROJECT_ID`/`OWNER`/`NEXT_UP_FIELD` constants in the script (get IDs via `gh api graphql` projectsV2 query).
-**Script:** the script lives **in the project repo** (memo: host `.zcode/scripts/gh_board.py`, container `.opencode/scripts/gh_board.py`) — the board is part of the host/container seam and travels via git. Seed a new project from `superagents/templates/.zcode/scripts/gh_board.py` and adjust the constants.
+**Script:** the script lives **in the project repo** (memo: host `.zcode/scripts/gh_board.py`, container `.opencode/scripts/gh_board.py`) — the board is part of the host/container seam and travels via git. Seed a new project from `superagents/.zcode/scripts/gh_board.py` and adjust the constants.
 
 ## Model
 

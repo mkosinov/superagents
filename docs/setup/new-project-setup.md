@@ -10,10 +10,10 @@
 
 ## Step 0: Host DESIGN Pipeline (.zcode)
 
-The workflow is split: DESIGN (gates G1a/G1b/G2) runs on the host in ZCode; IMPL runs in the container in OpenCode. The host part deploys from `templates/.zcode/`:
+The workflow is split: DESIGN (gates G1a/G1b/G2) runs on the host in ZCode; IMPL runs in the container in OpenCode. The host part deploys from the canon's `.zcode/` (DESIGN executors only):
 
 ```bash
-cp -R <superagents-checkout>/templates/.zcode/ .zcode/
+cp -R <superagents-checkout>/.zcode/ .zcode/
 ```
 
 Then adapt for the project:
@@ -24,37 +24,19 @@ Then adapt for the project:
 
 Restart ZCode after copying: the agent registry seeds at app start.
 
-**Sync discipline:** `templates/.zcode/` is the seed source for NEW projects. Each project's `.zcode/` is its living copy — per-project adaptations are committed in the project's repo, and cross-project improvements are back-ported into the templates manually.
+**Sync discipline:** the canon's `.zcode/` is the seed source for NEW projects. Each project's `.zcode/` is its living copy — per-project adaptations are committed in the project's repo, and cross-project improvements are back-ported into the canon manually.
 
-## Step 1: Copy Agent Definitions
+## Step 1: Container Pipeline (.opencode — the whole pipeline)
 
-```bash
-mkdir -p .opencode/agents
-cp /root/workspace/superagents/agents/*.md .opencode/agents/
-```
-
-This includes the 5 spec review panel agents (`spec-panel-*.md`) used by the brainstorming skill's Spec Panel Review step.
-
-## Step 2: Copy Skills
+The container part deploys wholesale from the canon's `.opencode/` (all agents, skills, scripts — the full workflow lives there):
 
 ```bash
-mkdir -p .opencode/skills
-for skill in brainstorming writing-plans using-git-worktrees \
-             test-driven-development subagent-driven-development \
-             finishing-a-development-branch systematic-debugging; do
-  mkdir -p ".opencode/skills/$skill"
-  cp "/root/workspace/superagents/skills/$skill/SKILL.md" ".opencode/skills/$skill/"
-done
+cp -R /root/workspace/superagents/.opencode/ .opencode/
 ```
 
-## Step 3: Copy Reviewer Templates
+Adapt per project: agent bodies reference project deltas (models, test commands) — see the Customization section below and manager/architect headers.
 
-```bash
-mkdir -p .opencode/skills/reviewers
-cp /root/workspace/superagents/templates/reviewers/*.md .opencode/skills/reviewers/
-```
-
-## Step 4: Configure opencode.jsonc
+## Step 2: Configure opencode.jsonc
 
 ```jsonc
 {
@@ -74,7 +56,7 @@ cp /root/workspace/superagents/templates/reviewers/*.md .opencode/skills/reviewe
 }
 ```
 
-## Step 5: Configure Spec Review Panel models
+## Step 3: Configure Spec Review Panel models
 
 The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
@@ -94,7 +76,7 @@ Reference default (memo project): shared omniroute gateway combos:
 
 If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
 
-## Step 6: Create Project Directories
+## Step 4: Create Project Directories
 
 ```bash
 mkdir -p docs/specs docs/plans
@@ -102,7 +84,7 @@ mkdir -p .worktrees
 echo ".worktrees/" >> .gitignore
 ```
 
-## Step 7: Create Scratchpad
+## Step 5: Create Scratchpad
 
 ```bash
 cat > .opencode/scratchpad.md << 'EOF'
@@ -123,7 +105,7 @@ cat > .opencode/scratchpad.md << 'EOF'
 EOF
 ```
 
-## Step 8: Restart OpenCode Container
+## Step 6: Restart OpenCode Container
 
 ```bash
 cd /root/docker && docker compose down opencode && docker compose up -d opencode
@@ -131,7 +113,7 @@ cd /root/docker && docker compose down opencode && docker compose up -d opencode
 
 **Required:** Container caches agents and skills at startup. Restart after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.
 
-## Step 9: Start Workflow
+## Step 7: Start Workflow
 
 Invoke `@architect` agent and request a new feature. The workflow begins at **G1 (Brainstorming)**.
 

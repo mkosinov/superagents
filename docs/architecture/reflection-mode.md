@@ -1,7 +1,7 @@
 # Reflection Mode — Architecture Overview
 
 > **Design doc:** [`docs/specs/2026-06-19-reflection-mode-design.md`](../specs/2026-06-19-reflection-mode-design.md) (1092 lines, full specification)
-> **Skill location:** [`skills/reflect/`](../../skills/reflect/)
+> **Skill location:** [`.opencode/skills/reflect/`](../../.opencode/skills/reflect/)
 
 ## Design Philosophy
 

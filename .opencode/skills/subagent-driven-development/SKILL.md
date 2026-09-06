@@ -81,7 +81,7 @@ When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-pro
 
 4. **Visual Compliance Gate (ONCE per phase, NOT per task)**
    - Trigger: All tasks in this phase complete, all reviews passed
-   - Run `/root/workspace/superagents/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
+   - Run `/root/workspace/superagents/.opencode/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
    - If FAILS → soft block: report to user with screenshots, wait for decision (fix/override/abort)
    - Only proceed to Step 5 (documentation) after pass or explicit user override
 
@@ -160,7 +160,7 @@ resuming, read the session's actual state from the DB — this costs 0 tokens:
 
     python3 .opencode/scripts/subagent-audit.py <session_id>
 
-(script: `superagents/scripts/subagent-audit.py`, canonical; synced to each project's
+(script: `superagents/.opencode/scripts/subagent-audit.py`, canonical; synced to each project's
 `.opencode/scripts/`. Opens `~/.local/share/opencode/opencode.db` read-only — safe while opencode
 is running.) The digest tells you which branch to take:
 

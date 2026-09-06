@@ -22,12 +22,12 @@ Capabilities:
 - **7+ quality gates** (G1a/b, G2, G3, G4–G6, G4.5 visual, G7) — see [Workflow guide](docs/workflow/README.md)
 - **Test-Driven Development** (RED-GREEN-REFACTOR) for implementation work
 - **Two-stage review** after non-trivial tasks (code compliance, then code quality + tests)
-- **Git worktree isolation** per feature via `scripts/create-worktree.sh`
+- **Git worktree isolation** per feature via `.opencode/scripts/create-worktree.sh`
 - **Documentation on the feature branch** before finish
 - **Resumable sessions** via `.opencode/scratchpad.md`
 - **Fast Track Protocol** for post-merge polish without full G1–G2
 - **Spec review panel** — 5 parallel free-model perspectives review every spec before user approval
-- **Reflection mode** for workflow self-analysis (`/reflect`, `skills/reflect/`)
+- **Reflection mode** for workflow self-analysis (`/reflect`, `.opencode/skills/reflect/`)
 
 ## Workflow guide (detailed)
 
@@ -70,35 +70,42 @@ Details, review tiers, and diagrams: **[Workflow guide](docs/workflow/README.md)
 
 ```
 superagents/
-├── agents/                  # Agent definitions (frontmatter + prompts)
-│   ├── manager.md           # Primary entry point — gates, brainstorming, phase dispatch
-│   ├── architect.md         # Phase executor — DESIGN or IMPL (never talks to user)
-│   ├── frontend-coder.md    # Next.js implementer
-│   ├── backend-coder.md     # FastAPI implementer
-│   ├── plan-reviewer.md     # Plan reviewer — plan vs spec (G2, DESIGN)
-│   ├── code-compliance-reviewer.md  # Code compliance reviewer — code vs task (G5)
-│   ├── code-quality-reviewer.md  # Quality + tests reviewer
-│   ├── tester.md            # Test env prep + test suite runs (cheap model)
-│   ├── debugger.md          # Root cause investigator
-│   ├── docser.md            # Meta documentation
-│   └── deployer.md          # DevOps / deploy
-├── scripts/                 # Shared automation (worktree, visual gate)
-│   ├── create-worktree.sh
-│   ├── remove-worktree.sh
-│   └── visual-compliance-check.sh
-├── skills/                  # Reusable skills (invoked via skill tool)
-│   ├── brainstorming/
-│   ├── writing-plans/
-│   ├── using-git-worktrees/
-│   ├── find-specialist/     # Pick agent when dispatch is unclear (architect)
-│   ├── test-driven-development/
-│   ├── subagent-driven-development/
-│   ├── finishing-a-development-branch/
-│   ├── systematic-debugging/
-│   ├── fast-track-protocol/
-│   └── reflect/
-├── templates/               # Reviewer prompt templates
-│   └── reviewers/
+├── .opencode/               # Container pipeline (IMPL + full workflow) — seed for project .opencode/
+│   ├── agents/              # Agent definitions (frontmatter + prompts)
+│   │   ├── manager.md       # Primary entry point — gates, brainstorming, phase dispatch
+│   │   ├── architect.md     # Phase executor — DESIGN or IMPL (never talks to user)
+│   │   ├── frontend-coder.md# Next.js implementer
+│   │   ├── backend-coder.md # FastAPI implementer
+│   │   ├── plan-reviewer.md # Plan reviewer — plan vs spec (G2, DESIGN)
+│   │   ├── code-compliance-reviewer.md  # Code compliance reviewer — code vs task (G5)
+│   │   ├── code-quality-reviewer.md     # Quality + tests reviewer
+│   │   ├── tester.md        # Test env prep + test suite runs (cheap model)
+│   │   ├── debugger.md      # Root cause investigator
+│   │   ├── docser.md        # Meta documentation
+│   │   ├── deployer.md      # DevOps / deploy
+│   │   └── spec-panel-*.md  # Spec review panel (5 perspectives, G1b)
+│   ├── scripts/             # Shared automation (worktree, visual gate, subagent audit)
+│   │   ├── create-worktree.sh
+│   │   ├── remove-worktree.sh
+│   │   ├── visual-compliance-check.sh
+│   │   └── subagent-audit.py
+│   ├── skills/              # Reusable skills (invoked via skill tool)
+│   │   ├── brainstorming/
+│   │   ├── writing-plans/
+│   │   ├── using-git-worktrees/
+│   │   ├── find-specialist/ # Pick agent when dispatch is unclear (architect)
+│   │   ├── test-driven-development/
+│   │   ├── subagent-driven-development/
+│   │   ├── finishing-a-development-branch/
+│   │   ├── systematic-debugging/
+│   │   ├── fast-track-protocol/
+│   │   └── reflect/
+│   └── templates/
+│       └── reviewers/       # Legacy reviewer prompt templates (pre-agents)
+├── .zcode/                  # Host DESIGN pipeline only — seed for project .zcode/
+│   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
+│   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
+│   └── scripts/gh_board.py  # GitHub Project board script
 └── docs/
     ├── workflow/            # Human workflow reference (start here for flow)
     ├── architecture/
@@ -149,7 +156,7 @@ Self-analysis tool for the SuperAgents workflow. Reads `opencode.db` (read-only)
 ```
 Optional text after `/reflect` = "what user noticed as wrong/strange", passed to the analysis as context.
 
-**CLI** — `skills/reflect/scripts/reflect.sh`:
+**CLI** — `.opencode/skills/reflect/scripts/reflect.sh`:
 
 | Mode | Command | Use when |
 |------|---------|----------|
