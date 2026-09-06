@@ -6,7 +6,7 @@ description: Manage GitHub Project board — read the Next Up trajectory at sess
 Managing the GitHub Project board is the **@manager's responsibility**, same as the scratchpad.
 
 **Project:** configure per project — set `PROJECT_ID`/`OWNER`/`NEXT_UP_FIELD` constants in the script (get IDs via `gh api graphql` projectsV2 query).
-**Script:** the script lives **in the project repo** (memo: `scripts/gh_board.py`) — the board is part of the host/container seam and travels via git. This skill carries the doc only; superagents does not ship a script copy. Seed a new project by copying `scripts/gh_board.py` from memo and adjusting the constants.
+**Script:** the script lives **in the project repo** (memo: host `.zcode/scripts/gh_board.py`, container `.opencode/scripts/gh_board.py`) — the board is part of the host/container seam and travels via git. This skill carries the doc only; superagents does not ship a script copy. Seed a new project by copying `gh_board.py` from memo (`.zcode/scripts/`) and adjusting the constants.
 
 ## Model
 
@@ -32,10 +32,10 @@ Status is gate-anchored: each status names the last workflow gate passed. Flip i
 ## Commands
 
 ```bash
-python3 scripts/gh_board.py next-up                    # show the trajectory (queue 1→3)
-python3 scripts/gh_board.py set-next-up 176 1          # put an issue in the queue (1|2|3); "none" — remove
-python3 scripts/gh_board.py shift                      # after Next Up 1 completes: clear it, shift 2→1, 3→2
-python3 scripts/gh_board.py status 176 "In IMPL"       # move a card's status
+python3 .opencode/scripts/gh_board.py next-up                    # show the trajectory (queue 1→3)
+python3 .opencode/scripts/gh_board.py set-next-up 176 1          # put an issue in the queue (1|2|3); "none" — remove
+python3 .opencode/scripts/gh_board.py shift                      # after Next Up 1 completes: clear it, shift 2→1, 3→2
+python3 .opencode/scripts/gh_board.py status 176 "In IMPL"       # move a card's status
 ```
 
 An issue is automatically added to the board on the first set/status call if it wasn't there.

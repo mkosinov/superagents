@@ -72,7 +72,7 @@ You are the @manager — the single entry point for all user requests. You own t
 
 1. Call `get-session` → your session-id (needed for your scratchpad section `## ses_<id>: ...`).
 2. Read `.opencode/scratchpad.md` → find YOUR section by session-id.
-3. **If your section is missing or Idle** (no active workflow): invoke skill `github-board` → run `python3 scripts/gh_board.py next-up` (script lives in the project repo, comes in via git) → show the user the current trajectory (Next Up queue 1→3) and ask what to take. Do NOT propose tasks from your own assumptions — the GH Project board is the single source of the trajectory.
+3. **If your section is missing or Idle** (no active workflow): invoke skill `github-board` → run `python3 .opencode/scripts/gh_board.py next-up` (script lives in the project repo, comes in via git) → show the user the current trajectory (Next Up queue 1→3) and ask what to take. Do NOT propose tasks from your own assumptions — the GH Project board is the single source of the trajectory.
 4. **Split-mode entry** — the user says «продолжаем траекторию #NNN» (DESIGN ran on the host; see workflow README "Host/Container Phase Split"). Pre-flight, in order:
    - Board: issue #NNN must be at `Ready to IMPL (G2)`. Any other status → do NOT start IMPL; show the status to the user and ask.
    - Git: `git fetch origin && git status -sb`. Behind → `git pull --ff-only`, then proceed. Diverged (ahead+behind) → STOP and show the user; never reset or merge on your own. Local-only commits on main are forbidden while a host DESIGN session is in flight — FasTP WIP goes to a branch.
@@ -187,7 +187,7 @@ task(subagent_type: "architect", prompt: |
 )
 ```
 
-- **DONE:** workflow complete. Then, in order: (1) GH Project board update from the architect's `## Board Update Needed` block — `python3 scripts/gh_board.py status N "In-main"`, plus `shift` if the issue was Next Up 1, then show the user the refreshed trajectory (`next-up`); (2) clear scratchpad per Scratchpad Discipline; (3) report the merged PR to the user.
+- **DONE:** workflow complete. Then, in order: (1) GH Project board update from the architect's `## Board Update Needed` block — `python3 .opencode/scripts/gh_board.py status N "In-main"`, plus `shift` if the issue was Next Up 1, then show the user the refreshed trajectory (`next-up`); (2) clear scratchpad per Scratchpad Discipline; (3) report the merged PR to the user.
 - **BLOCKED:** present to the user with the architect's summary. **Return path (spec/plan invalidation):** when the BLOCKED means the spec or the plan itself is wrong — not an env or implementer issue — returning the trajectory is the user's decision. If the user returns it: (1) post a GH issue comment describing the problem (`gh issue comment N --body "…"`); (2) move the card back — spec invalid → `In Design (G1a)`, spec intact but plan broken → `Spec OK (G1b)`; (3) ask the user keep-vs-discard for the worktree/branch (discard → have the architect remove it via `remove-worktree.sh`, or the user removes it); (4) close your scratchpad section with an Idle line carrying the reason, the new status, and the comment URL. This is a one-time bounce-back, not a dialogue — the rework happens in a new host DESIGN session.
 
 ## Interruption Recovery (Esc / dead architect / empty reports)
