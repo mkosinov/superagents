@@ -41,7 +41,7 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
 Both tools read `AGENTS.md` at the project root natively (zcode workspace instructions, opencode project instructions). Seed it from the canon:
 
 ```bash
-cp /root/workspace/superagents/AGENTS.md AGENTS.md
+cp /root/workspace/superagents/.opencode/agents/AGENTS.md AGENTS.md
 ```
 
 Sections are universal except "Subagents: report your session ID first" — that one is opencode-only and marked as such inline.
