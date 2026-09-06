@@ -105,9 +105,7 @@ superagents/
 │   │   ├── pytest-patterns/       # Backend test patterns (generic, Memo examples)
 │   │   ├── vitest-playwright-patterns/  # Frontend test patterns (generic, Memo examples)
 │   │   └── reflect/
-│   └── AGENTS.seed.md       # Universal shared agent rules (seed → project root AGENTS.md)
 ├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
-│   ├── AGENTS.seed.md       # Universal shared agent rules (identical to .opencode copy)
 │   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
 │   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
 │   └── scripts/gh_board.py  # GitHub Project board script
@@ -260,6 +258,7 @@ Test commands and app paths in diagrams may show *example (Memo)*; each project 
 
 ## Changelog
 
+- **3.6** — shared AGENTS.md dissolved: conversational rules moved into `manager.md` (container) and the `design-phase` skill (host); the opencode session-id rule rides inside dispatch prompts. No seeds, no root-level harness file in projects (both tools provably load instructions only from the repo root — kept empty of harness files by design).
 - **3.5** — workflow docs split by phase: `docs/workflow/README.md` → `design-phase.md` (host, ZCode, gates G1a–G2) + `impl-phase.md` (container, OpenCode, G3–G7); root README re-written as the two-phase entry point for newcomers. Canon restructured: flat `agents/`+`skills/`+`scripts/` moved into `.opencode/` (full pipeline) and `.zcode/` (DESIGN-only host seed); project seeding = copy the two folders + AGENTS.md to the project root.
 - **3.4** — agent registry rename (names state the reviewed document): `spec-review-*` panel → `spec-panel-*`; `spec-reviewer` split into `plan-reviewer` (G2: plan vs spec, DESIGN) + `code-compliance-reviewer` (G5: code vs task, symmetry with code-quality-reviewer at G6); gate G5 label "Spec Compliance" → "Code Compliance". Container `.opencode` copies re-sync manually after in-flight IMPL waves.
 - **3.3** — host/container phase split: DESIGN (G1a–G2) can run in a host session, IMPL stays in-container; plan-only IMPL entry (architect creates worktree + baseline as its first IMPL action, IMPL Step 0); git+board seam contract with diverged-main STOP and a one-time return path (BLOCKED → issue comment → card back).

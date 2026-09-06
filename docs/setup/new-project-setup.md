@@ -36,19 +36,7 @@ cp -R /root/workspace/superagents/.opencode/ .opencode/
 
 Adapt per project: agent bodies reference project deltas (models, test commands) — see the Customization section below and manager/architect headers.
 
-## Step 2: Shared Agent Rules (AGENTS.md)
-
-Both tools read `AGENTS.md` at the project root natively (zcode workspace instructions, opencode project instructions). Seed it from the canon:
-
-```bash
-cp /root/workspace/superagents/.opencode/AGENTS.seed.md AGENTS.md
-```
-
-The file is fully tool-neutral (zcode and opencode both read it from the root; neither loads instructions from the harness folders — verified live 2026-09-06). Tool-specific mechanics live in the agents themselves: the opencode session-id rule travels inside the manager/architect dispatch prompts.
-
-The board script ships in BOTH harness folders (`.zcode/scripts/` and `.opencode/scripts/`, identical) — no extra step. When you adapt the board constants in Step 0, edit both copies (or edit one and copy over).
-
-## Step 3: Configure opencode.jsonc
+## Step 2: Configure opencode.jsonc
 
 ```jsonc
 {
@@ -71,7 +59,7 @@ The board script ships in BOTH harness folders (`.zcode/scripts/` and `.opencode
 }
 ```
 
-## Step 4: Configure Spec Review Panel models
+## Step 3: Configure Spec Review Panel models
 
 The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
@@ -91,7 +79,7 @@ Reference default (memo project): shared omniroute gateway combos:
 
 If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
 
-## Step 5: Create Project Directories
+## Step 4: Create Project Directories
 
 ```bash
 mkdir -p docs/specs docs/plans
@@ -99,7 +87,7 @@ mkdir -p .worktrees
 echo ".worktrees/" >> .gitignore
 ```
 
-## Step 6: Create Scratchpad
+## Step 5: Create Scratchpad
 
 ```bash
 touch .opencode/scratchpad.md
@@ -107,7 +95,7 @@ touch .opencode/scratchpad.md
 
 Leave it empty. The container manager seeds its own section per trajectory at IMPL start (plan-only entry: architect's IMPL task_id + "gates G1a/G1b/G2 passed per board" + plan path). Do NOT pre-fill a legacy workflow template.
 
-## Step 7: Restart OpenCode Container
+## Step 6: Restart OpenCode Container
 
 ```bash
 cd /root/docker && docker compose down opencode && docker compose up -d opencode
@@ -115,12 +103,14 @@ cd /root/docker && docker compose down opencode && docker compose up -d opencode
 
 **Required:** Container caches agents and skills at startup. Restart after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.
 
-## Step 8: Start Workflow
+## Step 7: Start Workflow
 
 - **DESIGN phase** — on the host: open the project in ZCode and say `design` / `design #NNN` (the `design-phase` skill runs gates G1a–G2; see docs/workflow/design-phase.md).
 - **IMPL phase** — in the container: when the card is at `Ready to IMPL (G2)`, tell @manager «продолжаем траекторию #NNN» (plan-only entry; see docs/workflow/impl-phase.md).
 
 The in-container DESIGN flow (brainstorming via @manager → @architect) remains available as a fallback for non-split deployments.
+
+**No shared AGENTS.md:** conversational rules (input types, work-results-first) live where they execute — `manager.md` (container) and the `design-phase` skill (host). The opencode session-id rule travels inside the dispatch prompts. Neither tool loads instructions from the harness folders (verified live 2026-09-06), and the project root stays free of harness files.
 
 ## Customization
 
