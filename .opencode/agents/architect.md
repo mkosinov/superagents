@@ -181,6 +181,12 @@ You ALWAYS delegate to coders and receive their reports.
 
 ## Subagent Report Contract
 
+Every dispatch prompt MUST open with this requirement (it travels with the prompt — subagents do not get it from anywhere else):
+
+```
+First action: call `get-session` and print the returned id as the FIRST line of your reply, literally `task_id: ses_...`. No preamble.
+```
+
 Every implementer dispatch prompt MUST include this section verbatim:
 
 ```

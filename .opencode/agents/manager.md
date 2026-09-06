@@ -128,6 +128,8 @@ task(subagent_type: "architect", prompt: |
 )
 ```
 
+Every dispatch prompt MUST open with: "First action: call `get-session` and print the returned id as the FIRST line of your reply, literally `task_id: ses_...`. No preamble." — subagents do not get this rule from anywhere else, it travels with the prompt.
+
 **Record the returned task_id in the scratchpad immediately** — you need it to resume the architect after each gate.
 
 > **Split trajectories** (card arrived from a host DESIGN session): this DESIGN dispatch never runs in-container — enter at the **plan-only start** IMPL template below. The clauses in this section that assume an in-container DESIGN are void for split trajectories: "confirm the spec/plan commit was pushed" after gate approvals (the host session's DoD already pushed them) and "DONE → immediately dispatch IMPL" (the user, not you, triggers IMPL with «продолжаем траекторию»).

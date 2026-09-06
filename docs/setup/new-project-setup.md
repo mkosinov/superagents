@@ -41,10 +41,10 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
 Both tools read `AGENTS.md` at the project root natively (zcode workspace instructions, opencode project instructions). Seed it from the canon:
 
 ```bash
-cp /root/workspace/superagents/.opencode/agents/AGENTS.md AGENTS.md
+cp /root/workspace/superagents/.opencode/AGENTS.seed.md AGENTS.md
 ```
 
-Sections are universal except "Subagents: report your session ID first" — that one is opencode-only and marked as such inline. (A no-session-id variant ships as `.zcode/AGENTS.seed.md` for zcode-only setups.)
+The file is fully tool-neutral (zcode and opencode both read it from the root; neither loads instructions from the harness folders — verified live 2026-09-06). Tool-specific mechanics live in the agents themselves: the opencode session-id rule travels inside the manager/architect dispatch prompts.
 
 The board script ships in BOTH harness folders (`.zcode/scripts/` and `.opencode/scripts/`, identical) — no extra step. When you adapt the board constants in Step 0, edit both copies (or edit one and copy over).
 

@@ -105,9 +105,9 @@ superagents/
 │   │   ├── pytest-patterns/       # Backend test patterns (generic, Memo examples)
 │   │   ├── vitest-playwright-patterns/  # Frontend test patterns (generic, Memo examples)
 │   │   └── reflect/
-│   └── agents/AGENTS.md     # Shared-rules variant WITH the opencode session-id rule
+│   └── AGENTS.seed.md       # Universal shared agent rules (seed → project root AGENTS.md)
 ├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
-│   ├── AGENTS.seed.md       # Shared-rules variant WITHOUT session-id (zcode-only setups)
+│   ├── AGENTS.seed.md       # Universal shared agent rules (identical to .opencode copy)
 │   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
 │   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
 │   └── scripts/gh_board.py  # GitHub Project board script
