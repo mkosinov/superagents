@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """gh_board.py — GH Project #3 (Memo Project) board management.
 
 Usage (from repo root):
