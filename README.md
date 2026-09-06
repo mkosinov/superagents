@@ -100,7 +100,12 @@ superagents/
 │   │   ├── finishing-a-development-branch/
 │   │   ├── systematic-debugging/
 │   │   ├── fast-track-protocol/
+│   │   ├── github-board/    # Board doc (script ships in both harness folders)
+│   │   ├── panel-spec-review/     # Panel protocol (canon body for the host design-phase skill)
+│   │   ├── pytest-patterns/       # Backend test patterns (generic, Memo examples)
+│   │   ├── vitest-playwright-patterns/  # Frontend test patterns (generic, Memo examples)
 │   │   └── reflect/
+│   └── agents/AGENTS.md     # Shared-rules variant WITH the opencode session-id rule
 ├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
 │   ├── AGENTS.seed.md       # Shared-rules variant WITHOUT session-id (zcode-only setups)
 │   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
