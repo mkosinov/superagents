@@ -4,9 +4,27 @@
 
 ## Prerequisites
 
-- OpenCode installed
+- ZCode on the host (DESIGN phase) and OpenCode in the container (IMPL phase)
 - Docker (for isolated worktrees)
 - Git repository initialized
+
+## Step 0: Host DESIGN Pipeline (.zcode)
+
+The workflow is split: DESIGN (gates G1a/G1b/G2) runs on the host in ZCode; IMPL runs in the container in OpenCode. The host part deploys from `templates/.zcode/`:
+
+```bash
+cp -R <superagents-checkout>/templates/.zcode/ .zcode/
+```
+
+Then adapt for the project:
+
+- `.zcode/scripts/gh_board.py` — create a GitHub Project for the new repo and bake its constants (`PROJECT_ID`, field/option IDs via the graphql query in the script header). Shipped values are the reference project (memo, Project #3) — replace them.
+- `.zcode/skills/design-phase/SKILL.md` — repo paths (pre-flight git directory), board statuses if your chain differs.
+- Models resolve via the shared omniroute gateway combos (`omniroute/panel-*`, `omniroute/plan-reviewer`) — machine-level user config, nothing per-project.
+
+Restart ZCode after copying: the agent registry seeds at app start.
+
+**Sync discipline:** `templates/.zcode/` is the seed source for NEW projects. Each project's `.zcode/` is its living copy — per-project adaptations are committed in the project's repo, and cross-project improvements are back-ported into the templates manually.
 
 ## Step 1: Copy Agent Definitions
 
@@ -60,17 +78,19 @@ cp /root/workspace/superagents/templates/reviewers/*.md .opencode/skills/reviewe
 
 The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
-Reference default (memo project): free OpenCode Zen models via the `omniroute` provider:
+Reference default (memo project): shared omniroute gateway combos:
 
 | Panelist | Model |
 |----------|-------|
-| spec-panel-completeness | `omniroute/opencode-zen/big-pickle` |
-| spec-panel-feasibility | `omniroute/opencode-zen/mimo-v2.5-free` |
-| spec-panel-consistency | `omniroute/opencode-zen/nemotron-3-ultra-free` |
-| spec-panel-simplicity | `omniroute/opencode-zen/deepseek-v4-flash-free` |
-| spec-panel-best-practices | `omniroute/opencode-zen/ling-3.0-flash-free` |
+| spec-panel-completeness | `omniroute/panel-completeness` |
+| spec-panel-feasibility | `omniroute/panel-feasibility` |
+| spec-panel-consistency | `omniroute/panel-consistency` |
+| spec-panel-simplicity | `omniroute/panel-simplicity` |
+| spec-panel-best-practices | `omniroute/panel-best-practices` |
 
-**Model substitution:** to swap a panelist's model, edit the `model:` line in the corresponding `.opencode/agents/spec-panel-*.md`. Reserve pool in the zen tier: `opencode-zen/north-mini-code-free`, `opencode-zen/laguna-s-2.1-free` — or use any capable model available to the project.
+(`plan-reviewer` — `omniroute/plan-reviewer`.)
+
+**Model substitution:** to swap a panelist's model, edit the `model:` line in the corresponding agent file — or re-target the combo in the omniroute dashboard without touching files.
 
 If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
 
