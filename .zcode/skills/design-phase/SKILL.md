@@ -9,7 +9,7 @@ description: DESIGN-фаза на хосте (zcode) в split-топологии
 
 DESIGN (гейты G1a/G1b/G2) — эта интерактивная хост-сессия zcode. IMPL (G3–G7) — контейнер opencode (@manager/@architect), туда не лезем. Сессия объединяет роли manager+architect на DESIGN: общается с юзером на гейтах и диспатчит субагентов **одним уровнем** (панель, ревьюер плана) — вложенный диспатч не нужен и недоступен (depth limit).
 
-Через шов (git + борд) переходит только то, что запушено/перевёрнуто. Канон workflow: `~/dev/superagents/docs/workflow/README.md` (секция Host/Container Phase Split); план миграции: `~/dev/superagents/docs/plans/2026-09-05-host-design-container-impl-split-plan.md`.
+Через шов (git + борд) переходит только то, что запушено/перевёрнуто. Канон workflow: `~/dev/superagents/docs/workflow/design-phase.md` (эта фаза) + `impl-phase.md`; план миграции: `~/dev/superagents/docs/plans/2026-09-05-host-design-container-impl-split-plan.md`.
 
 ## 1. Старт сессии (ритуал)
 

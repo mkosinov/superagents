@@ -2,24 +2,28 @@
 
 > A reusable agentic workflow framework for AI-driven software development.
 >
-> **System:** @manager (entry point) → @architect (phase executor) + subagent implementers + two-stage review pipeline
-> **Version:** 3.4
+> **Version:** 3.5
 >
 > **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
-## What is SuperAgents?
+## What is SuperAgents? (read this first)
 
-SuperAgents orchestrates AI agents through a fixed **feature lifecycle** split into two phases:
-- **DESIGN** — spec writing → spec review panel → plan → plan review → worktree + baseline tests
-- **IMPL** — sequential task loop with reviews → visual compliance → docs → merge or PR
+Every feature goes through **two phases**, and by design each phase runs in its own tool:
 
-Humans approve at key gates (G1a/b, G2, G7); everything between gates runs automatically.
+| Phase | What happens | Where it runs | Full reference |
+|-------|--------------|---------------|----------------|
+| **DESIGN** | brainstorm concept → spec + 5-perspective review panel → plan + plan review. Human gates G1a/G1b/G2. Output: approved spec + plan **pushed to main**. | **ZCode on the host** — an interactive session with you; review agents dispatched in parallel | [docs/workflow/design-phase.md](docs/workflow/design-phase.md) |
+| **IMPL** | worktree + baseline → sequential task loop with two-stage reviews → visual gate → docs → merge/PR. Human gate G7. Input: the approved plan from DESIGN. | **OpenCode in the container** — @manager + @architect run it autonomously | [docs/workflow/impl-phase.md](docs/workflow/impl-phase.md) |
 
-DESIGN and IMPL can also run in **different environments** (host/container phase split): DESIGN in an interactive host session, IMPL in the opencode container — the seam is git + the GH Project board, with a plan-only IMPL entry. See [Workflow guide — Host/Container Phase Split](docs/workflow/README.md#hostcontainer-phase-split--design-on-host-impl-in-container).
+Why two tools: DESIGN is a conversation with a human at gates — it needs an interactive session and only one level of subagent dispatch, which the host (ZCode) provides. IMPL is a long autonomous pipeline with nested dispatch (manager → architect → coders/reviewers), which the container (OpenCode) provides. The only things that cross between them are **git** (pushed spec/plan) and the **GitHub Project board** (the card's status shows which gate was passed last). The handoff is one sentence: the user tells the container manager «продолжаем траекторию #NNN».
+
+If IMPL discovers the spec or plan itself is wrong, the card bounces back to a DESIGN gate with an issue comment — see the return path in [impl-phase.md](docs/workflow/impl-phase.md).
+
+Each project repo gets its own copies of the harness: `.zcode/` (DESIGN executors) and `.opencode/` (the full pipeline, container side), seeded from this repo's [`.zcode/`](.zcode/) and [`.opencode/`](.opencode/).
 
 Capabilities:
 
-- **7+ quality gates** (G1a/b, G2, G3, G4–G6, G4.5 visual, G7) — see [Workflow guide](docs/workflow/README.md)
+- **7+ quality gates** (G1a/b, G2, G3, G4–G6, G4.5 visual, G7)
 - **Test-Driven Development** (RED-GREEN-REFACTOR) for implementation work
 - **Two-stage review** after non-trivial tasks (code compliance, then code quality + tests)
 - **Git worktree isolation** per feature via `.opencode/scripts/create-worktree.sh`
@@ -29,21 +33,18 @@ Capabilities:
 - **Spec review panel** — 5 parallel free-model perspectives review every spec before user approval
 - **Reflection mode** for workflow self-analysis (`/reflect`, `.opencode/skills/reflect/`)
 
-## Workflow guide (detailed)
+## Workflow guides (detailed)
 
-**For people:** step-by-step flow, gate diagram, agent roles, visual compliance, and which files agents actually run.
-
-**[→ SuperAgents Workflow (`docs/workflow/README.md`)](docs/workflow/README.md)**
+- **[DESIGN phase — host, ZCode](docs/workflow/design-phase.md)** — brainstorm G1a, spec + panel G1b, plan G2, board flips, the push-to-main seam contract
+- **[IMPL phase — container, OpenCode](docs/workflow/impl-phase.md)** — plan-only entry, worktree G3, dev loop G4–G6, visual gate, finish G7, FasTP, agent architecture
 
 One-line map:
 
 ```
-Phase 0: Brainstorming (G1a) → Phase DESIGN: Spec (G1b) → Plan (G2) → Worktree (G3)
-                                                              ↓
-Phase IMPL: Dev loop (G4–G6) → Visual gate (G4.5) → Docs → Finish (G7)
+DESIGN (host, ZCode):  Brainstorm (G1a) → Spec + panel (G1b) → Plan (G2) → push to main
+                                                              ↓  «продолжаем траекторию #NNN»
+IMPL (container, opencode):  Worktree + baseline (G3) → Dev loop (G4–G6) → Visual (G4.5) → Docs → Finish (G7)
 ```
-
-In the IDE, start **@manager** (or it starts automatically). It brainstorms with you, then dispatches **@architect** for each phase.
 
 ## Quick Start
 
@@ -51,26 +52,26 @@ In the IDE, start **@manager** (or it starts automatically). It brainstorms with
 
 [New Project Setup](docs/setup/new-project-setup.md) — copy agents, skills, and templates into your repo and adjust project-specific paths and test commands.
 
-### Run Workflow (manager → architect)
+### Run Workflow (two phases, two tools)
 
-| Phase | Step | Gate | Who | Skill |
-|-------|------|------|-----|-------|
-| **Phase 0** | Brainstorming | G1a (concept) | **@manager** + user | `brainstorming` |
-| **DESIGN** | 1. Design spec | G1b (spec) | **@architect** | `brainstorming` (spec part) + `panel-spec-review` |
-| | 2. Plan + review | G2 (plan) | **@architect** | `writing-plans` |
-| | 3. Worktree + baseline | G3 | **@architect** | `using-git-worktrees` |
-| **IMPL** | 4. Dev loop + reviews | G4–G6 | **@architect** | `subagent-driven-development` |
-| | 4.5 Visual check (UI) | G4.5 | **@architect** | `visual-compliance-check.sh` |
-| | 5. Docs | — | **@architect** | dispatch `@docser` |
-| | 6. Finish | G7 (merge) | **@architect** | `finishing-a-development-branch` |
+| Phase | Step | Gate | Executor | Skill |
+|-------|------|------|----------|-------|
+| **DESIGN** (host, ZCode) | 0. Brainstorming | G1a (concept) | host session + user | `design-phase` |
+| | 1. Spec + panel review | G1b (spec) | host session + `spec-panel-*` ×5 | `design-phase` + `panel-spec-review` |
+| | 2. Plan + review | G2 (plan) | host session + `plan-reviewer` | `writing-plans` |
+| **IMPL** (container, OpenCode) | 0. Worktree + baseline | G3 | @architect (first IMPL action) | `using-git-worktrees` |
+| | 4. Dev loop + reviews | G4–G6 | @architect → coders → reviewers | `subagent-driven-development` |
+| | 4.5 Visual check (UI) | G4.5 | @architect | `visual-compliance-check.sh` |
+| | 5. Docs | — | @docser | dispatch |
+| | 6. Finish | G7 (merge) | @manager + user | `finishing-a-development-branch` |
 
-Details, review tiers, and diagrams: **[Workflow guide](docs/workflow/README.md)**.
+Details, review tiers, and diagrams: [design-phase.md](docs/workflow/design-phase.md) · [impl-phase.md](docs/workflow/impl-phase.md).
 
 ## Repository Structure
 
 ```
 superagents/
-├── .opencode/               # Container pipeline (IMPL + full workflow) — seed for project .opencode/
+├── .opencode/               # IMPL pipeline (full container workflow) — seed for project .opencode/
 │   ├── agents/              # Agent definitions (frontmatter + prompts)
 │   │   ├── manager.md       # Primary entry point — gates, brainstorming, phase dispatch
 │   │   ├── architect.md     # Phase executor — DESIGN or IMPL (never talks to user)
@@ -102,12 +103,12 @@ superagents/
 │   │   └── reflect/
 │   └── templates/
 │       └── reviewers/       # Legacy reviewer prompt templates (pre-agents)
-├── .zcode/                  # Host DESIGN pipeline only — seed for project .zcode/
+├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
 │   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
 │   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
 │   └── scripts/gh_board.py  # GitHub Project board script
 └── docs/
-    ├── workflow/            # Human workflow reference (start here for flow)
+    ├── workflow/            # design-phase.md + impl-phase.md (human reference)
     ├── architecture/
     └── setup/
 ```
@@ -141,7 +142,7 @@ superagents/
 9. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model); coders keep their contexts clean of env forensics
 10. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
 
-Full gate list and behavior: **[Workflow guide](docs/workflow/README.md)**.
+Full gate list and behavior: [design-phase.md](docs/workflow/design-phase.md) · [impl-phase.md](docs/workflow/impl-phase.md).
 
 ## Reflection Mode
 
@@ -210,13 +211,41 @@ This repo is the **single source of truth** for the SuperAgents workflow framewo
 ### Change Protocol
 
 1. **Generic workflow changes** → edit in `superagents/` FIRST → commit → sync to project repos
-2. **Project-specific changes** → edit in project `.opencode/` only → no sync needed
-3. Update **[docs/workflow/README.md](docs/workflow/README.md)** and this README when gates or steps change — use the [workflow change checklist](docs/workflow/README.md#workflow-change-checklist) in that doc
+2. **Project-specific changes** → edit in project `.opencode/`/`.zcode/` only → no sync needed
+3. Update **[docs/workflow/design-phase.md](docs/workflow/design-phase.md)** / **[docs/workflow/impl-phase.md](docs/workflow/impl-phase.md)** and this README when gates or steps change — using the workflow change checklist below
 4. **@infra** verifies sync status when workflow files change in either repo
+
+### Workflow change checklist
+
+When behavior of a step or gate changes, update in order:
+
+1. **`.opencode/agents/manager.md`** — routing, gate handling, phase dispatch (if change affects manager behavior)
+2. **`.opencode/agents/architect.md`** — steps, triggers, gate rules
+3. **Affected `.opencode/skills/*/SKILL.md`** — procedure invoked at that step
+4. **`.opencode/scripts/`** — if automation changes
+5. **`docs/workflow/design-phase.md` / `docs/workflow/impl-phase.md`** — human diagrams and gates
+6. **This README** — if gates, skills list, or onboarding summary changes
+7. **Project repos** — sync generic changes into `.opencode/`/`.zcode/`; restart agent runtime if required
+
+### Documentation map (keep in sync)
+
+| What | Human-readable | Runtime (agents execute) |
+|------|----------------|---------------------------|
+| DESIGN phase flow & gates | [docs/workflow/design-phase.md](docs/workflow/design-phase.md) | project `.zcode/skills/design-phase/SKILL.md` |
+| IMPL phase flow & gates | [docs/workflow/impl-phase.md](docs/workflow/impl-phase.md) | — |
+| Overview & onboarding | this README | — |
+| Entry point + routing (IMPL) | — | [.opencode/agents/manager.md](.opencode/agents/manager.md) |
+| Orchestration steps (IMPL) | — | [.opencode/agents/architect.md](.opencode/agents/architect.md) |
+| Worktree create/remove | — | [.opencode/skills/using-git-worktrees/SKILL.md](.opencode/skills/using-git-worktrees/SKILL.md), [.opencode/scripts/create-worktree.sh](.opencode/scripts/create-worktree.sh), [.opencode/scripts/remove-worktree.sh](.opencode/scripts/remove-worktree.sh) |
+| Dev loop & reviews | — | [.opencode/skills/subagent-driven-development/SKILL.md](.opencode/skills/subagent-driven-development/SKILL.md) |
+| Visual gate | impl-phase.md, Step 4.5 | [.opencode/scripts/visual-compliance-check.sh](.opencode/scripts/visual-compliance-check.sh) |
+| Reviewer behavior | impl-phase.md, agent architecture | [.opencode/agents/plan-reviewer.md](.opencode/agents/plan-reviewer.md), [.opencode/agents/code-compliance-reviewer.md](.opencode/agents/code-compliance-reviewer.md), [.opencode/agents/code-quality-reviewer.md](.opencode/agents/code-quality-reviewer.md) |
+
+Test commands and app paths in diagrams may show *example (Memo)*; each project configures its own commands in its `.opencode/`/`.zcode/` copies.
 
 ### Generic vs Project-Specific
 
-| Generic (edit superagents/) | Project-specific (edit project .opencode/) |
+| Generic (edit superagents/) | Project-specific (edit project .opencode/ or .zcode/) |
 |----------------------------|-------------------------------------------|
 | Workflow steps, gates, rules | Project name, design system paths |
 | Agent roles and responsibilities | Model assignments, temperature settings |
@@ -226,6 +255,7 @@ This repo is the **single source of truth** for the SuperAgents workflow framewo
 
 ## Changelog
 
+- **3.5** — workflow docs split by phase: `docs/workflow/README.md` → `design-phase.md` (host, ZCode, gates G1a–G2) + `impl-phase.md` (container, OpenCode, G3–G7); root README re-written as the two-phase entry point for newcomers. Canon restructured: flat `agents/`+`skills/`+`scripts/` moved into `.opencode/` (full pipeline) and `.zcode/` (DESIGN-only host seed); project seeding = copy the two folders + AGENTS.md to the project root.
 - **3.4** — agent registry rename (names state the reviewed document): `spec-review-*` panel → `spec-panel-*`; `spec-reviewer` split into `plan-reviewer` (G2: plan vs spec, DESIGN) + `code-compliance-reviewer` (G5: code vs task, symmetry with code-quality-reviewer at G6); gate G5 label "Spec Compliance" → "Code Compliance". Container `.opencode` copies re-sync manually after in-flight IMPL waves.
 - **3.3** — host/container phase split: DESIGN (G1a–G2) can run in a host session, IMPL stays in-container; plan-only IMPL entry (architect creates worktree + baseline as its first IMPL action, IMPL Step 0); git+board seam contract with diverged-main STOP and a one-time return path (BLOCKED → issue comment → card back).
 - **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code. Manager/Architect split: @manager owns conversation + gates, @architect is phase executor. Spec review panel (5 free-model perspectives). Reflection mode. Context HANDOFF protocol.
