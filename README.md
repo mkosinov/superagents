@@ -108,6 +108,7 @@ superagents/
 ├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
 │   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
 │   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
+│   ├── skills/brainstorming/ # G1a dialogue skill (explicit-only trigger; dispatched by design-phase)
 │   └── scripts/gh_board.py  # GitHub Project board script
 └── docs/
     ├── workflow/            # design-phase.md + impl-phase.md (human reference)
@@ -258,6 +259,7 @@ Test commands and app paths in diagrams may show *example (Memo)*; each project 
 
 ## Changelog
 
+- **3.7** — `brainstorming` ported to the host as a standalone `.zcode` skill: explicit-only trigger (`/brainstorming`, «побрейнштормим X», or dispatch from `design-phase` at G1a — never auto-fires on task descriptions), body trimmed to the G1a dialogue core (terminal state = user-approved concept). The opencode original keeps its full pipeline tail (manager fallback); on the host `design-phase` owns the orchestration.
 - **3.6** — shared AGENTS.md dissolved: conversational rules moved into `manager.md` (container) and the `design-phase` skill (host); the opencode session-id rule rides inside dispatch prompts. No seeds, no root-level harness file in projects (both tools provably load instructions only from the repo root — kept empty of harness files by design).
 - **3.5** — workflow docs split by phase: `docs/workflow/README.md` → `design-phase.md` (host, ZCode, gates G1a–G2) + `impl-phase.md` (container, OpenCode, G3–G7); root README re-written as the two-phase entry point for newcomers. Canon restructured: flat `agents/`+`skills/`+`scripts/` moved into `.opencode/` (full pipeline) and `.zcode/` (DESIGN-only host seed); project seeding = copy the two folders + AGENTS.md to the project root.
 - **3.4** — agent registry rename (names state the reviewed document): `spec-review-*` panel → `spec-panel-*`; `spec-reviewer` split into `plan-reviewer` (G2: plan vs spec, DESIGN) + `code-compliance-reviewer` (G5: code vs task, symmetry with code-quality-reviewer at G6); gate G5 label "Spec Compliance" → "Code Compliance". Container `.opencode` copies re-sync manually after in-flight IMPL waves.

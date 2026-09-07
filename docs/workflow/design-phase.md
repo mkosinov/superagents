@@ -6,9 +6,9 @@
 >
 > **Input:** an issue picked from the GitHub Project board. **Output:** an approved spec + plan, **pushed to origin/main**. The [IMPL phase](impl-phase.md) picks it up in the opencode container.
 >
-> **Version:** 3.6 · **Last aligned:** 2026-09-06
+> **Version:** 3.7 · **Last aligned:** 2026-09-07
 
-Executors: the project's `.zcode/` — skill **`design-phase`** (the actual protocol this page summarizes), agents **`spec-panel-*`** ×5 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
+Executors: the project's `.zcode/` — skills **`design-phase`** (the actual protocol this page summarizes) and **`brainstorming`** (the G1a dialogue: questions → approaches → concept; explicit-only trigger — dispatched by `design-phase`, or `/brainstorming`), agents **`spec-panel-*`** ×5 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
 
 ## At a glance
 
