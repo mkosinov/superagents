@@ -71,14 +71,14 @@ The branch is NOT merged yet. You must commit documentation INTO the feature bra
 
 ## Document Discovery
 
-При каждом вызове делай:
+On every call do the following:
 
 1. **Scan root**: `ls *.md` — new README, ROADMAP, etc. may have appeared
 2. **Scan `docs/`**: `ls docs/*.md` — new reference documents
 3. **Scan `docs/harness/`**: `ls docs/harness/*.md` — workflow/superagents specs, diagrams
 4. **Scan `sketches/`**: `ls sketches/*.md` — notes, specifications
 5. **Scan `.opencode/`**: `ls .opencode/agents/*.md`, `ls .opencode/skills/*.md` — new agents or skills
-5. **Update the list** above if something new was found
+6. **Update the list** above if something new was found
 
 This way you always know the full picture of project documents, even if someone created a new file without notifying you.
 
@@ -92,14 +92,14 @@ This way you always know the full picture of project documents, even if someone 
 
 ## Update Checklist
 
-При вызове от любого агента:
+When called by any agent:
 
-1. **Discover** — просканируй `docs/`, корень, `.opencode/` на новые файлы
-2. **Read** — PLAN.md для контекста
-3. **Update** — затронутые файлы
-4. **Report** — что обновил
+1. **Discover** — scan `docs/`, the repo root, `.opencode/` for new files
+2. **Read** — PLAN.md for context
+3. **Update** — the affected files
+4. **Report** — what was updated
 
-Чеклист обновления:
+Update checklist:
 
 - [ ] PLAN.md — mark completed items
 - [ ] CHANGELOG.md — add version entry if needed
