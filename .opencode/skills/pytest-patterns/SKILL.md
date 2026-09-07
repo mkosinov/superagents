@@ -30,7 +30,7 @@ WHEN user asks to write a test:
     → write contract test (see Contract Testing)
   IF "DB" / "is_active" / "cascade" / "FK"
     → write API test + SQL verification (see DB Verification)
-  IF unclear → ask: "Это проверка endpoint или полный флоу через несколько сущностей?"
+  IF unclear → ask: "Is this an endpoint check or a full flow across several entities?"
 
 BEFORE writing any test:
   READ references/conftest-template.py    ← factory signatures + query_db

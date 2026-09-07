@@ -219,6 +219,8 @@ This repo is the **single source of truth** for the SuperAgents workflow framewo
 3. Update **[docs/workflow/design-phase.md](docs/workflow/design-phase.md)** / **[docs/workflow/impl-phase.md](docs/workflow/impl-phase.md)** and this README when gates or steps change — using the workflow change checklist below
 4. **@infra** verifies sync status when workflow files change in either repo
 
+**Language convention:** skill and agent bodies (`.opencode/`, `.zcode/`) are written in English. Literal user-side strings stay in the user's language: trigger phrases («design #NNN», «продолжаем траекторию #NNN», «коммитим»), sample user-facing messages, UI literals and domain data in examples (Алиса, «Картина маслом») — translating those would break real triggers and make examples diverge from the actual product.
+
 ### Workflow change checklist
 
 When behavior of a step or gate changes, update in order:
@@ -259,6 +261,7 @@ Test commands and app paths in diagrams may show *example (Memo)*; each project 
 
 ## Changelog
 
+- **3.8** — container `brainstorming` trimmed to the G1a dialogue core (mirror of the host port): its tail had duplicated @architect DESIGN Steps 1-2 in a weaker form (no subagent-audit ladder, no push discipline, user-facing gates the architect cannot perform). The `## User Scenarios` spec requirement the tail carried moved to its consumers: @architect Step 1 (spec authoring) and both brainstorming ports' presentation step; host `design-phase` §3 now demands the section in the spec. Skill language convention fixed (README): bodies English, user-side literals stay; `design-phase` + both `brainstorming` ports translated to English.
 - **3.7** — `brainstorming` ported to the host as a standalone `.zcode` skill: explicit-only trigger (`/brainstorming`, «побрейнштормим X», or dispatch from `design-phase` at G1a — never auto-fires on task descriptions), body trimmed to the G1a dialogue core (terminal state = user-approved concept). The opencode original keeps its full pipeline tail (manager fallback); on the host `design-phase` owns the orchestration.
 - **3.6** — shared AGENTS.md dissolved: conversational rules moved into `manager.md` (container) and the `design-phase` skill (host); the opencode session-id rule rides inside dispatch prompts. No seeds, no root-level harness file in projects (both tools provably load instructions only from the repo root — kept empty of harness files by design).
 - **3.5** — workflow docs split by phase: `docs/workflow/README.md` → `design-phase.md` (host, ZCode, gates G1a–G2) + `impl-phase.md` (container, OpenCode, G3–G7); root README re-written as the two-phase entry point for newcomers. Canon restructured: flat `agents/`+`skills/`+`scripts/` moved into `.opencode/` (full pipeline) and `.zcode/` (DESIGN-only host seed); project seeding = copy the two folders + AGENTS.md to the project root.

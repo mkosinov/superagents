@@ -6,7 +6,7 @@
 >
 > **Input:** an issue picked from the GitHub Project board. **Output:** an approved spec + plan, **pushed to origin/main**. The [IMPL phase](impl-phase.md) picks it up in the opencode container.
 >
-> **Version:** 3.7 · **Last aligned:** 2026-09-07
+> **Version:** 3.8 · **Last aligned:** 2026-09-07
 
 Executors: the project's `.zcode/` — skills **`design-phase`** (the actual protocol this page summarizes) and **`brainstorming`** (the G1a dialogue: questions → approaches → concept; explicit-only trigger — dispatched by `design-phase`, or `/brainstorming`), agents **`spec-panel-*`** ×5 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
 
@@ -37,6 +37,7 @@ Legend: **Human** = requires a user decision (pause); `▼` = automatic transiti
          │ 4. Session reads the scout report → clarifying
          │    questions → propose 2-3 approaches → present
          │    concept: what we build / what we deliberately do NOT
+         │    (+ User Scenarios list, 3-7 tasks)
          │
          ▼  [G1a: USER APPROVES THE CONCEPT]
          │
@@ -46,6 +47,7 @@ Legend: **Human** = requires a user decision (pause); `▼` = automatic transiti
          │ 1. Write spec → docs/specs/YYYY-MM-DD-<feature>-design.md
          │    (self-contained BEFORE the panel: panelists get the
          │    spec path only — they do not read GitHub issues)
+         │    Must include ## User Scenarios — 3-7 tasks, each → E2E
          │ 2. Self-review (placeholders, consistency, scope)
          │ 3. Spec Panel Review: 5 parallel independent agents
          │ 4. Consolidated report → user decides on fixes

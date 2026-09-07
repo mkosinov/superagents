@@ -26,7 +26,7 @@ WHEN user asks to write a test:
     → write vitest UNIT test (see Unit Test Patterns)
   IF "user clicks" / "persists" / "DB" / "full flow" / "browser"
     → write Playwright E2E test (see E2E Test Patterns)
-  IF unclear → ask: "Это проверка рендера компонента или полный флоу через браузер + бэкенд?"
+  IF unclear → ask: "Is this a component-render check or a full flow through browser + backend?"
 
 BEFORE writing any unit test:
   READ references/memo-mock-data.ts        ← real mock objects + factory functions

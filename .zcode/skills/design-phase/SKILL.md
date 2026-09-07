@@ -1,91 +1,91 @@
 ---
 name: design-phase
-description: DESIGN-фаза на хосте (zcode) в split-топологии host/container — brainstorm G1a → спека + панель 5 ревьюеров G1b → план + ревью G2, DoD = push на origin, борд — скрипт scripts/gh_board.py в самом memo, handoff в контейнер «продолжаем траекторию #NNN». Использовать, когда юзер пишет «design #NNN», «продолжаем design», «вернулся #NNN» или просит спеку/план по issue в хост-сессии.
+description: DESIGN phase on the host (zcode) in the host/container split topology — brainstorm G1a → spec + 5-reviewer panel G1b → plan + review G2, DoD = push to origin, board = the scripts/gh_board.py script living in memo itself, handoff to the container is «продолжаем траекторию #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
 ---
 
-# DESIGN-фаза на хосте (split host/container)
+# DESIGN phase on the host (split host/container)
 
-## 0. Топология и роль
+## 0. Topology and role
 
-DESIGN (гейты G1a/G1b/G2) — эта интерактивная хост-сессия zcode. IMPL (G3–G7) — контейнер opencode (@manager/@architect), туда не лезем. Сессия объединяет роли manager+architect на DESIGN: общается с юзером на гейтах и диспатчит субагентов **одним уровнем** (панель, ревьюер плана) — вложенный диспатч не нужен и недоступен (depth limit).
+DESIGN (gates G1a/G1b/G2) is this interactive zcode host session. IMPL (G3–G7) is the opencode container (@manager/@architect) — we do not go there. The session merges the manager+architect roles for DESIGN: talks to the user at the gates and dispatches subagents **one level deep** (panel, plan reviewer) — nested dispatch is unnecessary and unavailable (depth limit).
 
-Через шов (git + борд) переходит только то, что запушено/перевёрнуто. Канон workflow: `~/dev/superagents/docs/workflow/design-phase.md` (эта фаза) + `impl-phase.md`; план миграции: `~/dev/superagents/docs/plans/2026-09-05-host-design-container-impl-split-plan.md`.
+Only what is pushed/flipped crosses the seam (git + board). Workflow canon: `~/dev/superagents/docs/workflow/design-phase.md` (this phase) + `impl-phase.md`; migration plan: `~/dev/superagents/docs/plans/2026-09-05-host-design-container-impl-split-plan.md`.
 
-## 1. Старт сессии (ритуал)
+## 1. Session start (ritual)
 
-1. Карточка вернулась из IMPL? Сначала `gh issue view N --comments` (read-only) — комментарий = вход: перепрогнать затронутые гейты, не всё с нуля.
-2. Pre-flight git (в `~/dev/memo`): `git fetch origin && git status -sb`
-   - behind → `git pull --ff-only`, продолжать;
-   - **diverged (ahead+behind) → STOP**: показать юзеру, ничего не ресетить (прецедент — коммит-пассажир cc8bc52).
-3. Борда: `next-up` (§7) → показать юзеру траекторию.
-4. Юзер выбрал issue → `status N "In Design (G1a)"`. Гарда: issue не должен стоять в `In IMPL` — один issue в один момент живёт в одной фазе.
-5. **Скаут (recon до G1a) — диспатчем, не руками.** Сразу после выбора issue диспатчить субагентов встроенного read-only типа для сбора фактов (zcode — `Explore`, opencode — `explorer`; дешёвая модель — дефолт этих агентов). По умолчанию **один**; широкий скоуп (много подсистем / зависимых issues) — несколько параллельно, по зонам, одним сообщением Agent-тулкола. В промпте: номер issue, что issue утверждает, что проверить по живому дереву (зависимости, потребители, паттерны).
-   - Назад — **компактный fact sheet**: структура/размер ключевых файлов vs утверждений issue; каждое утверждение — подтверждено/опровергнуто с `file:line`; статус зависимых issues (open/closed + одна строка дельты); инвентарь потребителей; готовые паттерны для переиспользования.
-   - Главная сессия до G1a читает **только отчёты скаутов** — как есть, без сырого мерджа. Сырые тела файлов и grep-дампы в её контекст не тащим (`gh issue view` по зависимостям — тоже скауту). Рационале: контекст главной сессии дорог и живёт всю сессию (G1a → G2); recon-мусор в нём — мёртвый груз (issue #14: ~10 тулколлов и 577 строк файла ради концепта в ~40 строк).
-   - Точечная проверка в диалоге G1a (один grep / одна секция файла) — можно самому; массовый recon — только скаут.
-6. **G1a — брейншторм:** вызвать скилл `brainstorming` (Skill tool), передать ему fact sheet скаута + номер issue. Диалог (вопросы по одному → 2–3 подхода → концепт) ведёт скилл; его финал — концепт «делаем / сознательно НЕ делаем» на одобрение юзеру = гейт G1a. Борд уже стоит `In Design (G1a)`, флипа нет; после одобрения — спека (§3).
+1. Card returned from IMPL? First `gh issue view N --comments` (read-only) — a comment is the input: re-run the affected gates, not everything from scratch.
+2. Git pre-flight (in `~/dev/memo`): `git fetch origin && git status -sb`
+   - behind → `git pull --ff-only`, continue;
+   - **diverged (ahead+behind) → STOP**: show the user, reset nothing (precedent — passenger commit cc8bc52).
+3. Board: `next-up` (§7) → show the trajectory to the user.
+4. The user picks an issue → `status N "In Design (G1a)"`. Guard: the issue must not sit in `In IMPL` — one issue lives in one phase at a time.
+5. **Scout (pre-G1a recon) — by dispatch, not by hand.** Right after the issue is picked, dispatch built-in read-only subagents to gather facts (zcode — `Explore`, opencode — `explorer`; a cheap model is these agents' default). Default is **one**; wide scope (many subsystems / dependency issues) — several in parallel, one per zone, in a single Agent-tool message. The prompt: issue number, what the issue claims, what to verify against the live tree (dependencies, consumers, patterns).
+   - Back comes a **compact fact sheet**: key files' structure/size vs the issue's claims; every claim confirmed/denied with `file:line`; dependency issues' state (open/closed + a one-line delta); consumer inventory; ready patterns to reuse.
+   - Until G1a the main session reads **only scout reports** — as-is, no raw merging. No raw file bodies or grep dumps into its context (`gh issue view` on dependencies goes to the scout too). Rationale: the main session's context is expensive and lives the whole session (G1a → G2); recon garbage in it is dead weight (issue #14: ~10 tool calls and a 577-line file read to produce a ~40-line concept).
+   - A spot check during the G1a dialogue (one grep / one file section) is fine by hand; bulk recon — scout only.
+6. **G1a — brainstorm:** invoke the `brainstorming` skill (Skill tool); pass it the scout fact sheet + issue number. The skill runs the dialogue (questions one at a time → 2–3 approaches → concept); its finish is the build / deliberately-NOT-build concept presented for user approval = gate G1a. The board already sits at `In Design (G1a)` — no flip; after approval — the spec (§3).
 
-## 1.5 Сессионные правила (разговор с юзером)
+## 1.5 Session rules (talking to the user)
 
-- Сообщение, заканчивающееся на `?`, — вопрос: ответ текстом, **без действий** (инструменты, коммиты, правки файлов). Исключение: для ответа нужны данные не из контекста — read-only сбор (прочитать файл, `git log`), затем сразу текстовый ответ.
-- **Отчёт прежде ответа**: новое сообщение не отменяет незачитанный результат работы. Сначала результат (статус DONE | DONE_WITH_CONCERNS | BLOCKED | awaiting user OK; изменённые файлы путями; доказательства; блокеры/вопросы), потом ответ на новое сообщение. Если с прошлого сообщения юзера диспатчей не было и ничего не ждёт его решения — строка «незавершённых задач нет» и сразу ответ. Правки в текущем ходе — финальное сообщение обязано их подытожить.
+- A message ending in `?` is a question: answer in text, **no actions** (tools, commits, file edits). Exception: the answer needs data not in context — read-only gathering (read a file, `git log`), then an immediate text answer.
+- **Report before answer**: a new message does not cancel an unread work result. First the result (status DONE | DONE_WITH_CONCERNS | BLOCKED | awaiting user OK; changed files as paths; evidence; blockers/questions), then the answer to the new message. If no dispatches happened since the user's last message and nothing awaits their decision — say "no outstanding tasks" and answer immediately. Edits in the current turn — the final message must summarize them.
 
-## 2. Гейты (все три — человеческие; флип борда строго в момент гейта)
+## 2. Gates (all three human; board flips strictly at the gate moment)
 
-| Гейт | Что одобряет юзер | После одобрения |
+| Gate | The user approves | After approval |
 |---|---|---|
-| G1a | концепцию: что делаем / что НЕ делаем (границы скоупа) | пишется спека |
-| G1b | спеку — после консолидированного отчёта панели и правок | commit + **push** спеки; борд → `Spec OK (G1b)` |
-| G2 | план — UI-фичи по **Behavioral Delta** (поведение, не код); инженерную часть гарантирует ревьюер | поправки и ограничения **вшиты в текст плана**; commit + **push**; борд → `Ready to IMPL (G2)` |
+| G1a | the concept: what we do / what we do NOT (scope boundaries) | the spec is written |
+| G1b | the spec — after the panel's consolidated report and fixes | commit + **push** the spec; board → `Spec OK (G1b)` |
+| G2 | the plan — UI features by **Behavioral Delta** (behavior, not code); the engineering part is the reviewer's guarantee | amendments and constraints **baked into the plan text**; commit + **push**; board → `Ready to IMPL (G2)` |
 
-## 3. Артефакты
+## 3. Artifacts
 
-- Спека: `docs/specs/YYYY-MM-DD-<feature>-design.md`. **Self-contained ДО панели**: панель не ходит в GH issues — проверку скоупа против issue делает главная сессия сама и вшивает находки в текст спеки.
-- План: `docs/plans/YYYY-MM-DD-<feature>-plan.md` по конвенциям writing-plans (канон: `~/dev/superagents/.opencode/skills/writing-plans/SKILL.md`):
-  - заголовок: Goal / Architecture / Tech Stack; сразу после него секция `## Behavioral Delta`;
-  - якорь каждой задачи: `## Task N: <имя>` + `### Classification: trivial|small|standard|large`; после коммита якоря не перенумеровывать;
-  - в каждой задаче `### Required Docs` (domain-rules для сущностей, design-system для UI);
-  - задача реализует User Scenario → в DoD строка «E2E test for scenario N passes (RED-GREEN-REFACTOR)»;
-  - без плейсхолдеров («TBD», «добавить валидацию» — это фейл плана).
-- Изменились доменные правила → `docs/domain-rules/` коммитится вместе со спекой.
+- Spec: `docs/specs/YYYY-MM-DD-<feature>-design.md`. Must include a `## User Scenarios` section — 3–7 user tasks the feature enables, each mapping to an E2E test (anchors the plan's E2E-in-DoD rule; the completeness panelist checks it). **Self-contained BEFORE the panel**: the panel does not read GH issues — the scope check against the issue is done by the main session itself, with findings baked into the spec text.
+- Plan: `docs/plans/YYYY-MM-DD-<feature>-plan.md` per the writing-plans conventions (canon: `~/dev/superagents/.opencode/skills/writing-plans/SKILL.md`):
+  - header: Goal / Architecture / Tech Stack; immediately after it a `## Behavioral Delta` section;
+  - every task anchor: `## Task N: <name>` + `### Classification: trivial|small|standard|large`; after commit, never renumber anchors;
+  - every task carries `### Required Docs` (domain-rules for entities, design-system for UI);
+  - a task implements a User Scenario (from the spec's `## User Scenarios`) → its DoD line: "E2E test for scenario N passes (RED-GREEN-REFACTOR)";
+  - no placeholders ("TBD", "add validation" — that is a plan failure).
+- Domain rules changed → `docs/domain-rules/` is committed together with the spec.
 
-## 4. Панель (host-порт — тело из `.opencode/skills/panel-spec-review`)
+## 4. Panel (host port — body from `.opencode/skills/panel-spec-review`)
 
-1. Диспатч: **5 агентов параллельно**, одним сообщением Agent-инструмента:
-   `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices` (файлы в `.zcode/agents/` репо, модели `omniroute/panel-*`).
-2. Каждому в промпте: **путь спеки** (+ путь предыдущей ревизии спеки, если она была). Без `gh issue view`, без сети — кроме best-practices, у которого WebSearch/WebFetch входят в дизайн.
-3. Агрегация: собрать 5 отчётов → дедуп одинаковых находок → ранжировать **BLOCKER > MAJOR > MINOR** → один консолидированный отчёт юзеру для решения о правках.
-4. **Availability policy (host-адаптация, субагент-аудита нет):** панелист не вернулся/упал → **один** рерун; второй фейл → пометить `skipped` в консолидированном отчёте, вердикт по остальным.
-5. best-practices вернул `Verdict: FAILED` (веб-исследование недоступно) → пометить в отчёте и исключить из вердикта — это его штатный отказ, не падение.
-6. Реестр агентов сеется только на старте сессии: `Agent tool: not found` при живых файлах `.zcode/agents/` → сессию перезапустить.
+1. Dispatch: **5 agents in parallel**, in a single Agent-tool message:
+   `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices` (files in the repo's `.zcode/agents/`, models `omniroute/panel-*`).
+2. Each prompt: the **spec path** (+ the previous spec revision's path, if there was one). No `gh issue view`, no network — except best-practices, whose design includes WebSearch/WebFetch.
+3. Aggregation: collect the 5 reports → dedupe identical findings → rank **BLOCKER > MAJOR > MINOR** → one consolidated report to the user for the fix decision.
+4. **Availability policy (host adaptation, no subagent audit):** a panelist did not return / crashed → **one** rerun; second failure → mark it `skipped` in the consolidated report, verdict on the rest.
+5. best-practices returned `Verdict: FAILED` (web research unavailable) → note it in the report and exclude it from the verdict — that is its designed refusal, not a crash.
+6. The agent registry is seeded only at session start: `Agent tool: not found` while `.zcode/agents/` files exist → restart the session.
 
-## 5. Ревью плана
+## 5. Plan review
 
-Диспатч `plan-reviewer` (проверяет, что план верно расширяет одобренную спеку): в промпте — путь спеки + путь плана. Отчёт → правки по решению юзера → фолдинг в план.
+Dispatch `plan-reviewer` (verifies the plan faithfully and completely expands the approved spec): the prompt carries the spec path + plan path. Report → fixes by the user's decision → folded into the plan.
 
-## 6. DoD DESIGN-сессии (контракт шва)
+## 6. DESIGN session DoD (the seam contract)
 
-- Шов пересекают только **git и борд**. Сессия НЕ заканчивается с локальными коммитами: каждый пройденный гейт = commit + push на origin/main.
-- **Все решения фолдятся в текст артефактов**: поправки ревью, ограничения вида «#NNN строго после #NNN — общий файл» — в спеку/план, не в чат. Git и борд не несут контекст сессии через шов.
-- После G2 сказать юзеру: «скажи менеджеру в opencode: продолжаем траекторию #NNN». Больше контейнеру ничего не нужно.
-- НЕ пересекает шов: `.opencode/scratchpad.md` (контейнер сеет свою секцию сам), worktree'ы, env. Хост **никогда не пишет и не читает** scratchpad — операций с контейнером на DESIGN-фазе нет вообще.
+- Only **git and the board** cross the seam. The session does NOT end holding local commits: every passed gate = commit + push to origin/main.
+- **All decisions are folded into the artifact texts**: review amendments, constraints like "#NNN strictly after #NNN — shared file" go into the spec/plan, not the chat. Git and the board carry no session context across the seam.
+- After G2 tell the user: «скажи менеджеру в opencode: продолжаем траекторию #NNN». The container needs nothing else.
+- Does NOT cross the seam: `.opencode/scratchpad.md` (the container seeds its own section), worktrees, env. The host **never writes or reads** the scratchpad — there are no container operations during the DESIGN phase at all.
 
-## 7. Борда (скрипт живёт в memo, локальный запуск)
+## 7. Board (the script lives in memo, run locally)
 
 ```bash
 python3 .zcode/scripts/gh_board.py next-up
 python3 .zcode/scripts/gh_board.py status 176 "Spec OK (G1b)"
-python3 .zcode/scripts/gh_board.py set-next-up 176 1   # только по слову юзера
+python3 .zcode/scripts/gh_board.py set-next-up 176 1   # only on the user's word
 ```
 
-- Golden source скрипта — **сам репозиторий memo** (`.zcode/scripts/gh_board.py`, константы Project #3 вшиты). Скрипт — часть шва: он в git, поэтому доступен и хосту, и контейнеру после pull; контейнерная копия — `.opencode/scripts/gh_board.py`. Отдельных копий вне harness-папок не плодить.
-- Fallback: `gh` CLI напрямую (projectsV2).
-- Один писатель на issue: DESIGN-флипы (`In Design (G1a)` → `Spec OK (G1b)` → `Ready to IMPL (G2)`) — эта сессия; IMPL-флипы — контейнер-менеджер. Скрипт сам добавляет issue на борд при первом обращении.
+- The script's golden source is **the memo repo itself** (`.zcode/scripts/gh_board.py`, Project #3 constants baked in). The script is part of the seam: it lives in git, so both the host and the container have it after a pull; the container copy is `.opencode/scripts/gh_board.py`. No extra copies outside the harness folders.
+- Fallback: `gh` CLI directly (projectsV2).
+- One writer per issue: DESIGN flips (`In Design (G1a)` → `Spec OK (G1b)` → `Ready to IMPL (G2)`) — this session; IMPL flips — the container manager. The script adds an issue to the board on first contact.
 
-## 8. Правила
+## 8. Rules
 
-- Один issue = одна фаза в моменте; борд — гарда. DESIGN на X + IMPL на Y параллельно — можно.
-- Одна DESIGN-сессия = один issue.
-- Параллельные DESIGN-сессии (разные issues, разные хост-сессии): одновременный push → `git pull --rebase`.
-- Возврат из IMPL: карточка на `In Design (G1a)` (сломана спека) или `Spec OK (G1b)` (сломан план) + комментарий в issue — это стартовая точка новой DESIGN-сессии (§1.1).
-- Агенты и скиллы DESIGN-фазы живут **в этом репо**: `.zcode/agents/` + `.zcode/skills/` — `design-phase` (протокол фазы) и `brainstorming` (диалог G1a; вызывается отсюда, самостоятельно не срабатывает) (git = источник правды для memo-порта). Канон superagents: тела — `~/dev/superagents/.opencode/agents/`, эталонный сид хост-портов — `~/dev/superagents/.zcode/agents/`; изменение канона переносится правкой файлов в `.zcode/agents/` (порт помечен в шапке каждого файла). Канон v3.4 (2026-09-06): панель `spec-review-*` → `spec-panel-*`; `spec-reviewer` разделён на `plan-reviewer` (G2, хост) + `code-compliance-reviewer` (G5, только контейнер). Каталог моделей omniroute — локальный `~/.zcode/v2/config.json` (с ключами, в репо не едет).
+- One issue = one phase at a time; the board is the guard. DESIGN on X + IMPL on Y in parallel — allowed.
+- One DESIGN session = one issue.
+- Parallel DESIGN sessions (different issues, different host sessions): simultaneous push → `git pull --rebase`.
+- Return from IMPL: the card goes to `In Design (G1a)` (broken spec) or `Spec OK (G1b)` (broken plan) + an issue comment — that is a new DESIGN session's starting point (§1.1).
+- DESIGN-phase agents and skills live **in this repo**: `.zcode/agents/` + `.zcode/skills/` — `design-phase` (the phase protocol) and `brainstorming` (the G1a dialogue; invoked from here, never fires on its own) (git = source of truth for the memo port). Superagents canon: bodies — `~/dev/superagents/.opencode/agents/`, reference seed of host ports — `~/dev/superagents/.zcode/agents/`; a canon change is ported by editing the files in `.zcode/agents/` (the port is marked in each file's header). Canon v3.4 (2026-09-06): panel `spec-review-*` → `spec-panel-*`; `spec-reviewer` split into `plan-reviewer` (G2, host) + `code-compliance-reviewer` (G5, container-only). The omniroute model catalog is the local `~/.zcode/v2/config.json` (with keys — never committed).

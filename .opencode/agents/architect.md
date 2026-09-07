@@ -250,6 +250,7 @@ Triggered by manager dispatch with the approved brainstorming output (design con
 2. If the task involves entity fields/validation/business logic → invoke `domain-rules` skill, check `docs/domain-rules/{entity}.md`, reference or create it.
 3. Write the design spec to `docs/specs/YYYY-MM-DD-<feature>-design.md`:
    - Preserve ALL requirements from the user's source materials (sketches, specs) — never silently change/remove/reinterpret. Conflicts → flag as questions in the report.
+   - Include `## User Scenarios` section — 3-7 user tasks the feature enables, each mapping to an E2E test (anchors the plan's E2E-in-DoD rule; the completeness panelist checks for it).
    - Include `## Visual Compliance Checks` section (UI features): checklist of key UI elements, e.g. `- [ ] <UI element name> is visible and <expected behavior>`
 4. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
    - **DESIGN-phase docs are pushed to main immediately after gate approval (rule).** Do NOT push
