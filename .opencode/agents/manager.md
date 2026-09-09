@@ -86,7 +86,7 @@ A new message does **not** cancel a pending report. Show work outcome (yours or 
 2. Read `.opencode/scratchpad.md` → find YOUR section by session-id.
 3. **If your section is missing or Idle** (no active workflow): invoke skill `github-board` → run `python3 .opencode/scripts/gh_board.py next-up` (script lives in the project repo, comes in via git) → show the user the current trajectory (Next Up queue 1→3) and ask what to take. Do NOT propose tasks from your own assumptions — the GH Project board is the single source of the trajectory.
 4. **Split-mode entry** — the user says «продолжаем траекторию #NNN» (DESIGN ran on the host; see docs/workflow/design-phase.md and docs/workflow/impl-phase.md). Pre-flight, in order:
-   - Board: issue #NNN must be at `Ready to IMPL (G2)`. Any other status → do NOT start IMPL; show the status to the user and ask.
+   - Board: issue #NNN must be at `Ready to IMPL (G2)` — check with `python3 .opencode/scripts/gh_board.py show NNN`. Any other status → do NOT start IMPL; show the status to the user and ask.
    - Git: `git fetch origin && git status -sb`. Behind → `git pull --ff-only`, then proceed. Diverged (ahead+behind) → STOP and show the user; never reset or merge on your own. Local-only commits on main are forbidden while a host DESIGN session is in flight — FasTP WIP goes to a branch.
    - Plan file: verify it exists on the fetched main. Missing → STOP and show the user.
    - Do NOT brainstorm — the feature is already approved through G2. Do NOT create worktrees or run baselines — the architect's FIRST IMPL action does both (and both are outside your allowlist).
@@ -292,7 +292,7 @@ Rules:
 
 ## GitHub Project Board
 
-Invoke `github-board` skill before moving any issue status.
+Invoke `github-board` skill before moving any issue status. Read card statuses via `gh_board.py show N` / `show all` — never via hand-written `gh api graphql`.
 
 ## Conflict Principle (hard rule)
 

@@ -33,6 +33,8 @@ Status is gate-anchored: each status names the last workflow gate passed. Flip i
 
 ```bash
 python3 .opencode/scripts/gh_board.py next-up                    # show the trajectory (queue 1→3)
+python3 .opencode/scripts/gh_board.py show 176                    # read one card: status + queue position
+python3 .opencode/scripts/gh_board.py show all                    # the whole board as a table
 python3 .opencode/scripts/gh_board.py set-next-up 176 1          # put an issue in the queue (1|2|3); "none" — remove
 python3 .opencode/scripts/gh_board.py shift                      # after Next Up 1 completes: clear it, shift 2→1, 3→2
 python3 .opencode/scripts/gh_board.py status 176 "In IMPL"       # move a card's status
@@ -45,6 +47,7 @@ An issue is automatically added to the board on the first set/status call if it 
 | Moment | Action | Who |
 |---|---|---|
 | **Session start, scratchpad = Idle** | `gh_board.py next-up` → show the user the trajectory, ask what to take | manager, automatic |
+| **Card status check (pre-flight, triage, "can X run in parallel?")** | `gh_board.py show N` (or `show all`) | manager |
 | **User picked a task** | `status N "In Design (G1a)"` | whoever runs DESIGN — manager in-container; host DESIGN session after the split |
 | **Design gate passed (G1a/G1b/G2)** | flip status per the gate table above | whoever runs DESIGN |
 | **New issue created (gh issue create)** | ask the user whether to put it in Next Up (and where) | manager |
@@ -56,6 +59,7 @@ An issue is automatically added to the board on the first set/status call if it 
 
 ## Rules
 
+- Read board state ONLY through the script (`next-up`, `show N`, `show all`). NEVER hand-write `gh api graphql` queries against the project — project IDs, field IDs and owner quirks live in the script; raw GraphQL wastes calls and has historically gone wrong (wrong owner type, nonexistent fields).
 - Next Up — max 3 positions, no duplicates (the script frees an occupied position automatically).
 - Don't move Status on every micro-task — only when the whole task's stage changes.
 - FasTP fixes without an issue: don't touch the board. FasTP on an issue: Status In IMPL → In-main as usual.

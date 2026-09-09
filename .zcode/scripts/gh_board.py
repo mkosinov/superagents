@@ -3,6 +3,8 @@
 
 Usage (from repo root):
   python3 .zcode/scripts/gh_board.py next-up                     — show the trajectory (Next Up 1→3)
+  python3 .zcode/scripts/gh_board.py show N                      — read one card: status + queue position
+  python3 .zcode/scripts/gh_board.py show all                    — the whole board as a table
   python3 .zcode/scripts/gh_board.py set-next-up N 1|2|3|none    — set/clear queue position
   python3 .zcode/scripts/gh_board.py shift                       — after Next Up 1 completes: clear it, shift 2→1, 3→2
   python3 .zcode/scripts/gh_board.py status N "In IMPL"          — move a card's status
@@ -125,6 +127,28 @@ def cmd_next_up():
         print(f"  {it['next_up']}. #{it['number']} [{it['status'] or 'no status'}] {it['title']}")
 
 
+def cmd_show(arg: str):
+    if arg == "all":
+        items = sorted(items_with_fields(), key=lambda it: it["number"])
+        if not items:
+            print("Board is empty.")
+            return
+        print(f"{'#':>5}  {'Status':<18} {'NextUp':<6}  Title")
+        for it in items:
+            print(f"{it['number']:>5}  {(it['status'] or '-'):<18} {(it['next_up'] or '-'):<6}  {it['title']} [{it['state']}]")
+        return
+    if not arg.isdigit():
+        sys.exit("argument must be an issue number or 'all'")
+    number = int(arg)
+    for it in items_with_fields():
+        if it["number"] == number:
+            print(f"#{number} [{it['state']}] {it['title']}")
+            print(f"  Status: {it['status'] or '-'}")
+            print(f"  Next Up: {it['next_up'] or '-'}")
+            return
+    sys.exit(f"#{number} is not on the board. It is added automatically by the first set-next-up/status call.")
+
+
 def cmd_set_next_up(number: int, pos: str):
     it = find_item(number)
     if pos == "none":
@@ -171,6 +195,8 @@ if __name__ == "__main__":
     cmd = args[0]
     if cmd == "next-up":
         cmd_next_up()
+    elif cmd == "show" and len(args) == 2:
+        cmd_show(args[1])
     elif cmd == "set-next-up" and len(args) == 3:
         cmd_set_next_up(int(args[1]), args[2])
     elif cmd == "shift":
