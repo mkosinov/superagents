@@ -59,7 +59,8 @@ An issue is automatically added to the board on the first set/status call if it 
 
 ## Rules
 
-- Read board state ONLY through the script (`next-up`, `show N`, `show all`). NEVER hand-write `gh api graphql` queries against the project — project IDs, field IDs and owner quirks live in the script; raw GraphQL wastes calls and has historically gone wrong (wrong owner type, nonexistent fields).
+- ALL board interaction — reads AND writes — goes through this script only. NEVER hand-write `gh api graphql` against the project: reads waste calls and have historically gone wrong (wrong owner type, nonexistent fields), and field-definition mutations destroy data.
+- Changing the status option list (adding/renaming statuses) is **user-only, via the GitHub web UI**. The agent never runs `updateProjectV2Field`: the mutation replaces the whole option list and detaches every card's value (2026-09-09: 65/69 cards lost Status this way). Need a new status → ask the user to add it in the web UI.
 - Next Up — max 3 positions, no duplicates (the script frees an occupied position automatically).
 - Don't move Status on every micro-task — only when the whole task's stage changes.
 - FasTP fixes without an issue: don't touch the board. FasTP on an issue: Status In IMPL → In-main as usual.

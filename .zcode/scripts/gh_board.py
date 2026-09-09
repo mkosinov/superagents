@@ -29,11 +29,8 @@ PROJECT_NUM = 3
 NEXT_UP_FIELD = "PVTSSF_lAHOA-0Z984BXl3ZzhZEGRs"
 NEXT_UP_OPTS = {"1": "ad936c13", "2": "8167d82e", "3": "ece04007"}
 
-# Статусы доски (актуальные для Project #3)
-STATUSES = [
-    "Backlog", "In Design (G1a)", "Spec OK (G1b)", "Ready to IMPL (G2)",
-    "In IMPL", "PR (G7)", "In-main", "deployed",
-]
+# Statuses are read live from the board (the option list is user-managed in
+# the web UI — e.g. "Not planned" was added there 2026-09-09; never hardcode).
 
 _status_field_id = None
 _status_opts = None
@@ -181,7 +178,7 @@ def cmd_shift():
 def cmd_status(number: int, status: str):
     load_status_field()
     if status not in _status_opts:
-        sys.exit(f"Unknown status '{status}'. Available: {', '.join(STATUSES)}")
+        sys.exit(f"Unknown status '{status}'. Available: {', '.join(_status_opts)}")
     it = find_item(number)
     set_field(it["item_id"], _status_field_id, _status_opts[status])
     print(f"#{number}: Status → {status}")
