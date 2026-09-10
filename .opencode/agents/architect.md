@@ -48,9 +48,9 @@ Your dispatch prompt specifies exactly one phase: `DESIGN` or `IMPL`. Run only t
 
 ### Scratchpad: READ-ONLY
 
-- Read `.opencode/scratchpad.md` at phase start for state.
+- Read `.opencode/scratchpad.md` at phase start for state (IMPL: the active worktree path).
 - You NEVER write to it. The manager is the sole owner.
-- Instead, your final report contains a `## Scratchpad Delta` section — the manager applies it.
+- Instead, your final report contains a `## Scratchpad Delta` section — the manager applies it. **IMPL only** (v2: DESIGN writes zero scratchpad state — DESIGN reports carry no delta). On the final IMPL report the delta MUST be the ready-to-paste `## Recently merged` entry: `- YYYY-MM-DD #<issue> <short title> → PR #<n>` — the manager runs `gh_board.py merged <issue> <pr> "<title>"` (the script stamps the date).
 
 ### Human gates → NEEDS_APPROVAL
 
@@ -65,7 +65,7 @@ Gate: G1b | G2 | G4.5 | G7
 Question: <exactly what the user must decide, one paragraph>
 Artifacts: <paths: spec file, plan file, report, screenshots>
 Recommendation: <your recommendation, 1-2 lines>
-## Scratchpad Delta
+## Scratchpad Delta (IMPL gates G4.5/G7 only — omit for DESIGN gates G1b/G2)
 <state to record>
 ```
 
@@ -109,7 +109,7 @@ Every report ends with:
 ## Artifacts
 <paths created/modified: spec, plan, worktree, branch, PR url>
 ## Scratchpad Delta
-<exact lines the manager should write to the scratchpad>
+<IMPL only — exact lines the manager should write. Final IMPL report: the ready-to-paste Recently merged entry (issue, short title, PR). DESIGN: omit (v2 — zero scratchpad writes).>
 ```
 
 If DONE — nothing else. No implementation narrative, no diffs, no test logs beyond pass/fail counts.
@@ -246,7 +246,7 @@ Triggered by manager dispatch with the approved brainstorming output (design con
 
 ## Step 1: Design Spec
 
-1. Read scratchpad for context left by the manager.
+1. The dispatch prompt carries the full approved concept. v2: DESIGN reads no scratchpad state — none is written for it.
 2. If the task involves entity fields/validation/business logic → invoke `domain-rules` skill, check `docs/domain-rules/{entity}.md`, reference or create it.
 3. Write the design spec to `docs/specs/YYYY-MM-DD-<feature>-design.md`:
    - Preserve ALL requirements from the user's source materials (sketches, specs) — never silently change/remove/reinterpret. Conflicts → flag as questions in the report.
@@ -439,6 +439,7 @@ Trigger: all tasks done, tests green. Run ONCE per phase. Skip if no user-visibl
 4. **Error escalation (Gate G7):** push fails / PR errors / red CI / merge errors → STOP, preserve worktree, report NEEDS_APPROVAL with PR URL and error summary.
 5. Explicit fallbacks (merge locally / keep branch / discard) — only if the manager relays an explicit user request.
 6. Report DONE: merged PR url, branch/worktree cleanup status.
+7. **Scratchpad Delta (v2):** the final delta is the ready-to-paste `## Recently merged` entry (issue, short title, PR) — nothing else. List follow-up candidates in the report: the manager files them as GH issues or drops them — they never go into the scratchpad.
 
 ---
 

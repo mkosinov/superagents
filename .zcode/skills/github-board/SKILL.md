@@ -38,6 +38,7 @@ python3 .opencode/scripts/gh_board.py show all                    # the whole bo
 python3 .opencode/scripts/gh_board.py set-next-up 176 1          # put an issue in the queue (1|2|3); "none" — remove
 python3 .opencode/scripts/gh_board.py shift                      # after Next Up 1 completes: clear it, shift 2→1, 3→2
 python3 .opencode/scripts/gh_board.py status 176 "In IMPL"       # move a card's status
+python3 .opencode/scripts/gh_board.py merged 176 177 "short title" # v2: append the "Recently merged" scratchpad line
 ```
 
 An issue is automatically added to the board on the first set/status call if it wasn't there.
@@ -46,16 +47,16 @@ An issue is automatically added to the board on the first set/status call if it 
 
 | Moment | Action | Who |
 |---|---|---|
-| **Session start, scratchpad = Idle** | `gh_board.py next-up` → show the user the trajectory, ask what to take | manager, automatic |
+| **Session start, no active workflow** | `gh_board.py next-up` → show the user the trajectory, ask what to take | manager, automatic |
 | **Card status check (pre-flight, triage, "can X run in parallel?")** | `gh_board.py show N` (or `show all`) | manager |
 | **User picked a task** | `status N "In Design (G1a)"` | whoever runs DESIGN — manager in-container; host DESIGN session after the split |
 | **Design gate passed (G1a/G1b/G2)** | flip status per the gate table above | whoever runs DESIGN |
 | **New issue created (gh issue create)** | ask the user whether to put it in Next Up (and where) | manager |
 | **User changes the trajectory** | `set-next-up` per their words | manager |
 | **Plan-only IMPL entry (split): user says «продолжаем траекторию #N», card at `Ready to IMPL (G2)`** | verify plan on fetched main → dispatch IMPL (plan-only start, no worktree yet — architect's first action) → `status N "In IMPL"` | manager, container |
-| **IMPL blocked: spec/plan invalid (return path)** | architect reports BLOCKED → user decides → issue comment + `status N` back to `In Design (G1a)` / `Spec OK (G1b)`; scratchpad section → Idle line (reason, status, comment URL); worktree keep-vs-discard — user decides | manager, after user decision |
+| **IMPL blocked: spec/plan invalid (return path)** | architect reports BLOCKED → user decides → issue comment + `status N` back to `In Design (G1a)` / `Spec OK (G1b)`; scratchpad (v2): section removed if the worktree is discarded, kept while a kept worktree lives — the durable record is the issue comment; worktree keep-vs-discard — user decides | manager, after user decision |
 | **Finishing: PR created** | `status N "PR (G7)"` | manager, at the architect's finishing report |
-| **Workflow finished, PR merged** | `status N "In-main"`; if the issue was Next Up 1 → `shift` | manager, mandatory finishing step (architect reports `## Board Update Needed`) |
+| **Workflow finished, PR merged** | `status N "In-main"`; if the issue was Next Up 1 → `shift`; then `merged N <pr> "<short title>"` (v2 — appends the `## Recently merged` line) and remove your scratchpad section | manager, mandatory finishing step (architect reports `## Board Update Needed`) |
 
 ## Rules
 

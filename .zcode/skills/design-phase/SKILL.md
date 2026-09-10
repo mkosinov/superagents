@@ -66,9 +66,9 @@ Dispatch `plan-reviewer` (verifies the plan faithfully and completely expands th
 ## 6. DESIGN session DoD (the seam contract)
 
 - Only **git and the board** cross the seam. The session does NOT end holding local commits: every passed gate = commit + push to origin/main.
-- **All decisions are folded into the artifact texts**: review amendments, constraints like "#NNN strictly after #NNN — shared file" go into the spec/plan, not the chat. Git and the board carry no session context across the seam.
+- **All decisions are folded into the artifact texts**: review amendments, constraints like "#NNN strictly after #NNN — shared file" go into the spec/plan, not the chat. Git and the board carry no session context across the seam. This is the DESIGN DoD under Scratchpad Discipline v2: DESIGN writes zero scratchpad state, so the pushed spec/plan are the ONLY carrier — fold every decision and dependency in **before the phase closes**.
 - After G2 tell the user: «скажи менеджеру в opencode: продолжаем траекторию #NNN». The container needs nothing else.
-- Does NOT cross the seam: `.opencode/scratchpad.md` (the container seeds its own section), worktrees, env. The host **never writes or reads** the scratchpad — there are no container operations during the DESIGN phase at all.
+- Does NOT cross the seam: `.opencode/scratchpad.md` (the container seeds its section at IMPL start — DESIGN itself writes nothing, v2), worktrees, env. The host **never writes or reads** the scratchpad — there are no container operations during the DESIGN phase at all.
 
 ## 7. Board (the script lives in memo, run locally)
 

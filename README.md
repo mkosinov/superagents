@@ -85,11 +85,12 @@ superagents/
 │   │   ├── docser.md        # Meta documentation
 │   │   ├── deployer.md      # DevOps / deploy
 │   │   └── spec-panel-*.md  # Spec review panel (5 perspectives, G1b)
-│   ├── scripts/             # Shared automation (worktree, visual gate, subagent audit)
+│   ├── scripts/             # Shared automation (worktree, visual gate, subagent + scratchpad audit)
 │   │   ├── create-worktree.sh
 │   │   ├── remove-worktree.sh
 │   │   ├── visual-compliance-check.sh
-│   │   └── subagent-audit.py
+│   │   ├── subagent-audit.py
+│   │   └── scratchpad_audit.py
 │   ├── skills/              # Reusable skills (invoked via skill tool)
 │   │   ├── brainstorming/
 │   │   ├── writing-plans/
@@ -241,6 +242,7 @@ When behavior of a step or gate changes, update in order:
 | IMPL phase flow & gates | [docs/workflow/impl-phase.md](docs/workflow/impl-phase.md) | — |
 | Overview & onboarding | this README | — |
 | Entry point + routing (IMPL) | — | [.opencode/agents/manager.md](.opencode/agents/manager.md) |
+| Scratchpad discipline (v2) | — | [.opencode/agents/manager.md](.opencode/agents/manager.md), [.opencode/scripts/scratchpad_audit.py](.opencode/scripts/scratchpad_audit.py), [.opencode/command/sanitize-scratchpad.md](.opencode/command/sanitize-scratchpad.md) |
 | Orchestration steps (IMPL) | — | [.opencode/agents/architect.md](.opencode/agents/architect.md) |
 | Worktree create/remove | — | [.opencode/skills/using-git-worktrees/SKILL.md](.opencode/skills/using-git-worktrees/SKILL.md), [.opencode/scripts/create-worktree.sh](.opencode/scripts/create-worktree.sh), [.opencode/scripts/remove-worktree.sh](.opencode/scripts/remove-worktree.sh) |
 | Dev loop & reviews | — | [.opencode/skills/subagent-driven-development/SKILL.md](.opencode/skills/subagent-driven-development/SKILL.md) |
@@ -261,6 +263,7 @@ Test commands and app paths in diagrams may show *example (Memo)*; each project 
 
 ## Changelog
 
+- **3.9** — Scratchpad Discipline v2 (user-approved): DESIGN — host and container — writes zero scratchpad state (crash recovery is manual from the DB/board/spec); IMPL/FasTP sections live while their worktree exists and collapse on finish into a new shared `## Recently merged` block (≤5, newest first: `- YYYY-MM-DD #<issue> <short title> → PR #<n>`) written via `gh_board.py merged` (the `Idle. Last:` stub convention is retired); follow-up candidates are filed as GH issues or dropped — never parked in the scratchpad; new `scratchpad_audit.py` + `/sanitize-scratchpad` command (AUTO_SAFE with `.bak` backup / NEEDS_USER; auto-run in the manager's Session Start Ritual when the file exceeds 150 lines); host-DESIGN DoD — all decisions/dependencies folded into the pushed spec/plan before phase close.
 - **3.8** — container `brainstorming` trimmed to the G1a dialogue core (mirror of the host port): its tail had duplicated @architect DESIGN Steps 1-2 in a weaker form (no subagent-audit ladder, no push discipline, user-facing gates the architect cannot perform). The `## User Scenarios` spec requirement the tail carried moved to its consumers: @architect Step 1 (spec authoring) and both brainstorming ports' presentation step; host `design-phase` §3 now demands the section in the spec. Skill language convention fixed (README): bodies English, user-side literals stay; `design-phase` + both `brainstorming` ports translated to English.
 - **3.7** — `brainstorming` ported to the host as a standalone `.zcode` skill: explicit-only trigger (`/brainstorming`, «побрейнштормим X», or dispatch from `design-phase` at G1a — never auto-fires on task descriptions), body trimmed to the G1a dialogue core (terminal state = user-approved concept). The opencode original keeps its full pipeline tail (manager fallback); on the host `design-phase` owns the orchestration.
 - **3.6** — shared AGENTS.md dissolved: conversational rules moved into `manager.md` (container) and the `design-phase` skill (host); the opencode session-id rule rides inside dispatch prompts. No seeds, no root-level harness file in projects (both tools provably load instructions only from the repo root — kept empty of harness files by design).

@@ -6,7 +6,7 @@
 >
 > **Input:** an approved plan already on origin/main, card at `Ready to IMPL (G2)` (produced by the [DESIGN phase](design-phase.md) on the host). **Output:** merged PR / In-main.
 >
-> **Version:** 3.5 · **Last aligned:** 2026-09-06
+> **Version:** 3.6 · **Last aligned:** 2026-09-10
 
 Executors: the project's `.opencode/` — agents `manager`, `architect`, `frontend-coder`/`backend-coder`, reviewers, `tester`, `docser`; skills `using-git-worktrees`, `subagent-driven-development`, `finishing-a-development-branch`; scripts under `.opencode/scripts/`. Seed source: this repo's [`.opencode/`](../../.opencode/).
 
@@ -361,7 +361,7 @@ Runtime: [`fast-track-protocol`](../../.opencode/skills/fast-track-protocol/SKIL
 
 ## Board during IMPL
 
-`In IMPL` (at dispatch) → `PR (G7)` (at finishing) → `In-main` (after merge; if the issue was Next Up 1 → `shift`). Flips belong to @manager. The board script lives in the project repo: `.opencode/scripts/gh_board.py`.
+`In IMPL` (at dispatch) → `PR (G7)` (at finishing) → `In-main` (after merge; if the issue was Next Up 1 → `shift`), then `gh_board.py merged <issue> <pr> "<short title>"` appends the `## Recently merged` scratchpad line (v2) and the manager removes its session section. Flips belong to @manager. The board script lives in the project repo: `.opencode/scripts/gh_board.py`.
 
 ## Return path (spec/plan invalid → back to DESIGN)
 
@@ -371,7 +371,7 @@ A one-time bounce-back, not a live channel:
 2. **The user decides** to return the trajectory.
 3. @manager posts a GH issue comment describing the problem, then moves the card back: spec invalid → `In Design (G1a)`; spec intact, plan broken → `Spec OK (G1b)`.
 4. Worktree/branch keep-vs-discard is the user's call.
-5. The trajectory's scratchpad section closes with an Idle line: reason, new status, comment URL.
+5. Scratchpad (v2): the section is removed if the worktree/branch is discarded; if it was kept, the section stays while that worktree lives. The durable record of the return is the issue comment + board status.
 
 The next host DESIGN session picks the issue up from the board with the issue comment as input — see [design-phase.md](design-phase.md).
 
@@ -400,5 +400,6 @@ G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discar
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
 8. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model)
 9. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
+10. **Scratchpad v2** — DESIGN writes nothing; the manager's section lives while the worktree exists; finishing = board flip + `merged` line (`## Recently merged`, max 5) + section removal; `/sanitize-scratchpad` audits legacy files
 
 **Container restart required** after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.

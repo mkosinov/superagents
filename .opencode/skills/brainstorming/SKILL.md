@@ -10,7 +10,7 @@ The dialogue core of Phase 0, run by @manager (the only role that talks to the u
 ## Contract
 
 - Input: an idea or change request from the user.
-- Output: an approved design concept — what we build / what we deliberately do NOT build (scope boundaries) + a User Scenarios list. Terminal state: gate G1a (explicit user approval). Then stop — record G1a in the scratchpad and dispatch @architect (DESIGN) with the full design sections (the manager's Phase DESIGN protocol).
+- Output: an approved design concept — what we build / what we deliberately do NOT build (scope boundaries) + a User Scenarios list. Terminal state: gate G1a (explicit user approval). Then stop — dispatch @architect (DESIGN) with the full design sections (the manager's Phase DESIGN protocol). v2: no scratchpad record — the concept travels in the dispatch prompt.
 - No implementation actions, no spec writing, no plan writing inside this skill.
 - Anti-pattern "this is too simple to need a brainstorm": everything goes through the dialogue. A trivial concept may be 2-3 sentences, but it must be presented and approved — simple tasks are exactly where unexamined assumptions cost the most.
 

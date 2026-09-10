@@ -6,7 +6,7 @@
 >
 > **Input:** an issue picked from the GitHub Project board. **Output:** an approved spec + plan, **pushed to origin/main**. The [IMPL phase](impl-phase.md) picks it up in the opencode container.
 >
-> **Version:** 3.8 · **Last aligned:** 2026-09-07
+> **Version:** 3.9 · **Last aligned:** 2026-09-10
 
 Executors: the project's `.zcode/` — skills **`design-phase`** (the actual protocol this page summarizes) and **`brainstorming`** (the G1a dialogue: questions → approaches → concept; explicit-only trigger — dispatched by `design-phase`, or `/brainstorming`), agents **`spec-panel-*`** ×5 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
 
@@ -98,7 +98,8 @@ The session aggregates: deduplicate identical findings, rank **BLOCKER > MAJOR >
 
 - Every passed gate = commit + **push to origin/main**. A DESIGN session never ends holding local commits.
 - **All decisions live in the artifact texts**: review amendments, cross-trajectory constraints («#NNN strictly after #NNN — shared file») go into the spec/plan. Git and the board carry no session context across the host/container boundary.
-- Explicitly NOT crossing the seam: `.opencode/scratchpad.md`, worktrees, env state.
+- **Host-DESIGN DoD (Scratchpad Discipline v2)**: DESIGN — host and container — writes zero scratchpad state, so the pushed spec/plan are the ONLY carrier of decisions and dependencies: fold them in before the phase closes.
+- Explicitly NOT crossing the seam: `.opencode/scratchpad.md` (no exception section, even for an in-flight container DESIGN — crash recovery is manual from the DB/board/spec), worktrees, env state.
 
 ## Return path (re-entry from IMPL)
 
