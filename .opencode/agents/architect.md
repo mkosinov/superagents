@@ -159,8 +159,9 @@ Specs and plans are large (a plan can be 20K+ tokens). Re-reading them wholesale
 session is a top token waster (real case: one DESIGN session re-read a 78 KB plan 30× and its
 spec 12× ≈ 700K tokens, most of it re-sent context).
 
-1. **Read any doc fully at most ONCE per session.** You wrote it (with edits) — its content is
-   already in your context.
+1. **Read any doc fully at most ONCE per session** — yours (spec/plan) or inherited (a previous
+   session's spec, domain-rules, user materials). The rule is about the file's SIZE, not
+   ownership: you wrote it (with edits) — its content is already in your context.
 2. **Locate by anchor, not by read.** Get the section map once: `grep '^## ' <file>` (for plans
    `grep '^## Task' <file>` returns the task headers with line numbers). Then read ONLY the
    needed region: `read <file> --offset <line> --limit <60>`.
@@ -171,6 +172,11 @@ spec 12× ≈ 700K tokens, most of it re-sent context).
    loop read ⇒ fix ⇒ re-read ⇒ next fix.
 5. **Never paste whole docs into reports or dispatch prompts.** Reference by path + section.
    Only the current task's text goes to an implementer (IMPL Step 5a) — never the entire
+6. **Compaction is not a license to re-read everything.** After a context clear the docs are
+   gone — restore the ONE document the current step needs via the anchor procedure (rule 2),
+   never a wholesale re-read "to be safe". A full post-compaction re-read is a last resort and
+   covers one document at a time. (Audit 2026-09-09: spec/plan re-reads of 30–100K, 4–7× per
+   session happened despite this discipline — compaction recovery was the driver.)
    plan/spec.
 
 ## CRITICAL: Controller Delegates Testing & Debugging

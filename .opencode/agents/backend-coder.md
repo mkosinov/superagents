@@ -29,6 +29,9 @@ You build the FastAPI backend: REST API, SQLite database, business logic, and ex
 ## Rules
 
 - ALWAYS read project spec docs and mock data first
+- **Read each spec/plan doc ONCE.** To revisit a detail, locate the section by anchor
+  (`grep -n '^## ' <file>`) and read only that region (`--offset/--limit`) — a second full read
+  of the same doc is forbidden (also after a context compaction: restore by anchor, not wholesale)
 - **ALWAYS read `docs/domain-rules/{entity}.md`** when working with entity validation or business logic
 - Use FastAPI with Pydantic models for request/response
 - Follow RESTful naming conventions
