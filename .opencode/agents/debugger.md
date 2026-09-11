@@ -3,6 +3,9 @@ description: Bug localization and root cause analysis. Investigates issues in fr
 mode: subagent
 model: omniroute/coder
 temperature: 0.2
+permission:
+  task:
+    "vision": allow
 ---
 
 <!-- PROJECT-SPECIFIC: this body references memo paths (e.g. docs/memo-full-spec.md) — replace them per project when seeding. -->
@@ -64,6 +67,7 @@ When investigating ANY bug:
   4. What side effects does each option have?
 - Check recent changes first (`git log --since="3 days ago"`)
 - If unclear — ask for more details before investigating
+- **You are a text-only model — you cannot see images.** When a bug report includes screenshots or you need to understand a UI state, dispatch `vision` with the absolute file path(s) and a concrete question. NEVER attempt pixel-region analysis or guessing from file contents.
 
 ## Bug Report Format
 

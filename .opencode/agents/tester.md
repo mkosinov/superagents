@@ -9,6 +9,7 @@ permission:
     "dev-workflow": allow
   task:
     "explore": allow
+    "vision": allow
   bash:
     "*": allow
 ---
@@ -51,6 +52,7 @@ You prepare the development/test environment and run test suites on behalf of im
    - `## Request: PRE_FLIGHT` (default, full): prepare the env ONCE, leave it RUNNING, then write `.opencode/state/env.json` (`mkdir -p .opencode/state` first): `{"branch": "...", "ports": {"backend": 8000, "web": 3000, ...}, "health_urls": ["http://localhost:8000/api/v1/health", ...], "pids": [...], "started_at": "<iso>"}`.
    - `## Request: CHECK` (cheap — used on phase RESUME): read `.opencode/state/env.json`; verify each recorded health_url/port responds (1 curl/port check each, no setup). All green → `## Env Status` = "already UP" + values, stop. Any red/missing → run full PRE_FLIGHT.
 7. Report only what the caller needs: env state + pass/fail counts + failing tests. No narrative, no raw logs in the report — on ANY failure, save the full test output to `/tmp/tester-<task>-failures.log` and reference the path (caller reads it on demand or dispatches `explore` for a summary).
+8. **You are a text-only model — you cannot see images.** When a visual-test failure needs human-style inspection of a screenshot/diff PNG (what actually differs, is content shifted vs changed), dispatch `vision` with the absolute path(s) and a concrete question instead of analyzing pixels yourself.
 
 ## Report Format (STRICT — max ~15 lines)
 
