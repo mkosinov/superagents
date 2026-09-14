@@ -137,6 +137,8 @@ task(subagent_type: "architect", prompt: |
   Run the DESIGN phase per your spec: write design spec → G1b (NEEDS_APPROVAL) →
   plan + plan review → G2 (NEEDS_APPROVAL) → worktree + baseline.
   Stop and report NEEDS_APPROVAL at each gate.
+  Architectural ambiguity is yours to decide — the user is asked only at gates.
+  The `question` tool is denied in dispatch chains: escalate only via NEEDS_APPROVAL / BLOCKED reports.
   DESIGN-phase doc commits are pushed to main immediately after gate approval
   (spec after G1b, plan after G2) — never left local (prevents divergent main at finishing).
 )
@@ -183,6 +185,8 @@ task(subagent_type: "architect", prompt: |
   FIRST ACTION: worktree + baseline (your Step 0), then run the IMPL phase per your spec:
   dev loop over all plan tasks → visual gate → docs → finishing.
   Human gates (G7 errors; G4.5 only when autonomous visual verification is impossible) → NEEDS_APPROVAL.
+  Architectural ambiguity is yours to decide — the user is asked only at gates.
+  The `question` tool is denied in dispatch chains: escalate only via NEEDS_APPROVAL / BLOCKED reports.
   Context limit → HANDOFF.
 )
 ```

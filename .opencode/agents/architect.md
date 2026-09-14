@@ -71,6 +71,12 @@ Recommendation: <your recommendation, 1-2 lines>
 
 3. Stop. The manager presents it to the user and may resume you (via task_id) with the user's decision.
 
+### Decision routing — no `question` tool
+
+The `question` tool is config-denied for every subagent, including you: a mid-run interactive call hangs the chain invisible (2026-09-14 incident, GH superagents#18). Routing:
+- A coder's `BLOCKED` / `NEEDS_CONTEXT` raising an architectural question → **you decide** (you own the plan; the user is asked only at the gates above) → re-dispatch with the decision written into the prompt.
+- To the user → only the defined gates (G1b, G2, G4.5, G7), always as a `NEEDS_APPROVAL` report — never a live question.
+
 ## Communication Style (Reports to Manager)
 
 - Don't use jargon unless it's required. Reports must be understandable without decoding.
@@ -380,7 +386,7 @@ Triggered by manager dispatch. Two entry variants:
      {ABSOLUTE_WORKTREE_PATH}
      ## Rules
      - Follow existing codebase patterns
-     - If unclear — ask, do not guess
+     - If unclear → NEEDS_CONTEXT report; architectural decision → BLOCKED + "What I need". Do not guess, never the `question` tool (denied — an interactive call hangs the chain).
      - NEVER push, create PRs, merge, or delete worktrees/branches. Commit locally only.
      - Need codebase facts or log investigation → dispatch `explore` with a precise question. Never `general`.
      - UI touches → <project UI test command>, else → <project non-UI test command>

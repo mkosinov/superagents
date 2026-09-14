@@ -9,6 +9,7 @@ session actually did. Zero token cost — pure SQL.
 Usage:
     python3 subagent-audit.py <session_id> [--json]
     python3 subagent-audit.py --project-sessions           # last 10 sessions of current project dir
+    python3 subagent-audit.py --pending-questions [HOURS]  # live hangs: question tool still awaiting an answer
 
 session_id examples: ses_ffbafe64fffeOX12Lr0lgZmZKJ
 DB (default): ~/.local/share/opencode/opencode.db  (override: $OPENCODE_DB)
@@ -273,15 +274,57 @@ def list_recent_sessions(conn, limit=10):
         print(f"  {r[0]}  {fmt_ts(r[3])}  {r[1]:<18} in:{r[4]:<9} {r[2][:80]}")
 
 
+def list_pending_questions(conn, hours):
+    """Live-hang detector: question-tool parts still in state "pending".
+
+    A question inside a dispatch chain is never answered — the parent only
+    reads the final report — so a pending one means a hung subagent
+    (2026-09-14 incident, GH superagents#18). Recovery: kill the session,
+    decide the question (architect owns the plan), re-dispatch.
+
+    Scans only parts of sessions updated inside the window: the session table
+    is small and part.session_id is indexed, so the LIKE never walks the full
+    part table (full-table scans are minutes-slow). The LIKE is just a
+    prefilter (JSON spacing varies); the authoritative check is parsed JSON.
+    """
+    cutoff = int((time.time() - hours * 3600) * 1000)
+    rows = run(conn, """
+        SELECT p.session_id, p.data, p.time_created, s.parent_id, COALESCE(s.agent,''), COALESCE(s.title,'')
+        FROM part p JOIN session s ON s.id = p.session_id
+        WHERE p.session_id IN (SELECT id FROM session WHERE time_updated > ?)
+          AND (p.data LIKE '%"tool":"question"%' OR p.data LIKE '%"tool": "question"%')
+        ORDER BY p.time_created
+    """, (cutoff,))
+    now_ms = int(time.time() * 1000)
+    hits = []
+    for sid, raw, ts, parent, agent, title in rows:
+        p = parse_part(raw)
+        state = p.get("state") or {}
+        if p.get("tool") == "question" and state.get("status") == "pending":
+            hits.append((sid, agent, parent or "?", ts, title, json.dumps(state.get("input", {}), ensure_ascii=False)))
+    if not hits:
+        print(f"no pending question calls in the last {hours:g}h — no live hangs")
+        return
+    print(f"PENDING QUESTION CALLS ({len(hits)}) — hung subagents; kill + decide + re-dispatch (GH superagents#18):")
+    for sid, agent, parent, ts, title, q in hits:
+        print(f"  {sid}  agent:{agent}  parent:{parent}  pending {fmt_dur(now_ms - ts)}  {title[:60]}")
+        print(f"    question: {q[:300]}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Recover subagent state from opencode DB")
     ap.add_argument("session_id", nargs="?", help="session id (ses_...)")
     ap.add_argument("--json", action="store_true", help="emit JSON")
     ap.add_argument("--project-sessions", action="store_true",
                     help="list recent sessions of the CURRENT working-directory project (not all projects)")
+    ap.add_argument("--pending-questions", nargs="?", type=float, const=24.0, default=None, metavar="HOURS",
+                    help="detect live hangs: question tool calls still awaiting an answer (window: HOURS, default 24)")
     args = ap.parse_args()
 
     conn = connect()
+    if args.pending_questions is not None:
+        list_pending_questions(conn, args.pending_questions)
+        return
     if args.project_sessions:
         list_recent_sessions(conn)
         return

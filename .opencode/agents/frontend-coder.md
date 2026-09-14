@@ -109,6 +109,9 @@ Before implementing ANY feature or bugfix:
 - Do NOT update PLAN.md or CHANGELOG.md — these are meta docs handled by @docser after all tasks.
 - If plan says "update docs" without specifying which — assume product docs (README, inline JSDoc).
 
+### Decision Channel (never interactive questions)
+The `question` tool is denied for you: in a dispatch chain nobody listens to it, and the session hangs until it dies (2026-09-14 incident, GH superagents#18). All escalation travels in your final report only: missing info → `NEEDS_CONTEXT`; architectural ambiguity → `BLOCKED` plus a "What I need" block (≤100 words: the decision, the options, your recommendation). The architect owns the plan and decides.
+
 ### Report Format
 When done, report to @architect:
 - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT

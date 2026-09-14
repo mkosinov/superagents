@@ -99,6 +99,9 @@ Before running tests, MUST invoke `dev-workflow` skill via `skill` tool to learn
 - If task changes data model → update data model docs
 - Do NOT update PLAN.md or CHANGELOG.md — meta docs handled by @docser
 
+### Decision Channel (never interactive questions)
+The `question` tool is denied for you: in a dispatch chain nobody listens to it, and the session hangs until it dies (2026-09-14 incident, GH superagents#18). All escalation travels in your final report only: missing info → `NEEDS_CONTEXT`; architectural ambiguity → `BLOCKED` plus a "What I need" block (≤100 words: the decision, the options, your recommendation). The architect owns the plan and decides.
+
 ### Report Format
 When done, report to @architect:
 - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
