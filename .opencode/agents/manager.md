@@ -9,6 +9,7 @@ permission:
   grep: allow
   glob: allow
   webfetch: allow
+  question: allow
   edit:
     ".opencode/scratchpad.md": allow
   bash:
