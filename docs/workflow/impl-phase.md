@@ -15,7 +15,7 @@ Executors: the project's `.opencode/` — agents `manager`, `architect`, `fronte
 | Step | Gate | Who decides | Executors |
 |------|------|-------------|-----------|
 | Entry: plan-only start | — | user says «продолжаем траекторию #NNN» | @manager |
-| 0. Worktree + baseline | G3 | Auto (ask if tests fail) | @architect |
+| 0. Worktree + baseline | G3 | Auto (BLOCKED on red baseline) | @architect |
 | 4. Dev loop + reviews | G4–G6 | Auto | @architect → coders → reviewers |
 | 4.5 Visual check (UI) | G4.5 | Auto, soft block | `visual-compliance-check.sh` |
 | 5. Docs on branch | — | Auto | @docser |
@@ -44,9 +44,9 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
          │ 2. Invoke skill `using-git-worktrees`
          │ 3. Run .opencode/scripts/create-worktree.sh <branch>
          │ 4. cd .worktrees/<branch>; confirm .worktrees/ gitignored
-         │ 5. Run project test suite → clean baseline
+         │ 5. Verify clean baseline (CI fact-check, or local suite)
          │
-         ▼  [G3: TESTS PASS]  (if fail → ask user)
+         ▼  [G3: BASELINE GREEN]  (red → BLOCKED)
          │
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 4: SUBAGENT-DRIVEN DEVELOPMENT  (Auto Gates G4-G6)     ║
@@ -378,7 +378,7 @@ The next host DESIGN session picks the issue up from the board with the issue co
 ## Gates summary
 
 ```
-G3 ─── Clean Baseline ────────── Auto ─── Tests pass on empty worktree
+G3 ─── Clean Baseline ────────── Auto ─── Baseline green: CI fact-check of latest merged PR, or local suite
 G4 ─── TDD Compliance ────────── Auto ─── Implementer self-check
 G4a ── Architect Spot-Check ──── Auto ─── Diff ≤5 lines (trivial only)
 G4.5 ─ Visual Compliance ─────── Auto ─── UI phases only; skip if no UI

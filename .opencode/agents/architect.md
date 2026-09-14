@@ -321,9 +321,11 @@ Trigger: manager resumes you with "G2 approved". (In split mode this step does n
    the feature branch diff contains only implementation commits.
 1. Invoke `using-git-worktrees` skill — run `./.opencode/scripts/create-worktree.sh <branch-name>` from repo root.
 2. Enter `.worktrees/<branch-name>`.
-3. Run the project's baseline tests to verify clean state.
-4. If tests FAIL → report BLOCKED with the failure summary (do NOT fix).
-5. If PASS → report DONE with worktree path, branch name, baseline result. Phase complete.
+3. Verify a clean baseline — mode follows the project's merge flow:
+   - **CI-gated merges (CI runs on PRs):** NO local test run. `gh pr list --state merged --limit 10 --json number,headRefOid,statusCheckRollup,mergedAt,mergeCommit` → pick the entry with max `mergedAt` (the list is creation-ordered, not merge-ordered). Green = every check in `statusCheckRollup` has conclusion `SUCCESS`; any FAILURE/non-success, or an empty rollup → the baseline is red. Staleness guard: `git log --name-only <mergeCommit>..origin/main` — if any changed file falls outside the project's docs/harness-only paths, unverified code landed on main after the verified merge → the baseline is red. No merged PR at all → proceed with an explicit warning in the report.
+   - **No CI gating:** run the project's baseline tests to verify clean state.
+4. If the baseline is red (test failure, red rollup, or stale facts) → report BLOCKED with the facts (do NOT fix).
+5. If green → report DONE with worktree path, branch name, baseline result (CI mode: PR number, head SHA, rollup status). Phase complete.
 
 ---
 
@@ -340,7 +342,9 @@ Triggered by manager dispatch. Two entry variants:
 2. **Plan-vs-main sanity check:** if main advanced after G2 (other merges landed), re-verify the plan's file paths and targets still hold on the fetched main. Material drift → report BLOCKED (return path), do NOT improvise.
 3. Invoke `using-git-worktrees` skill — run `./.opencode/scripts/create-worktree.sh <branch-name>` from repo root.
 4. Enter `.worktrees/<branch-name>`.
-5. Run the project's baseline tests to verify clean state. FAIL → report BLOCKED with the failure summary (do NOT fix). PASS → proceed to Step 4.
+5. Verify a clean baseline — mode follows the project's merge flow:
+   - **CI-gated merges (CI runs on PRs):** NO local test run. `gh pr list --state merged --limit 10 --json number,headRefOid,statusCheckRollup,mergedAt,mergeCommit` → pick the entry with max `mergedAt` (the list is creation-ordered, not merge-ordered). Green = every check in `statusCheckRollup` has conclusion `SUCCESS`; any FAILURE/non-success, or an empty rollup → the baseline is red. Staleness guard: `git log --name-only <mergeCommit>..origin/main` — if any changed file falls outside the project's docs/harness-only paths, unverified code landed on main after the verified merge → the baseline is red. No merged PR at all → proceed with an explicit warning in the report.
+   - **No CI gating:** run the project's baseline tests to verify clean state. FAIL → report BLOCKED with the failure summary (do NOT fix). Green → proceed to Step 4. The CI-mode report carries the facts: PR number, head SHA, rollup status, staleness result.
 
 ## Step 4: Subagent-Driven Development Loop
 

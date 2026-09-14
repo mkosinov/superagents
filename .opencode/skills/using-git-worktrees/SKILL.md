@@ -99,6 +99,6 @@ Branch deletion is separate; the script only reminds you if the branch still exi
 - Create a worktree when Step 0 detects existing isolation
 - Run `git worktree add` or copy env / link `node_modules` manually instead of `create-worktree.sh`
 - Create worktree without verifying `.worktrees/` is in `.gitignore`
-- Skip baseline test verification
+- Skip baseline verification (CI fact-check or local suite — whichever architect Step 0 prescribes)
 - Proceed with failing tests without asking
 - Remove a worktree while inside it (use `remove-worktree.sh` from project root)
