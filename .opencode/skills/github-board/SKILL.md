@@ -16,7 +16,7 @@ The board = the development trajectory (durable, cross-session). The scratchpad 
 - **Priority** — importance (Critical/High/Medium/Low)
 - **Next Up** (1/2/3) — the user's explicit queue: which task to take next. Only the manager changes it, on the user's word.
 
-Status is gate-anchored: each status names the last workflow gate passed. Flip it at gate approval, not by feel. (In Review and Staging / QA were removed — never used.)
+Status is gate-anchored: each status names the last workflow gate passed. Flip it at gate approval, not by feel. Single exception: `In IMPL` flips at IMPL dispatch, before G3 evidence exists — a flip placed after the blocking dispatch lands hours late or never (see touchpoint below). (In Review and Staging / QA were removed — never used.)
 
 | Status | Gate | Meaning | Set by |
 |---|---|---|---|
@@ -24,7 +24,7 @@ Status is gate-anchored: each status names the last workflow gate passed. Flip i
 | In Design (G1a) | G1a | concept approved in brainstorm; spec work underway | DESIGN session |
 | Spec OK (G1b) | G1b | panel review done, spec fixes folded, spec pushed to main | DESIGN session |
 | Ready to IMPL (G2) | G2 | plan reviewed and pushed — the signal for IMPL start (plan-only start) | DESIGN session |
-| In IMPL | G3 | worktree + baseline green, dev loop running | container manager |
+| In IMPL | G3 | IMPL dispatched (plan-only start); worktree + baseline green follow as the architect's first steps | container manager |
 | PR (G7) | G7 | finishing: PR open, CI/merge pending | container |
 | In-main | — | merged to main | manager, mandatory |
 | deployed | — | released to production | user |
@@ -53,7 +53,7 @@ An issue is automatically added to the board on the first set/status call if it 
 | **Design gate passed (G1a/G1b/G2)** | flip status per the gate table above | whoever runs DESIGN |
 | **New issue created (gh issue create)** | ask the user whether to put it in Next Up (and where) | manager |
 | **User changes the trajectory** | `set-next-up` per their words | manager |
-| **Plan-only IMPL entry (split): user says «продолжаем траекторию #N», card at `Ready to IMPL (G2)`** | verify plan on fetched main → dispatch IMPL (plan-only start, no worktree yet — architect's first action) → `status N "In IMPL"` | manager, container |
+| **Plan-only IMPL entry (split): user says «продолжаем траекторию #N», card at `Ready to IMPL (G2)`** | verify card + plan on fetched main → `status N "In IMPL"` → dispatch IMPL (plan-only start, no worktree yet — architect's first action). Flip BEFORE the dispatch: the dispatch blocks for the whole marathon (2026-09-13: #262 sat on `Ready to IMPL` through a 15-hour run) | manager, container |
 | **IMPL blocked: spec/plan invalid (return path)** | architect reports BLOCKED → user decides → issue comment + `status N` back to `In Design (G1a)` / `Spec OK (G1b)`; scratchpad (v2): section removed if the worktree is discarded, kept while a kept worktree lives — the durable record is the issue comment; worktree keep-vs-discard — user decides | manager, after user decision |
 | **Finishing: PR created** | `status N "PR (G7)"` | manager, at the architect's finishing report |
 | **Workflow finished, PR merged** | `status N "In-main"`; if the issue was Next Up 1 → `shift`; then `merged N <pr> "<short title>"` (v2 — appends the `## Recently merged` line) and remove your scratchpad section | manager, mandatory finishing step (architect reports `## Board Update Needed`) |

@@ -93,10 +93,11 @@ A new message does **not** cancel a pending report. Show work outcome (yours or 
 4. **If your section is missing or completed** (no active workflow): invoke skill `github-board` → run `python3 .opencode/scripts/gh_board.py next-up` (script lives in the project repo, comes in via git) → show the user the current trajectory (Next Up queue 1→3) and ask what to take. Do NOT propose tasks from your own assumptions — the GH Project board is the single source of the trajectory.
 5. **Split-mode entry** — the user says «продолжаем траекторию #NNN» (DESIGN ran on the host; see docs/workflow/design-phase.md and docs/workflow/impl-phase.md). Pre-flight, in order:
    - Board: issue #NNN must be at `Ready to IMPL (G2)` — check with `python3 .opencode/scripts/gh_board.py show NNN`. Any other status → do NOT start IMPL; show the status to the user and ask.
+   - Flip the board immediately after that check, BEFORE anything else: `python3 .opencode/scripts/gh_board.py status NNN "In IMPL"`. The card moves at take-on, not after the run — the dispatch below blocks for the whole marathon, so a flip placed after it lands hours late or never (2026-09-13: #262 sat on `Ready to IMPL` through a 15-hour IMPL run).
    - Git: `git fetch origin && git status -sb`. Behind → `git pull --ff-only`, then proceed. Diverged (ahead+behind) → STOP and show the user; never reset or merge on your own. Local-only commits on main are forbidden while a host DESIGN session is in flight — FasTP WIP goes to a branch.
    - Plan file: verify it exists on the fetched main. Missing → STOP and show the user.
    - Do NOT brainstorm — the feature is already approved through G2. Do NOT create worktrees or run baselines — the architect's FIRST IMPL action does both (and both are outside your allowlist).
-   - Create your scratchpad section at the IMPL dispatch (v2 — it lives while the worktree exists, see Scratchpad Discipline), dispatch IMPL with the **plan-only start** template, then flip the board: `gh_board.py status N "In IMPL"`.
+   - Create your scratchpad section at the IMPL dispatch (v2 — it lives while the worktree exists, see Scratchpad Discipline) and dispatch IMPL with the **plan-only start** template. The board flip already happened in the pre-flight — never defer it past the dispatch.
 6. If YOUR section contains an active workflow — resume from it; do not read the board. Other sessions' sections are not your concern.
 
 ## Routing
