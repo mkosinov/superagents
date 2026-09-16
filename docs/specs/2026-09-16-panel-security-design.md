@@ -1,7 +1,7 @@
 # Panel Security Reviewer (6th Panelist) — Design
 
 **Date:** 2026-09-16
-**Status:** Draft — G1a approved, panel fixes applied, consistency re-run pending
+**Status:** Shipped 2026-09-16 — G1b approved (commit cfeae9f), plan G2 approved, canon implemented on host (user redirected IMPL from container to host session); first auth-bearing-spec run = field acceptance
 **Author:** host design session (brainstorming with user)
 
 **Placement:** SuperAgents is the framework source of truth. The panel runs on the host (zcode) during DESIGN (gate G1b); canon bodies live in `.opencode/agents/`, host-port seeds in `.zcode/agents/`. The memo instance and future projects receive the change via git (the host port is the reference seed; container syncs `.opencode/` from canon on pull).
@@ -153,7 +153,7 @@ The plan must consume (not re-derive) the following:
 
 ## Implementation outline
 
-1. Create `.opencode/agents/spec-panel-security.md` (Appendix A, canon shape) and the host-port twin `.zcode/agents/spec-panel-security.md` (port header; twin exists already on disk, uncommitted).
+1. Create `.opencode/agents/spec-panel-security.md` (Appendix A, canon shape) and the host-port twin `.zcode/agents/spec-panel-security.md` (port header; twin already committed — cfeae9f).
 2. Edit the roster-carrier files per the Workflow integration table (counts and semantic lines 5→6; count-clause removal in panelist bodies).
 3. Plan DoD must include a mechanical grep sweep over the repo: `5 panelists|5 parallel|×5|5-reviewer|one of 5` — the Workflow table lists the known sites, the sweep catches the unknown ones.
 4. User side: define the `panel-security` combo chain in the omniroute dashboard (before the next session's panel run).
