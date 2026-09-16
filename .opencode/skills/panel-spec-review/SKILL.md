@@ -38,13 +38,14 @@ spec-panel-* panel agents. Not needed on IMPL phase.
 | `spec-panel-feasibility` | Technical risks, hidden complexity | read/grep/glob/git-read |
 | `spec-panel-simplicity` | Overengineering, unrequested scope, YAGNI | read/grep/glob/git-read |
 | `spec-panel-best-practices` | Current best practices via web research | same + `task: researcher-agent` |
+| `spec-panel-security` | Application security: authn, authz/roles, security-model breakage; explicit no-attack-surface verdict | read/grep/glob/git-read |
 
-All 5 are read-only leaf agents. They do NOT edit, do NOT run `gh`,
+All 6 are read-only leaf agents. They do NOT edit, do NOT run `gh`,
 do NOT access the network directly (except best-practices via researcher-agent).
 
 ## Aggregation
 
-After all 5 return:
+After all 6 return:
 
 1. Collect findings from all reports.
 2. Dedup overlapping findings (same issue flagged by multiple agents).
