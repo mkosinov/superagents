@@ -41,11 +41,13 @@ Only what is pushed/flipped crosses the seam (git + board). Workflow canon: `~/d
 ## 3. Artifacts
 
 - Spec: `docs/specs/YYYY-MM-DD-<feature>-design.md`. Must include a `## User Scenarios` section — 3–7 user tasks the feature enables, each mapping to an E2E test (anchors the plan's E2E-in-DoD rule; the completeness panelist checks it). **Self-contained BEFORE the panel**: the panel does not read GH issues — the scope check against the issue is done by the main session itself, with findings baked into the spec text.
+- Spec must also carry a `## Reuse` section — what the feature reuses instead of inventing: existing code (components, hooks, endpoints, with `file:line`), existing logic and patterns (guards, cache-invalidation, error semantics), and domain rules from `docs/domain-rules/` (by name); sourced from the scout's fact sheet. Explicit "none reusable — searched: <grep queries>" is a legal variant. The completeness panelist checks the section is present and concrete.
 - Plan: `docs/plans/YYYY-MM-DD-<feature>-plan.md` per the writing-plans conventions (canon: `~/dev/superagents/.opencode/skills/writing-plans/SKILL.md`):
   - header: Goal / Architecture / Tech Stack; immediately after it a `## Behavioral Delta` section;
   - every task anchor: `## Task N: <name>` + `### Classification: trivial|small|standard|large`; after commit, never renumber anchors;
   - every task carries `### Required Docs` (domain-rules for entities, design-system for UI);
   - a task implements a User Scenario (from the spec's `## User Scenarios`) → its DoD line: "E2E test for scenario N passes (RED-GREEN-REFACTOR)";
+  - a task consumes the spec's `## Reuse`: it extends/mirrors the named code, logic, or domain rules; introducing a new component/hook/endpoint/piece of logic not listed there is an unrequested engineering decision (flag at G2 review);
   - no placeholders ("TBD", "add validation" — that is a plan failure).
 - Domain rules changed → `docs/domain-rules/` is committed together with the spec.
 

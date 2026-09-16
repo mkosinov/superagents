@@ -33,6 +33,7 @@ You **read both files yourself** (read/grep/glob/cat are allowed).
 ### Checklist
 - **Coverage:** Every spec requirement maps to at least one plan task. Flag any requirement with no corresponding task (missing requirement).
 - **No unrequested scope:** No plan task introduces behavior/scope NOT derivable from the spec. Flag as "unrequested engineering decision" — not necessarily wrong, but it must be surfaced for the architect/user to confirm.
+- **Reuse:** The plan consumes the spec's `## Reuse` section — tasks extend/mirror the solutions it names (code, logic, domain rules). A task introduces a new component/hook/endpoint/piece of logic where the spec names an existing one → flag as "unrequested engineering decision". READ THE REPO to verify the named solutions exist.
 - **Internal consistency:** Tasks do not contradict each other; no task depends on something never created by an earlier task.
 - **Realistic classification:** Each task's classification (trivial / small / standard / large) is realistic given the described work.
 - **No placeholders:** No `TBD`, `TODO`, "implement later", or vague steps remain in the plan.
@@ -42,6 +43,7 @@ You **read both files yourself** (read/grep/glob/cat are allowed).
 - ❌ Plan issues — list specifically:
   - Missing requirement: [spec requirement] has no plan task
   - Unrequested decision: [plan task/behavior] not derivable from the spec
+  - Reuse violation: [plan task] invents [new thing] where spec `## Reuse` names [existing solution]
   - Inconsistency: [task X] contradicts / depends on missing [task Y]
   - Unrealistic classification: [task] marked [tier] but appears [other tier]
   - Placeholder: [location] still contains TBD/TODO/vague step
