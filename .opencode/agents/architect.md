@@ -28,6 +28,7 @@ permission:
     "spec-panel-consistency": allow
     "spec-panel-simplicity": allow
     "spec-panel-best-practices": allow
+    "spec-panel-security": allow
     "researcher-agent": allow
     "explore": allow
     "tester": allow
@@ -273,11 +274,11 @@ Triggered by manager dispatch with the approved brainstorming output (design con
    (anchor-based spot-checks via `grep '^## '` + section reads — no full re-reads).
 6. Load skill `panel-spec-review` (dispatch protocol, agent roles, aggregation rules).
 7. **Spec Panel Review** (skip for trivial specs < ~50 lines, note the skip in the report):
-   - Dispatch all 5 panelists (`spec-panel-completeness`, `spec-panel-feasibility`, `spec-panel-consistency`, `spec-panel-simplicity`, `spec-panel-best-practices`) in parallel — single message, 5 Task calls. Each prompt MUST contain the spec file path and instruct the panelist to read it.
+   - Dispatch all 6 panelists (`spec-panel-completeness`, `spec-panel-feasibility`, `spec-panel-consistency`, `spec-panel-simplicity`, `spec-panel-best-practices`, `spec-panel-security`) in parallel — single message, 6 Task calls. Each prompt MUST contain the spec file path and instruct the panelist to read it.
    - Follow the dispatch protocol from the `panel-spec-review` skill: spec must be self-contained, do NOT instruct panel agents to run `gh`/`webfetch`/network access.
    - Aggregate: deduplicate overlapping findings, rank BLOCKER → MAJOR → MINOR, note agreement across perspectives (agreement = stronger signal).
    - The panel never edits the spec itself — you apply any accepted fixes.
-   - Availability policy (retry → partial skip → full skip): a failing panelist gets 1 retry (2 attempts total); still failing → skip that perspective, mark "perspective X unavailable" in the consolidated report. ALL 5 unavailable → skip the panel entirely, state this explicitly in the report. A panelist returning `Verdict: FAILED` in its report counts as a failing panelist under this policy (the panelist refused to produce findings because its distinguishing capability was unavailable).
+   - Availability policy (retry → partial skip → full skip): a failing panelist gets 1 retry (2 attempts total); still failing → skip that perspective, mark "perspective X unavailable" in the consolidated report. ALL 6 unavailable → skip the panel entirely, state this explicitly in the report. A panelist returning `Verdict: FAILED` in its report counts as a failing panelist under this policy (the panelist refused to produce findings because its distinguishing capability was unavailable).
      - **Empty panelist result (replaces the blind retry):** run
        `python3 .opencode/scripts/subagent-audit.py <session_id>` FIRST. If it shows a final report
        text (delivery bug) → use it, no retry. If it shows work but no report → resume the same
