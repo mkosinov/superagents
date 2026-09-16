@@ -12,7 +12,7 @@ Every feature goes through **two phases**, and by design each phase runs in its 
 
 | Phase | What happens | Where it runs | Full reference |
 |-------|--------------|---------------|----------------|
-| **DESIGN** | brainstorm concept → spec + 5-perspective review panel → plan + plan review. Human gates G1a/G1b/G2. Output: approved spec + plan **pushed to main**. | **ZCode on the host** — an interactive session with you; review agents dispatched in parallel | [docs/workflow/design-phase.md](docs/workflow/design-phase.md) |
+| **DESIGN** | brainstorm concept → spec + 6-perspective review panel → plan + plan review. Human gates G1a/G1b/G2. Output: approved spec + plan **pushed to main**. | **ZCode on the host** — an interactive session with you; review agents dispatched in parallel | [docs/workflow/design-phase.md](docs/workflow/design-phase.md) |
 | **IMPL** | worktree + baseline → sequential task loop with two-stage reviews → visual gate → docs → merge/PR. Human gate G7. Input: the approved plan from DESIGN. | **OpenCode in the container** — @manager + @architect run it autonomously | [docs/workflow/impl-phase.md](docs/workflow/impl-phase.md) |
 
 Why two tools: DESIGN is a conversation with a human at gates — it needs an interactive session and only one level of subagent dispatch, which the host (ZCode) provides. IMPL is a long autonomous pipeline with nested dispatch (manager → architect → coders/reviewers), which the container (OpenCode) provides. The only things that cross between them are **git** (pushed spec/plan) and the **GitHub Project board** (the card's status shows which gate was passed last). The handoff is one sentence: the user tells the container manager «продолжаем траекторию #NNN».
@@ -30,7 +30,7 @@ Capabilities:
 - **Documentation on the feature branch** before finish
 - **Resumable sessions** via `.opencode/scratchpad.md`
 - **Fast Track Protocol** for post-merge polish without full G1–G2
-- **Spec review panel** — 5 parallel free-model perspectives review every spec before user approval
+- **Spec review panel** — 6 parallel free-model perspectives review every spec before user approval
 - **Reflection mode** for workflow self-analysis (`/reflect`, `.opencode/skills/reflect/`)
 
 ## Workflow guides (detailed)
@@ -57,7 +57,7 @@ IMPL (container, opencode):  Worktree + baseline (G3) → Dev loop (G4–G6) →
 | Phase | Step | Gate | Executor | Skill |
 |-------|------|------|----------|-------|
 | **DESIGN** (host, ZCode) | 0. Brainstorming | G1a (concept) | host session + user | `design-phase` |
-| | 1. Spec + panel review | G1b (spec) | host session + `spec-panel-*` ×5 | `design-phase` (panel protocol ported from `panel-spec-review`) |
+| | 1. Spec + panel review | G1b (spec) | host session + `spec-panel-*` ×6 | `design-phase` (panel protocol ported from `panel-spec-review`) |
 | | 2. Plan + review | G2 (plan) | host session + `plan-reviewer` | `design-phase` (conventions from `writing-plans`) |
 | **IMPL** (container, OpenCode) | 0. Worktree + baseline | G3 | @architect (first IMPL action) | `using-git-worktrees` |
 | | 4. Dev loop + reviews | G4–G6 | @architect → coders → reviewers | `subagent-driven-development` |
@@ -84,7 +84,7 @@ superagents/
 │   │   ├── debugger.md      # Root cause investigator
 │   │   ├── docser.md        # Meta documentation
 │   │   ├── deployer.md      # DevOps / deploy
-│   │   └── spec-panel-*.md  # Spec review panel (5 perspectives, G1b)
+│   │   └── spec-panel-*.md  # Spec review panel (6 perspectives, G1b)
 │   ├── scripts/             # Shared automation (worktree, visual gate, subagent + scratchpad audit)
 │   │   ├── create-worktree.sh
 │   │   ├── remove-worktree.sh
@@ -107,7 +107,7 @@ superagents/
 │   │   ├── vitest-playwright-patterns/  # Frontend test patterns (generic, Memo examples)
 │   │   └── reflect/
 ├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
-│   ├── agents/              # spec-panel-* ×5, plan-reviewer (+ smoke spikes)
+│   ├── agents/              # spec-panel-* ×6, plan-reviewer (+ smoke spikes)
 │   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
 │   ├── skills/brainstorming/ # G1a dialogue skill (explicit-only trigger; dispatched by design-phase)
 │   └── scripts/gh_board.py  # GitHub Project board script

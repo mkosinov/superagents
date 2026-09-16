@@ -61,7 +61,7 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
 
 ## Step 3: Configure Spec Review Panel models
 
-The brainstorming skill runs a 5-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
+The brainstorming skill runs a 6-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
 Reference default (memo project): shared omniroute gateway combos:
 
@@ -72,6 +72,7 @@ Reference default (memo project): shared omniroute gateway combos:
 | spec-panel-consistency | `omniroute/panel-consistency` |
 | spec-panel-simplicity | `omniroute/panel-simplicity` |
 | spec-panel-best-practices | `omniroute/panel-best-practices` |
+| spec-panel-security | `omniroute/panel-security` |
 
 (`plan-reviewer` — `omniroute/plan-reviewer`.)
 

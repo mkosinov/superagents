@@ -8,14 +8,14 @@
 >
 > **Version:** 3.9 · **Last aligned:** 2026-09-10
 
-Executors: the project's `.zcode/` — skills **`design-phase`** (the actual protocol this page summarizes) and **`brainstorming`** (the G1a dialogue: questions → approaches → concept; explicit-only trigger — dispatched by `design-phase`, or `/brainstorming`), agents **`spec-panel-*`** ×5 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
+Executors: the project's `.zcode/` — skills **`design-phase`** (the actual protocol this page summarizes) and **`brainstorming`** (the G1a dialogue: questions → approaches → concept; explicit-only trigger — dispatched by `design-phase`, or `/brainstorming`), agents **`spec-panel-*`** ×6 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
 
 ## At a glance
 
 | Step | Gate | Who decides | Executors |
 |------|------|-------------|-----------|
 | 0. Brainstorm the concept | G1a — concept | **Human** | host session |
-| 1. Spec + panel review | G1b — spec | **Human** | host session + `spec-panel-*` ×5 |
+| 1. Spec + panel review | G1b — spec | **Human** | host session + `spec-panel-*` ×6 |
 | 2. Plan + plan review | G2 — plan | **Human** | host session + `plan-reviewer` |
 
 Legend: **Human** = requires a user decision (pause); `▼` = automatic transition.
@@ -49,7 +49,7 @@ Legend: **Human** = requires a user decision (pause); `▼` = automatic transiti
          │    spec path only — they do not read GitHub issues)
          │    Must include ## User Scenarios — 3-7 tasks, each → E2E
          │ 2. Self-review (placeholders, consistency, scope)
-         │ 3. Spec Panel Review: 5 parallel independent agents
+         │ 3. Spec Panel Review: 6 parallel independent agents
          │ 4. Consolidated report → user decides on fixes
          │
          ▼  [G1b: USER APPROVES THE SPEC]
