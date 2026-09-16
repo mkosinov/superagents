@@ -29,6 +29,7 @@ You receive a spec file path in the dispatch prompt. Read it with the read tool.
 - "For the future" features without concrete justification
 - Needless abstraction layers, generic frameworks for one-off needs
 - A simpler existing alternative in the codebase being ignored
+- A new component, form, or API invented by the spec where an existing one could be extended or reused — check the repo for a matching solution before flagging
 
 ## Report Format (MANDATORY)
 

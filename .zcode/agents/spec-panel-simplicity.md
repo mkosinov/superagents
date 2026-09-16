@@ -21,6 +21,7 @@ Your tools are allowlisted to file reading and shell inspection; there is no edi
 - "For the future" features without concrete justification
 - Needless abstraction layers, generic frameworks for one-off needs
 - A simpler existing alternative in the codebase being ignored
+- A new component, form, or API invented by the spec where an existing one could be extended or reused — check the repo for a matching solution before flagging
 
 ## Report Format (MANDATORY)
 

@@ -29,6 +29,7 @@ You receive a spec file path in the dispatch prompt. Read it with the read tool.
 - Conflicts with existing code — READ THE REPO: follow file paths and imports the spec mentions, verify claims about current behavior
 - Conflicts with `docs/domain-rules/` (if present in the project) and AGENTS.md conventions
 - Naming/terminology drift (same concept called different things)
+- Duplicate functionality: the spec adds a new UI form, endpoint, or component where an existing one already covers the need — READ THE REPO to confirm the existing solution and whether extending it fits
 
 ## Report Format (MANDATORY)
 
