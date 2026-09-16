@@ -1,6 +1,6 @@
 ---
 name: design-phase
-description: DESIGN phase on the host (zcode) in the host/container split topology — brainstorm G1a → spec + 5-reviewer panel G1b → plan + review G2, DoD = push to origin, board = the scripts/gh_board.py script living in memo itself, handoff to the container is «продолжаем траекторию #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
+description: DESIGN phase on the host (zcode) in the host/container split topology — brainstorm G1a → spec + 6-reviewer panel G1b → plan + review G2, DoD = push to origin, board = the scripts/gh_board.py script living in memo itself, handoff to the container is «продолжаем траекторию #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
 ---
 
 # DESIGN phase on the host (split host/container)
@@ -53,10 +53,10 @@ Only what is pushed/flipped crosses the seam (git + board). Workflow canon: `~/d
 
 ## 4. Panel (host port — body from `.opencode/skills/panel-spec-review`)
 
-1. Dispatch: **5 agents in parallel**, in a single Agent-tool message:
-   `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices` (files in the repo's `.zcode/agents/`, models `omniroute/panel-*`).
+1. Dispatch: **6 agents in parallel**, in a single Agent-tool message:
+   `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices`, `spec-panel-security` (files in the repo's `.zcode/agents/`, models `omniroute/panel-*`).
 2. Each prompt: the **spec path** (+ the previous spec revision's path, if there was one). No `gh issue view`, no network — except best-practices, whose design includes WebSearch/WebFetch.
-3. Aggregation: collect the 5 reports → dedupe identical findings → rank **BLOCKER > MAJOR > MINOR** → one consolidated report to the user for the fix decision.
+3. Aggregation: collect the 6 reports → dedupe identical findings → rank **BLOCKER > MAJOR > MINOR** → one consolidated report to the user for the fix decision.
 4. **Availability policy (host adaptation, no subagent audit):** a panelist did not return / crashed → **one** rerun; second failure → mark it `skipped` in the consolidated report, verdict on the rest.
 5. best-practices returned `Verdict: FAILED` (web research unavailable) → note it in the report and exclude it from the verdict — that is its designed refusal, not a crash.
 6. The agent registry is seeded only at session start: `Agent tool: not found` while `.zcode/agents/` files exist → restart the session.
