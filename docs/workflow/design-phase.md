@@ -6,7 +6,7 @@
 >
 > **Input:** an issue picked from the GitHub Project board. **Output:** an approved spec + plan, **pushed to origin/main**. The [IMPL phase](impl-phase.md) picks it up in the opencode container.
 >
-> **Version:** 3.9 · **Last aligned:** 2026-09-10
+> **Version:** 3.10 · **Last aligned:** 2026-09-17
 
 Executors: the project's `.zcode/` — skills **`design-phase`** (the actual protocol this page summarizes) and **`brainstorming`** (the G1a dialogue: questions → approaches → concept; explicit-only trigger — dispatched by `design-phase`, or `/brainstorming`), agents **`spec-panel-*`** ×6 and **`plan-reviewer`**, script **`.zcode/scripts/gh_board.py`** (board). Seed source: this repo's [`.zcode/`](../../.zcode/).
 
@@ -82,11 +82,11 @@ The main session keeps: pre-flight git, board flips, reading the scout report �
 
 ## Board during DESIGN
 
-The GitHub Project card walks `In Design (G1a) → Spec OK (G1b) → Ready to IMPL (G2)`. Flip strictly at the gate moment, never by feel. One writer per issue: DESIGN-stage flips belong to the host session; IMPL-stage flips to the container manager.
+The GitHub Project card walks `In Design (G1a) → Spec OK (G1b) → Ready to IMPL (G2)`; the fast-track path branches off after G1b straight to `In IMPL` (see [Fast-track](#fast-track-docsharness-issues-no-impl-session)). Flip strictly at the gate moment, never by feel. One writer per issue: DESIGN-stage flips belong to the host session; IMPL-stage flips to the container manager.
 
 ## Spec Panel Review (G1b)
 
-Five **independent parallel** perspectives, one agent each: `completeness`, `consistency`, `feasibility`, `simplicity`, `best-practices` (the last one does web research; a `Verdict: FAILED` from it is its designed no-network refusal — excluded from the verdict, not counted as a crash).
+Six **independent parallel** perspectives, one agent each: `completeness`, `consistency`, `feasibility`, `simplicity`, `best-practices`, `security` (the best-practices one does web research; a `Verdict: FAILED` from it is its designed no-network refusal — excluded from the verdict, not counted as a crash).
 
 The session aggregates: deduplicate identical findings, rank **BLOCKER > MAJOR > MINOR**, present ONE consolidated report; the user decides which fixes to apply. Availability policy: a panelist that fails to return is retried once, then marked `skipped` in the report — the verdict rests on the rest.
 
@@ -112,3 +112,32 @@ G1a ─── Design Concept Approval ─── Human ── Concept approved, s
 G1b ─── Written Spec Approval ───── Human ── Spec + panel report reviewed
 G2 ─── Plan Approval ─────────── Human ── Plan + review, pushed to main
 ```
+
+## Fast-track: docs/harness issues (no IMPL session)
+
+An issue that touches **only** documentation (`docs/`) or the harness
+(`.zcode/`, `.opencode/` — no application code) may skip the container IMPL
+session entirely and be implemented by the host DESIGN session itself
+(precedents in memo: #107, #287).
+
+- **Trigger:** the user opts in at any gate; the session recommends the
+  fast-track for a pure docs/harness issue by default.
+- **Gates:** G1a and G1b unchanged — the concept and the spec (with the
+  panel) still apply. **G2 is collapsed by default:** no plan artifact for
+  the fast-track; the implementation order and the verification design live
+  in a `## Verification` section of the spec — mechanical checks (greps,
+  path/line existence, coverage lists); the E2E-in-DoD rule does not apply
+  (no app surface). Write the plan anyway when the change decomposes into
+  ≥3 independent tasks or the verification itself needs design — the
+  user decides at G1b.
+- **Seam:** gate pushes are replaced by the PR — the spec (and plan, if
+  any) commit together with the change itself. The session still never
+  ends holding local commits.
+- **Board:** the card never sits in `Ready to IMPL (G2)` — the auto-impl
+  pipeline has nothing to claim. While the PR is open the card goes to
+  `In IMPL` (the host session acts as the executor); after merge →
+  `In-main`.
+- **Closing:** the PR description carries `Closes #N` — the only sanctioned
+  place for the closing keyword; commit messages stay keyword-free.
+- **Handoff:** none — do not say «продолжаем траекторию» for a fast-tracked
+  issue.
