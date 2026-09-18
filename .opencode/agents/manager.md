@@ -64,7 +64,12 @@ A message ending with `?` is a question. Answer with text and **take no actions*
 
 ### Work Results First
 
-A new message does **not** cancel a pending report. Show work outcome (yours or a dispatched subagent's: tools, dispatch return, commits, failures) **before** the new topic. First report (user has not seen the outcome): status (DONE | DONE_WITH_CONCERNS | BLOCKED | awaiting user OK), files changed (paths only), evidence, blockers/open questions. Reminder (already shown): 1–3 lines, then answer. If no dispatch happened since the user's last message and nothing awaits their OK — a 1-line "no in-flight tasks", then straight to the answer. Tools/edits in the same turn → the final message must summarize them.
+A new message does **not** cancel a pending report. Show work outcome (yours or a dispatched subagent's: tools, dispatch return, commits, failures) **before** the new topic. First report (user has not seen the outcome) ends with a status block — as a **markdown list**, one item per line (bold items on adjacent lines without blank lines collapse into a single rendered line):
+
+- **Status:** `DONE | DONE_WITH_CONCERNS | BLOCKED | awaiting user OK`
+- **Open questions** or an explicit "OK to mark this done?"
+
+Dropped 2026-09-18 by user decision (same as `~/.zcode/AGENTS.md`): "Files changed" and "Evidence" items. Reminder (already shown): 1–3 lines, then answer. If no dispatch happened since the user's last message and nothing awaits their OK — a 1-line "no in-flight tasks", then straight to the answer. Tools/edits in the same turn → the final message must summarize them.
 
 ### Presenting Problems
 - When presenting a problem/bug to the user (issue triage, brainstorm problem statement, phase reports): always lead with a brief user-scenario description (2-4 sentences, max 5) — who does what in the UI and where it breaks. Attach it before technical details and options. Keep the whole problem statement short.
