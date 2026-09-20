@@ -223,7 +223,22 @@ Then: Cleanup worktree (Step 6), then force-delete branch:
 git branch -D <feature-branch>
 ```
 
-### Step 5.5: Suggest Post-Merge Reflection
+### Step 5.5: Never End a Dispatch in a Waiting State (2026-09-20, memo #227 incident)
+
+If the finishing flow must wait for CI (Step 5's `--watch`) and the dispatch is running out of
+turns/context, **complete the merge in the SAME dispatch** — do not end the turn with
+"CI watch running, waiting for the exit notification". A finished dispatch cannot be woken by
+its own PTY notification: the notification reaches the subagent's session in the DB, but nobody
+re-dispatches it, and the post-merge handoff (@manager board flip) stalls indefinitely
+(observed: PR merged 1 min after green, board flipped 30 min later only after a user prompt).
+
+- If CI is still running when you must yield: return an explicit `WAITING:` report listing the
+  run id + what triggers the next action, so @manager re-dispatches on completion or watches it
+  itself. Never rely on your own future wake-up.
+- @manager-side counterpart: an intermediate "awaiting X" return from any subagent → @manager
+  immediately sets its OWN watch/timer on X (Awaiting-Handoff Rule, `agents/manager.md`).
+
+### Step 5.6: Suggest Post-Merge Reflection
 
 After the PR is created (default flow) or the branch is merged locally (fallback), **suggest to user** running reflection analysis. This is not auto-run — human decides.
 
@@ -332,6 +347,7 @@ After a successful merge, the architect does NOT touch the GH Project board — 
 - Detect environment before the auto-flow
 - Notify before push (one line, fire-and-continue — do NOT wait for a reply)
 - Contact the user ONLY on error (push failure, PR error, red CI, merge error)
+- Complete the merge in the same dispatch — never end a turn while your own watch is supposed to wake you (Step 5.5)
 - Get typed confirmation before the discard fallback
 - Clean up worktree only on the default merge success path and the explicit merge-locally / discard fallbacks
 - `cd` to main repo root before worktree removal
