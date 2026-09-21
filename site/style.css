@@ -257,6 +257,46 @@ a { color: var(--link); }
 .dot-human { background: var(--human); }
 .dot-auto { background: var(--auto); }
 
+/* detail flash */
+.detail.flash { animation: flash-detail 0.8s ease; }
+@keyframes flash-detail {
+  0% { box-shadow: 0 0 0 4px rgba(108, 176, 255, 0.35); }
+  100% { box-shadow: 0 0 0 4px rgba(108, 176, 255, 0); }
+}
+
+/* board */
+.board { margin-top: 64px; }
+.board-title { font-size: 22px; margin-bottom: 10px; }
+.board-sub { color: var(--muted); max-width: 780px; margin-bottom: 24px; }
+.board-chain {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; margin-bottom: 24px;
+}
+.status-chip {
+  font-size: 12.5px; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+  white-space: nowrap;
+}
+.chip-design { color: var(--human); border-color: rgba(245, 181, 68, 0.4); }
+.chip-ready { color: var(--link); border-color: rgba(108, 176, 255, 0.4); }
+.chip-impl { color: var(--auto); border-color: rgba(52, 211, 153, 0.4); }
+.chain-arrow { color: #3d4f66; font-size: 13px; }
+.board-cards {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+}
+.board-card {
+  border: 1px solid var(--border); border-radius: 12px;
+  background: var(--surface); padding: 16px 18px;
+}
+.board-card h4 {
+  font-size: 13.5px; color: #fff; margin-bottom: 8px; letter-spacing: 0.01em;
+}
+.board-card p { font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+.board-watchers {
+  margin-top: 18px; font-size: 14px; color: var(--muted);
+  border-left: 2px solid var(--auto); padding: 4px 0 4px 16px;
+}
+
 /* ============ agents ============ */
 .agent-groups { display: flex; flex-direction: column; gap: 34px; }
 .group-tag {
@@ -334,6 +374,7 @@ a { color: var(--link); }
   .metric:nth-child(3) { border-left: none; }
   .metric:nth-child(n+3) { border-top: 1px solid var(--border); margin-top: 10px; padding-top: 18px; }
   .agent-cards { grid-template-columns: repeat(2, 1fr); }
+  .board-cards { grid-template-columns: 1fr; }
 }
 @media (max-width: 640px) {
   .section { padding: 60px 0; }

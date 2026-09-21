@@ -32,8 +32,9 @@
     <p class="hero-sub">
       Меня зовут Максим Косинов. Я проектирую конвейер разработки, в котором
       LLM-агенты пишут и ревьюят код, а человек принимает решения в контрольных
-      точках. Продукт — платформа для арт-студий: <b>1146 коммитов за четыре месяца</b>,
-      каждая фича — от концепции до мержа — через спеку, план и ревью агентами.
+      точках. Продукт — платформа для арт-студий: <b>1146 коммитов за четыре месяца</b>.
+      Конвейер работает сам: наблюдатели по расписанию разбирают задачи на четырёх
+      машинах, человек подключается там, где решение действительно его.
     </p>
     <div class="hero-actions">
       <a class="btn btn-primary" href="https://github.com/mkosinov/superagents" target="_blank" rel="noopener">Фреймворк на GitHub ↗</a>
@@ -58,7 +59,7 @@
       <span class="metric-label">тест-файла: pytest на бэкенде,<br>vitest и Playwright на фронтенде</span>
     </div>
     <div class="metric">
-      <span class="metric-value mono">12+6</span>
+      <span class="metric-value mono">14+6</span>
       <span class="metric-label">ролей агентов: кодеры и ревьюеры<br>плюс панель ревью спек</span>
     </div>
   </div>
@@ -70,9 +71,10 @@
     <p class="section-kicker mono">// главная история</p>
     <h2>Конвейер: две фазы, семь гейтов</h2>
     <p class="section-sub">
-      Каждая фича проходит два этапа в двух разных средах. <b>DESIGN</b> — интерактивная
-      сессия с человеком: концепция, спека, план. <b>IMPL</b> — автономный контейнер:
-      код, ревью, тесты. Между ними — только git и доска задач.
+      Каждая фича проходит два этапа в двух разных средах. <b>DESIGN</b> — спека и план:
+      наблюдатель по расписанию ведёт карточку сам и останавливается только там,
+      где решение действительно за человеком. <b>IMPL</b> — автономный контейнер:
+      код, ревью, тесты. Между фазами — только git и доска проекта.
       <span class="hint">Нажмите на гейт, чтобы увидеть детали.</span>
     </p>
 
@@ -83,25 +85,25 @@
         <div class="phase-head">
           <span class="phase-tag mono">ФАЗА 1</span>
           <h3>DESIGN</h3>
-          <p class="phase-meta">интерактивная сессия на хосте · решения принимает человек</p>
+          <p class="phase-meta">наблюдатель на хосте, цикл каждые 2 часа · стоп — только на развилках и подтверждениях</p>
         </div>
         <div class="gates">
-          <button class="gate" data-gate="g1a" type="button">
-            <span class="gate-badge mono human">G1a</span>
+          <button class="gate" data-gate="ga" type="button">
+            <span class="gate-badge mono auto">A</span>
             <span class="gate-title">Концепция</span>
-            <span class="gate-who human-who">решает человек</span>
+            <span class="gate-who auto-who">авто · при развилке — человек</span>
           </button>
           <div class="gate-arrow" aria-hidden="true">↓</div>
-          <button class="gate" data-gate="g1b" type="button">
-            <span class="gate-badge mono human">G1b</span>
+          <button class="gate" data-gate="gb" type="button">
+            <span class="gate-badge mono human">B</span>
             <span class="gate-title">Спека + панель 6 агентов</span>
-            <span class="gate-who human-who">решает человек</span>
+            <span class="gate-who human-who">обязательный стоп человека</span>
           </button>
           <div class="gate-arrow" aria-hidden="true">↓</div>
-          <button class="gate" data-gate="g2" type="button">
-            <span class="gate-badge mono human">G2</span>
+          <button class="gate" data-gate="gc" type="button">
+            <span class="gate-badge mono auto">C</span>
             <span class="gate-title">План + сверка со спекой</span>
-            <span class="gate-who human-who">решает человек</span>
+            <span class="gate-who auto-who">авто · стоп при изменении спеки</span>
           </button>
         </div>
       </div>
@@ -111,7 +113,7 @@
         <div class="seam-line" aria-hidden="true"></div>
         <div class="seam-label">
           <span class="mono">шов</span>
-          <p>спека и план пушатся в <span class="mono">main</span>, карточка на доске → «продолжаем траекторию #NNN»</p>
+          <p>спека и план пушатся в <span class="mono">main</span>, карточка → Ready to IMPL; её подбирает IMPL-наблюдатель или она запускается фразой «продолжаем траекторию #NNN»</p>
         </div>
         <div class="seam-line" aria-hidden="true"></div>
       </div>
@@ -175,8 +177,54 @@
     </div>
 
     <div class="legend">
-      <span class="legend-item"><span class="dot dot-human"></span>решает человек — конвейер встаёт и ждёт</span>
-      <span class="legend-item"><span class="dot dot-auto"></span>проходит автоматически — без человека</span>
+      <span class="legend-item"><span class="dot dot-human"></span>обязательный стоп — конвейер встаёт и ждёт человека</span>
+      <span class="legend-item"><span class="dot dot-auto"></span>авто — стоп только при проблеме</span>
+    </div>
+
+    <!-- board -->
+    <div class="board">
+      <h3 class="board-title">Доска проекта — живой прогресс</h3>
+      <p class="board-sub">
+        GitHub Project — единый источник правды о траектории. Статус карточки
+        меняется ровно в момент гейта, никогда «по ощущению». Открыв доску,
+        я вижу весь проект: что в работе, что ждёт моего решения, на какой машине.
+      </p>
+      <div class="board-chain">
+        <span class="status-chip mono">Backlog</span>
+        <span class="chain-arrow">→</span>
+        <span class="status-chip mono chip-design">In Design</span>
+        <span class="chain-arrow">→</span>
+        <span class="status-chip mono chip-ready">Ready to IMPL</span>
+        <span class="chain-arrow">→</span>
+        <span class="status-chip mono chip-impl">In IMPL</span>
+        <span class="chain-arrow">→</span>
+        <span class="status-chip mono chip-impl">PR (G7)</span>
+        <span class="chain-arrow">→</span>
+        <span class="status-chip mono">In-main</span>
+        <span class="chain-arrow">→</span>
+        <span class="status-chip mono">deployed</span>
+      </div>
+      <div class="board-cards">
+        <article class="board-card">
+          <h4 class="mono">gate: concept / spec / plan / blocked</h4>
+          <p>Метка на карточке: «ждём решения человека». Пустая метка — агенты работают, никого не ждут. Ответ человека стирает метку — конвейер едет дальше.</p>
+        </article>
+        <article class="board-card">
+          <h4 class="mono">host: imac / macbook / hk / gcp</h4>
+          <p>Какая машина ведёт карточку. Бюджет слотов на машину (imac — 2, macbook — 1); карточка на CI слот не занимает. Захват карточки — гонка, разруливается этим же полем.</p>
+        </article>
+        <article class="board-card">
+          <h4 class="mono">Next Up 1–3</h4>
+          <p>Явная очередь человека: что брать следующим. Когда первое в очереди смержено — очередь сдвигается сама, без ручного перекладывания.</p>
+        </article>
+      </div>
+      <p class="board-watchers">
+        Обе фазы оживляются наблюдателями по расписанию: DESIGN-наблюдатель каждые
+        два часа берёт свободную карточку из Backlog, сверяет её с реальностью
+        кода (устаревшие закрываются с доказательствами) и ведёт до первого
+        стопа; IMPL-наблюдатель в контейнере подбирает готовые планы по свободным
+        слотам своей машины. Человек заходит на доску — и видит картину целиком.
+      </p>
     </div>
   </div>
 </section>
@@ -185,13 +233,27 @@
 <section class="section section-alt" id="agents">
   <div class="container">
     <p class="section-kicker mono">// исполнители</p>
-    <h2>Двенадцать ролей и панель ревью</h2>
+    <h2>Четырнадцать ролей и панель ревью</h2>
     <p class="section-sub">
       Агенты — не «один чат с умной моделью», а разделение ролей с правами доступа.
       Контроллер не пишет код, ревьюеры не правят код, дорогие модели заняты только
       решениями, дешёвые — прогонами.
     </p>
     <div class="agent-groups">
+
+      <div class="agent-group">
+        <h3 class="group-tag auto-who">наблюдатели по расписанию</h3>
+        <div class="agent-cards">
+          <article class="agent-card">
+            <h4 class="mono">auto-design</h4>
+            <p>Сессия на хосте, цикл каждые 2 часа: берёт свободную карточку из Backlog, сверяет с кодом и ведёт DESIGN до первого стопа — или до готового плана.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">auto-impl</h4>
+            <p>Скрипт в контейнере: подбирает карточки Ready to IMPL по свободным слотам своей машины и запускает IMPL-конвейер без человека.</p>
+          </article>
+        </div>
+      </div>
 
       <div class="agent-group">
         <h3 class="group-tag human-who">контроллеры</h3>
@@ -317,7 +379,7 @@
       <div class="principle">
         <span class="principle-num mono">06</span>
         <h3>Решения живут в артефактах</h3>
-        <p>Все правки ревью вносятся в текст спеки и плана, а не остаются в чате. Git и доска не переносят контекст сессий — переносят только файлы.</p>
+        <p>Все правки ревью вносятся в текст спеки и плана, а не остаются в чате. Состояние проекта живёт в git и на доске: любая новая сессия — хоть человек, хоть наблюдатель — продолжает с того же места.</p>
       </div>
       <div class="principle">
         <span class="principle-num mono">07</span>
