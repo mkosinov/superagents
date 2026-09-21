@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gh_board.py — GH Project #3 (Memo Project) board management.
+"""gh_board.py — GH Project #4 (Superagents) board management.
 
 Usage (from repo root):
   python3 .zcode/scripts/gh_board.py next-up                     — show the trajectory (Next Up 1→3)
@@ -11,7 +11,7 @@ Usage (from repo root):
   python3 .zcode/scripts/gh_board.py merged N PR ["short title"] — append the "Recently merged" line (scratchpad v2)
   python3 .zcode/scripts/gh_board.py issue N                      — standard issue view: state, labels, body
 
-Project constants are hardcoded (IDs are stable for Project #3).
+Project constants are hardcoded (IDs are stable for Project #4).
 The script is part of the host/container seam and travels via git.
 Identical copies ship in BOTH harness folders — .zcode/scripts/ (host)
 and .opencode/scripts/ (container); when editing, change both (or edit
@@ -29,10 +29,10 @@ MERGED_MAX = 5
 
 # Configure per project. Get IDs via:
 #   gh api graphql -f query='query { user(login: "<owner>") { projectV2(number: <N>) { id fields(first: 30) { nodes { ... on ProjectV2SingleSelectField { name id options { id name } } } } } } }'
-PROJECT_ID = "PVT_kwHOA-0Z984BXl3Z"
+PROJECT_ID = "PVT_kwHOA-0Z984BkOSk"
 OWNER = "mkosinov"
-REPO = "memo"
-PROJECT_NUM = 3
+REPO = "superagents"
+PROJECT_NUM = 4
 
 NEXT_UP_FIELD = "PVTSSF_lAHOA-0Z984BXl3ZzhZEGRs"
 NEXT_UP_OPTS = {"1": "ad936c13", "2": "8167d82e", "3": "ece04007"}
