@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Максим Косинов — AI-инженер · агентный конвейер разработки</title>
+  <meta name="description" content="Портфолио AI-инженера: конвейер разработки, в котором LLM-агенты пишут и ревьюят код под контролем человека. Семь гейтов качества от идеи до продакшена.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <span class="logo">MC<span class="logo-dot">·</span>pipeline</span>
+    <nav class="topnav">
+      <a href="#pipeline">Конвейер</a>
+      <a href="#agents">Агенты</a>
+      <a href="#principles">Принципы</a>
+      <a href="#projects">Проекты</a>
+      <a href="#contacts" class="nav-cta">Контакты</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="container">
+    <p class="hero-kicker mono">// AI-инженер · агентные циклы разработки</p>
+    <h1>Код пишут агенты.<br>Качество держат гейты.</h1>
+    <p class="hero-sub">
+      Меня зовут Максим Косинов. Я проектирую конвейер разработки, в котором
+      LLM-агенты пишут и ревьюят код, а человек принимает решения в контрольных
+      точках. Продукт — платформа для арт-студий: <b>1146 коммитов за четыре месяца</b>,
+      каждая фича — от концепции до мержа — через спеку, план и ревью агентами.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://github.com/mkosinov/superagents" target="_blank" rel="noopener">Фреймворк на GitHub ↗</a>
+      <a class="btn" href="#pipeline">Как устроен конвейер ↓</a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ METRICS ============ -->
+<section class="metrics">
+  <div class="container metrics-grid">
+    <div class="metric">
+      <span class="metric-value mono">1146</span>
+      <span class="metric-label">коммитов в продукте<br>за 4 месяца работы</span>
+    </div>
+    <div class="metric">
+      <span class="metric-value mono">122</span>
+      <span class="metric-label">спеки — каждая прошла<br>панель из 6 ревьюеров-агентов</span>
+    </div>
+    <div class="metric">
+      <span class="metric-value mono">344</span>
+      <span class="metric-label">тест-файла: pytest на бэкенде,<br>vitest и Playwright на фронтенде</span>
+    </div>
+    <div class="metric">
+      <span class="metric-value mono">12+6</span>
+      <span class="metric-label">ролей агентов: кодеры и ревьюеры<br>плюс панель ревью спек</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PIPELINE ============ -->
+<section class="section" id="pipeline">
+  <div class="container">
+    <p class="section-kicker mono">// главная история</p>
+    <h2>Конвейер: две фазы, семь гейтов</h2>
+    <p class="section-sub">
+      Каждая фича проходит два этапа в двух разных средах. <b>DESIGN</b> — интерактивная
+      сессия с человеком: концепция, спека, план. <b>IMPL</b> — автономный контейнер:
+      код, ревью, тесты. Между ними — только git и доска задач.
+      <span class="hint">Нажмите на гейт, чтобы увидеть детали.</span>
+    </p>
+
+    <div class="diagram">
+
+      <!-- DESIGN phase -->
+      <div class="phase phase-design">
+        <div class="phase-head">
+          <span class="phase-tag mono">ФАЗА 1</span>
+          <h3>DESIGN</h3>
+          <p class="phase-meta">интерактивная сессия на хосте · решения принимает человек</p>
+        </div>
+        <div class="gates">
+          <button class="gate" data-gate="g1a" type="button">
+            <span class="gate-badge mono human">G1a</span>
+            <span class="gate-title">Концепция</span>
+            <span class="gate-who human-who">решает человек</span>
+          </button>
+          <div class="gate-arrow" aria-hidden="true">↓</div>
+          <button class="gate" data-gate="g1b" type="button">
+            <span class="gate-badge mono human">G1b</span>
+            <span class="gate-title">Спека + панель 6 агентов</span>
+            <span class="gate-who human-who">решает человек</span>
+          </button>
+          <div class="gate-arrow" aria-hidden="true">↓</div>
+          <button class="gate" data-gate="g2" type="button">
+            <span class="gate-badge mono human">G2</span>
+            <span class="gate-title">План + сверка со спекой</span>
+            <span class="gate-who human-who">решает человек</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- SEAM -->
+      <div class="seam">
+        <div class="seam-line" aria-hidden="true"></div>
+        <div class="seam-label">
+          <span class="mono">шов</span>
+          <p>спека и план пушатся в <span class="mono">main</span>, карточка на доске → «продолжаем траекторию #NNN»</p>
+        </div>
+        <div class="seam-line" aria-hidden="true"></div>
+      </div>
+
+      <!-- IMPL phase -->
+      <div class="phase phase-impl">
+        <div class="phase-head">
+          <span class="phase-tag mono">ФАЗА 2</span>
+          <h3>IMPL</h3>
+          <p class="phase-meta">автономно в Docker-контейнере · человек только на финале</p>
+        </div>
+        <div class="gates">
+          <button class="gate" data-gate="g3" type="button">
+            <span class="gate-badge mono auto">G3</span>
+            <span class="gate-title">Worktree, зелёный baseline</span>
+            <span class="gate-who auto-who">автоматически</span>
+          </button>
+          <div class="gate-arrow" aria-hidden="true">↓</div>
+          <button class="gate" data-gate="g46" type="button">
+            <span class="gate-badge mono auto">G4–G6</span>
+            <span class="gate-title">Код по TDD + двухступенчатое ревью</span>
+            <span class="gate-who auto-who">автоматически</span>
+          </button>
+          <div class="gate-arrow" aria-hidden="true">↓</div>
+          <button class="gate" data-gate="g45" type="button">
+            <span class="gate-badge mono auto">G4.5</span>
+            <span class="gate-title">Визуальный гейт: скриншоты + DOM</span>
+            <span class="gate-who auto-who">автоматически</span>
+          </button>
+          <div class="gate-arrow" aria-hidden="true">↓</div>
+          <button class="gate" data-gate="docs" type="button">
+            <span class="gate-badge mono auto">docs</span>
+            <span class="gate-title">Документация в ветке фичи</span>
+            <span class="gate-who auto-who">автоматически</span>
+          </button>
+          <div class="gate-arrow" aria-hidden="true">↓</div>
+          <button class="gate" data-gate="g7" type="button">
+            <span class="gate-badge mono human">G7</span>
+            <span class="gate-title">Финал: merge / PR / откат</span>
+            <span class="gate-who human-who">решает человек</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- return path -->
+    <p class="return-path">
+      <span class="mono">↩ возврат:</span>
+      если в IMPL выясняется, что ошибочна сама спека или план — карточка возвращается
+      в DESIGN с комментарием к issue. Новая сессия начинает с этого гейта, а не с нуля.
+    </p>
+
+    <!-- detail panel -->
+    <div class="detail" id="gate-detail" aria-live="polite">
+      <div class="detail-badge mono" id="detail-badge">G1b</div>
+      <div class="detail-body">
+        <h3 id="detail-title"></h3>
+        <p id="detail-text"></p>
+        <div class="detail-facts mono" id="detail-facts"></div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span class="legend-item"><span class="dot dot-human"></span>решает человек — конвейер встаёт и ждёт</span>
+      <span class="legend-item"><span class="dot dot-auto"></span>проходит автоматически — без человека</span>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AGENTS ============ -->
+<section class="section section-alt" id="agents">
+  <div class="container">
+    <p class="section-kicker mono">// исполнители</p>
+    <h2>Двенадцать ролей и панель ревью</h2>
+    <p class="section-sub">
+      Агенты — не «один чат с умной моделью», а разделение ролей с правами доступа.
+      Контроллер не пишет код, ревьюеры не правят код, дорогие модели заняты только
+      решениями, дешёвые — прогонами.
+    </p>
+    <div class="agent-groups">
+
+      <div class="agent-group">
+        <h3 class="group-tag human-who">контроллеры</h3>
+        <div class="agent-cards">
+          <article class="agent-card">
+            <h4 class="mono">@manager</h4>
+            <p>Единая точка входа в контейнере: держит гейты, доску задач и scratchpad. Только он говорит с пользователем.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@architect</h4>
+            <p>Исполнитель фазы: декомпозирует план и раздаёт задачи. Никогда не пишет код и не общается с пользователем — иначе перестаёт быть контроллером.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="agent-group">
+        <h3 class="group-tag auto-who">исполнители</h3>
+        <div class="agent-cards">
+          <article class="agent-card">
+            <h4 class="mono">@frontend-coder</h4>
+            <p>Next.js и UI-код, строго по TDD: красный тест → реализация → рефакторинг.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@backend-coder</h4>
+            <p>FastAPI: сервисы, репозитории, миграции. Тот же дисциплина TDD.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@debugger</h4>
+            <p>Расследователь: ищет корневую причину, когда задача не идёт.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@tester</h4>
+            <p>Дешёвая модель: готовит окружение и гоняет полные наборы тестов.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@docser</h4>
+            <p>Пишет документацию фичи: PLAN.md, CHANGELOG.md — в ветку, до мержа.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">скаут</h4>
+            <p>Разведка до старта: read-only проход по коду, компактная сводка фактов, каждое утверждение — со ссылкой на файл и строку.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="agent-group">
+        <h3 class="group-tag human-who">ревьюеры</h3>
+        <div class="agent-cards">
+          <article class="agent-card">
+            <h4 class="mono">@code-compliance-reviewer</h4>
+            <p>Ступень 1: код соответствует утверждённому плану.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@code-quality-reviewer</h4>
+            <p>Ступень 2: чистота кода и зелёные тесты; для UI — полный визуальный набор.</p>
+          </article>
+          <article class="agent-card">
+            <h4 class="mono">@plan-reviewer</h4>
+            <p>Сверяет план со спекой до того, как план вообще начнут исполнять.</p>
+          </article>
+        </div>
+      </div>
+
+      <div class="agent-group">
+        <h3 class="group-tag auto-who">панель ревью спек · 6 параллельно</h3>
+        <div class="agent-cards">
+          <article class="agent-card panel-card">
+            <h4 class="mono">completeness</h4><p>ничего не забыто</p>
+          </article>
+          <article class="agent-card panel-card">
+            <h4 class="mono">consistency</h4><p>без противоречий</p>
+          </article>
+          <article class="agent-card panel-card">
+            <h4 class="mono">feasibility</h4><p>осуществимо в этом коде</p>
+          </article>
+          <article class="agent-card panel-card">
+            <h4 class="mono">simplicity</h4><p>без лишней сложности</p>
+          </article>
+          <article class="agent-card panel-card">
+            <h4 class="mono">best-practices</h4><p>проверяет по вебу</p>
+          </article>
+          <article class="agent-card panel-card">
+            <h4 class="mono">security</h4><p>без дыр</p>
+          </article>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ============ PRINCIPLES ============ -->
+<section class="section" id="principles">
+  <div class="container">
+    <p class="section-kicker mono">// почему это работает</p>
+    <h2>Принципы, которые держат качество</h2>
+    <div class="principles-grid">
+      <div class="principle">
+        <span class="principle-num mono">01</span>
+        <h3>Контроллер никогда не пишет код</h3>
+        <p>Архитектор раздаёт задачи и читает diffs. Как только контроллер начинает реализовывать сам, некому держать план.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">02</span>
+        <h3>Одна задача за раз</h3>
+        <p>Исполнители работают строго последовательно. Параллельный диспатч агентов в одном worktree — источник конфликтов, который дороже ускорения.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">03</span>
+        <h3>Двухступенчатое ревью</h3>
+        <p>Соответствие плану — отдельно, качество кода и тесты — отдельно. Одна ступень без другой пропускает либо drift, либо хрупкость.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">04</span>
+        <h3>Предохранитель: три цикла</h3>
+        <p>Максимум три итерации «ревью → правки» на каждого ревьюера. Дальше — стоп и эскалация человеку, а не бесконечная возня.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">05</span>
+        <h3>Diff передаётся файлом</h3>
+        <p>Ревьюер получает путь к patch-файлу, а не текст diff'а в промпте. Архитектор видит только статистику. Экономия ~30–40% токенов на ревью.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">06</span>
+        <h3>Решения живут в артефактах</h3>
+        <p>Все правки ревью вносятся в текст спеки и плана, а не остаются в чате. Git и доска не переносят контекст сессий — переносят только файлы.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">07</span>
+        <h3>Дешёвое — дешёвым</h3>
+        <p>Разведка, прогоны тестов, env — на младших моделях. Дорогая модель в главном окне занимается только решениями. Маршрутизация моделей — через собственный локальный шлюз.</p>
+      </div>
+      <div class="principle">
+        <span class="principle-num mono">08</span>
+        <h3>Возврат — это нормально</h3>
+        <p>Если код вскрыл ошибку спеки — траектория честно возвращается на гейт дизайна с комментарием, вместо того чтобы агенты «дожимали» неверный план.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ PROJECTS ============ -->
+<section class="section section-alt" id="projects">
+  <div class="container">
+    <p class="section-kicker mono">// код открыт</p>
+    <h2>Два репозитория</h2>
+    <div class="projects-grid">
+      <article class="project-card">
+        <div class="project-head">
+          <h3 class="mono">superagents</h3>
+          <span class="project-type">фреймворк</span>
+        </div>
+        <p>
+          Сам конвейер: определение агентов, скиллы, скрипты для worktree и доски,
+          человеческая документация обеих фаз. Прорастал из реального продукта —
+          каждое правило здесь когда-то было болью.
+        </p>
+        <a class="btn btn-small" href="https://github.com/mkosinov/superagents" target="_blank" rel="noopener">github.com/mkosinov/superagents ↗</a>
+      </article>
+      <article class="project-card">
+        <div class="project-head">
+          <h3 class="mono">memo</h3>
+          <span class="project-type">продукт</span>
+        </div>
+        <p>
+          Платформа управления арт-студиями: расписание, записи, клиенты, материалы.
+          FastAPI с clean architecture, монорепо Turborepo c Next.js-приложениями.
+          Живёт в продакшене, разрабатывается этим конвейером.
+        </p>
+        <a class="btn btn-small" href="https://github.com/mkosinov/memo" target="_blank" rel="noopener">github.com/mkosinov/memo ↗</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ============ CONTACTS ============ -->
+<section class="section" id="contacts">
+  <div class="container contacts-inner">
+    <p class="section-kicker mono">// связь</p>
+    <h2>Поговорим про агентов в вашей команде</h2>
+    <p class="section-sub">
+      Могу рассказать, как внедрить такой конвейер под ваш стек, — или прийти
+      и сделать это руками.
+    </p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="mailto:mkosinov@mail.ru">mkosinov@mail.ru</a>
+      <a class="btn" href="https://github.com/mkosinov" target="_blank" rel="noopener">GitHub ↗</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span>© 2026 Максим Косинов</span>
+    <span class="mono">код сайта — HTML/CSS/JS без сборки, как и положено</span>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
