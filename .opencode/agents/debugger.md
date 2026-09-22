@@ -1,7 +1,7 @@
 ---
 description: Bug localization and root cause analysis. Investigates issues in frontend (Next.js) and backend (FastAPI).
 mode: subagent
-model: omniroute/coder
+model: omniroute/flash
 temperature: 0.2
 permission:
   task:
