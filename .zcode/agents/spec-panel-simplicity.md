@@ -3,6 +3,7 @@ name: spec-panel-simplicity
 description: Spec panel reviewer — simplicity/YAGNI perspective. Finds overengineering, unrequested scope, and needless complexity in spec documents.
 tools: [Read, Bash]
 model: omniroute/panel-simplicity
+thoughtLevel: enabled
 ---
 
 <!-- Host port of superagents/.opencode/agents/spec-panel-simplicity.md (2026-09-05; renamed from spec-review-simplicity 2026-09-06). The superagents repo is canonical — re-port on change. -->

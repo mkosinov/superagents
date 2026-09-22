@@ -3,6 +3,7 @@ name: spec-panel-feasibility
 description: Spec panel reviewer — feasibility perspective. Finds technical risks, hidden complexity, and unrealistic assumptions in spec documents.
 tools: [Read, Bash]
 model: omniroute/panel-feasibility
+thoughtLevel: enabled
 ---
 
 <!-- Host port of superagents/.opencode/agents/spec-panel-feasibility.md (2026-09-05; renamed from spec-review-feasibility 2026-09-06). The superagents repo is canonical — re-port on change. -->

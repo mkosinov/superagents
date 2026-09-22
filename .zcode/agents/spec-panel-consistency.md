@@ -3,6 +3,7 @@ name: spec-panel-consistency
 description: Spec panel reviewer — consistency perspective. Finds contradictions within the spec and conflicts with existing code, domain rules, and conventions.
 tools: [Read, Bash]
 model: omniroute/panel-consistency
+thoughtLevel: enabled
 ---
 
 <!-- Host port of superagents/.opencode/agents/spec-panel-consistency.md (2026-09-05; renamed from spec-review-consistency 2026-09-06). The superagents repo is canonical — re-port on change. -->
