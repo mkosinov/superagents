@@ -1,7 +1,7 @@
 ---
 description: Test environment specialist. Prepares the dev/test environment (servers, ports, DB seed, health) and runs test suites. Reports compact pass/fail results only.
 mode: subagent
-model: omniroute/opencode-go/deepseek-v4-flash
+model: omniroute/flash
 variant: max
 temperature: 0.2
 permission:

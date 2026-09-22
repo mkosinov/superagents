@@ -1,7 +1,7 @@
 ---
 description: Phase executor. Runs DESIGN (spec+plan+review+worktree) or IMPL (dev-loop, docs, finishing) phases dispatched by @manager. Never talks to the user directly.
 mode: all
-model: omniroute/zai/glm-5.3
+model: omniroute/architect
 variant: max
 temperature: 0.2
 permission:
