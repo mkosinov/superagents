@@ -1,7 +1,7 @@
 # Board Bootstrap: roll out a project from the etalon — Design (issue #24)
 
 **Date:** 2026-09-21
-**Status:** G1a approved (concept, 2026-09-22); G1b panel reviewed 2026-09-22 (6/6: 5 NEEDS_REVISION, 1 SOUND), all fixes folded — G1b approved 2026-09-22
+**Status:** G1a approved (concept, 2026-09-22); G1b panel reviewed 2026-09-22 (6/6: 5 NEEDS_REVISION, 1 SOUND), all fixes folded — G1b approved 2026-09-22; plan G2 approved 2026-09-22 (docs/plans/2026-09-22-board-bootstrap-plan.md)
 **Author:** host design session (brainstorming with user)
 
 **Placement:** superagents is the tooling canon. The script ships in BOTH harness folders (`.zcode/scripts/` + `.opencode/scripts/`, identical twins per the gh_board.py header convention) and travels to consumer repos with the harness copy step. The etalon doc lives in `docs/board/board-etalon.md`; the generated config lives in `docs/board/board_config.json` (both resolved from the repo root derived from the script's own path — the same `parents[2]` convention `gh_board.py` uses, so both twins read and write the same files).
@@ -101,10 +101,11 @@ Option ids are **not** stored: they are project-specific and must be read from `
 
 ### Interface
 
-    board_bootstrap.py init  --repo <owner/name> --title <project title> [--owner <login>] [--etalon <path>] [--dry-run]
-    board_bootstrap.py adopt <project-number> --repo <owner/name> [--owner <login>] [--etalon <path>] [--force] [--dry-run]
+    board_bootstrap.py init  --repo <owner/name> --title <project title> [--owner <login>] [--etalon <path>] [--out <path>] [--dry-run]
+    board_bootstrap.py adopt <project-number> --repo <owner/name> [--owner <login>] [--etalon <path>] [--out <path>] [--force] [--dry-run]
 
 - `--owner <login>` — the project owner's explicit login; defaults to the `--repo` owner. Never `@me` (it fails with "different owner", rollout-log quirk).
+- `--out <path>` — where to write the config; defaults to `docs/board/board_config.json` under the script's own repo root. Cross-repo adoption uses it explicitly (e.g. writing memo's mapping from the canon checkout: `--out <memo-checkout>/docs/board/board_config.json`). Guards check the **effective** config path.
 - `--dry-run` — **zero network calls**: parse the etalon, validate arguments and local pre-flight, print the plan tree. Where live data would be read (issue list, project fields), the plan says "read at run time". Unit tests drive the comparison/seeding planners on fixture data instead.
 - `--force` (adopt only) — deliberate overwrite of an existing `board_config.json`.
 - Item ids during seeding come from gh's JSON output (`item-add --format json`), never from parsed text.
@@ -133,7 +134,7 @@ Rules enforced in both modes: **etalon parsed and validated before any network c
 ### Guard (damage prevention)
 
 - `init` refuses if `board_config.json` already exists at the canonical path (`docs/board/board_config.json`). Damage described in the refusal: a second run creates a **duplicate project**, re-seeds the issues as **duplicate cards**, and **overwrites the config** — the previously rolled-out board loses its config and goes unwatched. One canonical path means running either twin hits the same guard.
-- `init` refuses if the repo is already linked to ANY open project (one GraphQL read of the repo's projects; simpler and stricter than the earlier "has items or custom fields" wording, which missed a freshly created empty board — exactly the duplicate case).
+- `init` refuses if the repo is already linked to ANY open project. Implemented as one read pass over the owner's open projects (a repo-side "my projects" connection is not guaranteed in the GraphQL schema — the exact connection field is confirmed by schema introspection at implementation, with a documented downgrade: no connection field found → the guard degrades to the config check plus the title-collision warning, recorded in the PR). Simpler and stricter than the earlier "has items or custom fields" wording, which missed a freshly created empty board — exactly the duplicate case. All list reads carry explicit limits (no 30-row defaults).
 - Title collision with an existing open project of the same owner → warning (GitHub allows duplicate titles), naming both.
 - Every refusal names what was found and exactly what would have been broken.
 
