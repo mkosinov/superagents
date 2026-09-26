@@ -1,7 +1,7 @@
 # Token Analytics: per-issue token & duration spend — Design (issue #26)
 
 **Date:** 2026-09-26
-**Status:** G1a approved 2026-09-26 (concept, incl. durations scope extension and board write-back); G1b panel reviewed 2026-09-26 (6/6 reports: 1 NEEDS_REVISION, 5 SOUND_WITH_CONCERNS, no blockers), all findings folded + two user decisions taken the same day (full rebuild per run instead of incremental watermarks; per-project board config) — G1b approved 2026-09-26
+**Status:** G1a approved 2026-09-26 (concept, incl. durations scope extension and board write-back); G1b panel reviewed 2026-09-26 (6/6 reports: 1 NEEDS_REVISION, 5 SOUND_WITH_CONCERNS, no blockers), all findings folded + two user decisions taken the same day (full rebuild per run instead of incremental watermarks; per-project board config) — G1b approved 2026-09-26; plan G2 approved 2026-09-26 (docs/plans/2026-09-26-token-analytics-plan.md); amended post-G2 same day (user OK): managed field creation + name binding — Design revision 3
 **Author:** host design session (brainstorm 2026-09-26 + recon 2026-09-26 + panel 2026-09-26)
 
 **Placement:** a new `token-analytics/` directory at the superagents repo root. This is a host-side personal tool, not an agent-harness artifact — the `.zcode`/`.opencode` twins convention does **not** apply to it. Personal metrics (`token-analytics/data/`) never land in git (`.gitignore` addition is part of this scope). The memo port is a separate follow-up after обкатка (usual reuse-check pipeline).
@@ -10,13 +10,14 @@
 
 ## Summary
 
-An app that answers «where do my tokens go» per feature. A **collector** (Python stdlib, runs on the host) reads two session databases — the zcode host DB (DESIGN sessions) and the opencode container DB (IMPL sessions) — maps sessions to issue numbers, aggregates tokens and active model time per issue/phase/gate/task, and writes per-issue **JSON snapshots** into a gitignored `data/` dir. Every run re-reads both DBs in full and rebuilds all snapshots (a full read is seconds; see Design revision 1). A **static viewer** (`collect serve`, localhost:8765, vanilla JS, no chart libs, no build step) renders: issue list per project → issue page with phase split, by-model and by-agent charts, drill-down into design gates and IMPL tasks. A **board write-back** pushes 6 numeric fields per issue (tokens total/design/impl + hours total/design/impl) to **that project's own board** (superagents #4; memo #3, disabled until its fields exist) via the managed `gh project item-edit` command only.
+An app that answers «where do my tokens go» per feature. A **collector** (Python stdlib, runs on the host) reads two session databases — the zcode host DB (DESIGN sessions) and the opencode container DB (IMPL sessions) — maps sessions to issue numbers, aggregates tokens and active model time per issue/phase/gate/task, and writes per-issue **JSON snapshots** into a gitignored `data/` dir. Every run re-reads both DBs in full and rebuilds all snapshots (a full read is seconds; see Design revision 1). A **static viewer** (`collect serve`, localhost:8765, vanilla JS, no chart libs, no build step) renders: issue list per project → issue page with phase split, by-model and by-agent charts, drill-down into design gates and IMPL tasks. A **board write-back** pushes 6 numeric fields per issue (tokens total/design/impl + hours total/design/impl) to **that project's own board** (superagents #4; memo #3, disabled until enabled) via managed gh CLI commands only — `item-edit` for values, one-time field creation by the `fields` subcommand (Design revision 3).
 
 Approach A (JSON snapshots + static site) — chosen at G1a over B (server + its own analytics DB) and C (self-contained HTML).
 
 **Design revisions (post-panel, user decisions 2026-09-26):**
 1. **Full rebuild per run replaces incremental watermarks.** The panel verified a hole in the watermark scheme — 886 of 927 host sessions finish turns AFTER their `session.time_updated` advances (lag up to 9 s), so a `time_updated`-keyed increment permanently misses final turns. A full re-read of both DBs takes seconds (verified), so the incremental machinery (watermarks, `--full`, affected-issue logic) is removed entirely; the G1a-approved periodicity (cron ~15 min) is unchanged. Side benefits: deleted sessions and hand-removed overrides heal on the next run by construction.
 2. **Per-project board config.** The G1a phrase «6 numeric fields per project» is now structural: each project in the config carries its own `board` + `write_back` block. Memo write-back ships disabled (`enabled: false`) until the user creates its 6 fields by hand on board #3 — enabling is a config edit, no code.
+3. **Managed field creation + name binding (post-G2 amendment, user OK 2026-09-26).** Replaces the G1a decision «fields created once, manually, in the web UI; config ships an empty fields map» with: a `fields` subcommand creates missing NUMBER fields via the managed `gh project field-create`, and the config binds by field NAME with the 6 canonical lines shipped from day one — no user-side chore. Rationale: the 2026-09-09 wipe came from a single-select **option-list replacement** mutation; `field-create` only ADDS a new field and replaces nothing (a NUMBER field has no option list at all), so the dangerous path does not exist for it. Memo enabling = config flip + one `fields` run.
 
 ## Goals
 
@@ -139,7 +140,8 @@ Per issue (and per phase): host — from `model_usage` (per-call `model_id`/`age
 
 - `collect` — **full rebuild** of both sources, then write-back (for projects with it enabled). Cron example (README): `*/15 * * * * cd <repo>/token-analytics && python3 collect.py collect >> data/collect.log 2>&1` — cadence 15–30 min is the user's cron choice; no in-tool scheduler. A second run finding the lock held → log «skipped: previous run still active», exit 0.
 - Bind-triggered rebuild — the server runs the same full rebuild in-process after appending an override (seconds; under the same lock).
-- `writeback` — standalone: re-push from existing snapshots WITHOUT a rebuild (manual re-push, e.g. right after creating a new board field). Write-back also runs at the end of every rebuild.
+- `fields` — create/validate the 6 NUMBER fields on each enabled project's board (idempotent; safe to run anytime; see Board write-back).
+- `writeback` — standalone: re-push from existing snapshots WITHOUT a rebuild (manual re-push). Write-back also runs at the end of every rebuild.
 
 ### Viewer (`collect serve`, `server.py`)
 
@@ -154,8 +156,8 @@ Per issue (and per phase): host — from `model_usage` (per-call `model_id`/`age
 
 ### Board write-back (`writeback.py`)
 
-- **Fields**: 6 numeric fields **on each project's own board** (superagents → project #4; memo → project #3) — tokens total / design / IMPL, hours total / design / impl. Created **once, manually, in the web UI** by the user (number fields named freely, e.g. «Tokens total»); the config binds by field id. Memo ships `enabled: false` until its fields exist (Design revision 2).
-- **Command**: managed CLI only — `gh project item-edit --id <item> --field-id <field> --project-id <project> --number <value>`, one item+field per call. **Never** raw GraphQL mutations and **never** field-definition mutations (`updateProjectV2Field`) — the 2026-09-09 wipe ban stands untouched (that ban concerns raw field mutations; `item-edit` is not one). What this tool DOES take is a recorded exception to the single-writer rule «all board writes go through `gh_board.py`»: `writeback.py` is a deliberate second writer via the managed CLI, approved at G1a close (issue #23's skill rewrite should mention it — see Relation).
+- **Fields**: 6 numeric fields **on each project's own board** (superagents → project #4; memo → project #3) — tokens total / design / IMPL, hours total / design / impl, canonical names as in the config. Created by the **`fields` subcommand** (Design revision 3): per enabled project, missing fields are created via the managed `gh project field-create --data-type NUMBER` (one call per field, idempotent); an existing name with a non-NUMBER type stops loudly naming the field, changing nothing. **Never** renames or modifies existing fields, **never** touches single-select options — the 2026-09-09 wipe ban stands untouched. The config binds by **field name**; `writeback` resolves name→id per run via `gh project field-list` (explicit limit/pagination — same rule as item-list); an unknown name → warning + that field skipped with a «run `fields`» hint. `field-create` is the second recorded exception to the single-writer rule, alongside `item-edit` (both managed CLI; item-edit approved at G1a close, field-create by this amendment). Memo ships `enabled: false`; enablement = config flip + one `fields` run (Design revision 2).
+- **Commands**: managed CLI only — `gh project item-edit --id <item> --field-id <field> --project-id <project> --number <value>` (one item+field per call) and `gh project field-create --data-type NUMBER` (one-time field creation); nothing else. **Never** raw GraphQL mutations and **never** field-definition mutations (`updateProjectV2Field`) — the 2026-09-09 wipe ban stands untouched (that ban concerns raw field mutations; `item-edit` is not one). What this tool DOES take is a recorded exception to the single-writer rule «all board writes go through `gh_board.py`»: `writeback.py` is a deliberate second writer via the managed CLI, approved at G1a close (issue #23's skill rewrite should mention it — see Relation).
 - **Values**: written verbatim from the snapshot's board-ready fields — tokens in millions with 1 decimal («48.2»), hours with 1 decimal («25.3»).
 - **Config is generic**: each project's `write_back.fields` maps field id → dot-path into that issue's snapshot. The 6 starting fields are 6 config lines with canonical paths: `tokens.total_m`, `phases.design.tokens.total_m`, `phases.impl.tokens.total_m`, `active.hours`, `phases.design.active.hours`, `phases.impl.active.hours`. A future field («design gate tokens», hand-measured gate toll) = create the field by hand + one config line, no code change.
 - **Diff-gated**: last-written values cached in `state.json`; a field is written only when the written (rounded) number changed. Failures (gh error, network) → warning to the log, collection continues, exit code 0 (fail-open). Issue not on that project's board → skip with a note. A write failure with a cached item id drops that cache entry (a re-added card gets a new id) — re-resolved next run.
@@ -177,25 +179,32 @@ Per issue (and per phase): host — from `model_usage` (per-call `model_id`/`age
           "directories": ["/Users/mkosinov/dev/opencode/workspace/superagents", "/Users/mkosinov/dev/superagents"],
           "board": {"owner": "mkosinov", "project_number": 4, "project_id": "PVT_kwHOA-0Z984BkOSk"},
           "write_back": {"enabled": true, "fields": {
-            "<PVTNF_tokens_total_id>":  "tokens.total_m",
-            "<PVTNF_tokens_design_id>": "phases.design.tokens.total_m",
-            "<PVTNF_tokens_impl_id>":   "phases.impl.tokens.total_m",
-            "<PVTNF_hours_total_id>":   "active.hours",
-            "<PVTNF_hours_design_id>":  "phases.design.active.hours",
-            "<PVTNF_hours_impl_id>":    "phases.impl.active.hours"
+            "Tokens total":  "tokens.total_m",
+            "Tokens design": "phases.design.tokens.total_m",
+            "Tokens IMPL":   "phases.impl.tokens.total_m",
+            "Hours total":   "active.hours",
+            "Hours design":  "phases.design.active.hours",
+            "Hours impl":    "phases.impl.active.hours"
           }}
         },
         "memo": {
           "repo": "mkosinov/memo", "phase_mode": "split",
           "directories": ["/root/workspace/memo", "/Users/mkosinov/dev/memo"],
           "board": {"owner": "mkosinov", "project_number": 3, "project_id": "<PVT_…>"},
-          "write_back": {"enabled": false, "fields": {}}
+          "write_back": {"enabled": false, "fields": {
+            "Tokens total":  "tokens.total_m",
+            "Tokens design": "phases.design.tokens.total_m",
+            "Tokens IMPL":   "phases.impl.tokens.total_m",
+            "Hours total":   "active.hours",
+            "Hours design":  "phases.design.active.hours",
+            "Hours impl":    "phases.impl.active.hours"
+          }}
         }
       },
       "serve": {"host": "127.0.0.1", "port": 8765}
     }
 
-Field ids are discovered with `gh project field-list` (README documents it). **Shipped state:** `write_back.fields` starts as an empty map `{}` for both projects — the six id→dot-path lines are pasted after the one-time field creation (README); an empty map is a documented write-back no-op. The superagents constants mirror the `gh_board.py` convention (same values, kept in sync by hand — two lines, see Relation).
+Fields bind by NAME; the six canonical name→dot-path lines ship in the config from day one — nothing to paste; `fields` creates/validates the fields on the board (README documents the one run per project). An empty `fields` map remains a documented write-back no-op. The superagents constants mirror the `gh_board.py` convention (same values, kept in sync by hand — two lines, see Relation).
 
 ## Safety & privacy
 
@@ -208,7 +217,7 @@ Field ids are discovered with `gh project field-list` (README documents it). **S
 
 Offline by construction: synthetic fixture DBs of BOTH schemas, generated by test setup into a tmp dir (no committed binaries).
 
-- **Unit**: ordered mapping patterns (incl. Russian titles, leftmost-wins, multi-number titles); recursive tree building and subtree aggregation (grandchildren fold into their parent node); T-label folding (labeled group vs standalone); phase modes (split vs title) + phase overrides; token math (5 components, raw-sum total, board-value rounding M-1dp / hours-1dp); full-rebuild determinism (same fixture DB → byte-identical snapshot); write-back diff-gating on rounded values, fail-open, item-cache invalidation; dot-path resolver; atomic write; lock behavior (second writer skips / POST 503); server guards (Host/Origin/Content-Type); bind validation (unknown session → 400, unknown issue → 400, enum phases).
+- **Unit**: ordered mapping patterns (incl. Russian titles, leftmost-wins, multi-number titles); recursive tree building and subtree aggregation (grandchildren fold into their parent node); T-label folding (labeled group vs standalone); phase modes (split vs title) + phase overrides; token math (5 components, raw-sum total, board-value rounding M-1dp / hours-1dp); full-rebuild determinism (same fixture DB → byte-identical snapshot); write-back diff-gating on rounded values, fail-open, item-cache invalidation; name→id resolution (unknown name → warning + that field skipped); `fields` subcommand (missing → created, rerun idempotent, non-NUMBER type mismatch stops loudly with zero mutations); dot-path resolver; atomic write; lock behavior (second writer skips / POST 503); server guards (Host/Origin/Content-Type); bind validation (unknown session → 400, unknown issue → 400, enum phases).
 - **Golden**: real small issue — superagents #16 (host-only, the panel-security design) — golden snapshot in `data/` (gitignored): regenerated on demand, test **skips when the file is absent** (keeps personal numbers out of git while enabling local verification).
 - **E2E per User Scenario** (below): `collect serve` on an ephemeral port over a fixture-populated `data/` dir, driven with stdlib `urllib` — assert index JSON, issue snapshot shape, bind POST (unmatched AND already-matched session) → override appended + snapshot updated (write-back stubbed). Browser-level look = manual acceptance (checklist in README).
 - **Live acceptance (manual, one-time, at implementation)**: real `collect`; the 6 board fields created by the user in the web UI and written for real on board #4; `collect serve` opened in the browser. No live gh in automated tests.
@@ -235,6 +244,6 @@ Offline by construction: synthetic fixture DBs of BOTH schemas, generated by tes
 ## Relation
 
 - **#24 (board bootstrap)**: orthogonal — its `board_config.json` v1 binds single-select `PVTSSF_` field ids for status ops; this tool binds numeric `PVTNF_` write-back ids per project in its own config. When #24 lands, unifying the project-binding blocks is an optional follow-up, not a dependency. The issue's phrase «field ids land next to board_config.json» is resolved as: same conventions, self-contained file (the #24 config does not exist yet — recon).
-- **#23 (board self-hosting)**: independent. The 2-line duplication of project constants (here vs `gh_board.py`) is accepted until #23's parameterization lands; a note in README marks the sync point. #23's skill rewrite («all board writes through the script») should name `writeback.py` as the recorded second writer (managed CLI only).
+- **#23 (board self-hosting)**: independent. The 2-line duplication of project constants (here vs `gh_board.py`) is accepted until #23's parameterization lands; a note in README marks the sync point. #23's skill rewrite («all board writes through the script») should name `writeback.py` as the recorded second writer (managed CLI only: `item-edit` for values, `field-create` for one-time field creation).
 - **superagents #16**: the golden-test issue (small, host-only).
 - **`docs/architecture/token-economy.md`**: stale; superseded for per-issue accounting by this tool's measurements. Refresh = separate task.

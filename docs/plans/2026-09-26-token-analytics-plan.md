@@ -3,6 +3,7 @@
 **Spec:** `docs/specs/2026-09-26-token-analytics-design.md` (G1a + G1b approved, panel fixes folded, two post-panel design revisions: full rebuild per run; per-project board config)
 **Date:** 2026-09-26
 **Port source:** none — all code is new; the spec's Reuse section names the in-repo patterns to mirror.
+**Post-G2 amendment (user OK 2026-09-26):** fields are created by a `collect.py fields` subcommand (managed `gh project field-create`, NUMBER only) and the config binds by field NAME — replaces the originally approved «manual web-UI creation + empty shipped fields map»; folded into Tasks 1/8/9, spec Design revision 3.
 
 ## Goal
 
@@ -35,7 +36,7 @@ Python 3 stdlib only (`sqlite3`, `subprocess`, `http.server`, `json`, `pathlib`,
 - Opening `http://localhost:8765` shows where tokens go per feature — issue list per project sorted by spend, with in-progress issues showing accrued totals and real last-activity dates — replacing hand audits and the stale token-economy estimates.
 - An issue page splits design/IMPL: 5 token components + total, active model time (exact on host, «≈» on container), secondary calendar span; by-model and by-agent bars; expandable drill-down into design gates (scout/panelists/plan-reviewer) and IMPL tasks folded by T-label — nested sub-sessions never lose spend.
 - Unmatched sessions are visible in a global dashboard tab and bindable by button (project + issue + phase); wrongly auto-matched sessions are rebound the same way; unbinding = removing a line by hand, effective next run.
-- Board cards carry 6 auto-updated numeric fields (tokens total/design/impl in millions, hours total/design/impl) — superagents #4 immediately after the user creates the fields; memo #3 after the same manual step plus a config flip.
+- Board cards carry 6 auto-updated numeric fields (tokens total/design/impl in millions, hours total/design/impl); the fields themselves are created by one idempotent `collect.py fields` run — superagents #4 immediately, memo #3 after a config flip + the same run. No manual web-UI step.
 - Collection runs unattended every 15 min: container down, gh down, or a busy database degrades to a warning — snapshots and exit code survive; nothing ever writes to the source DBs.
 
 ---
@@ -44,7 +45,7 @@ Python 3 stdlib only (`sqlite3`, `subprocess`, `http.server`, `json`, `pathlib`,
 
 ### Classification: trivial
 
-Create `token-analytics/` with stub modules (`collect.py`, `collector.py`, `writeback.py`, `server.py` — module docstring + empty functions), the CLI skeleton in `collect.py` (argparse, subcommands `collect` / `serve` / `writeback`, each stubbed to a «not implemented» exit), `config.json` exactly per spec §Config file — with one deliberate deviation: `write_back.fields` ships as `{}` for BOTH projects (superagents `enabled: true`, memo `enabled: false`); the 6 canonical field-id→dot-path lines are pasted by the user after field creation (README, Task 9) — no fake `PVTNF_…` ids in git. Add `token-analytics/data/` to `.gitignore`. Create `data/` with a `.gitkeep`-free layout (dir created at runtime; gitignore covers it either way) and a README stub (title + one line).
+Create `token-analytics/` with stub modules (`collect.py`, `collector.py`, `writeback.py`, `server.py` — module docstring + empty functions), the CLI skeleton in `collect.py` (argparse, subcommands `collect` / `serve` / `writeback`, each stubbed to a «not implemented» exit), `config.json` exactly per spec §Config file: the 6 canonical field-NAME→dot-path pairs ship from day one for both projects (superagents `enabled: true`, memo `enabled: false` — binding by name per the post-G2 amendment; no field ids in git at all). Add `token-analytics/data/` to `.gitignore`. Create `data/` with a `.gitkeep`-free layout (dir created at runtime; gitignore covers it either way) and a README stub (title + one line).
 
 Consume spec Reuse: `gh_board.py` constants-at-top convention for the config's board block.
 
@@ -54,7 +55,7 @@ Consume spec Reuse: `gh_board.py` constants-at-top convention for the config's b
 ### DoD
 - `python3 token-analytics/collect.py --help` lists the three subcommands; stubs exit cleanly with «not implemented».
 - `git check-ignore token-analytics/data/x` succeeds; `git status` clean.
-- `config.json` validates against the spec's shape (projects, sources, serve block).
+- `config.json` validates against the spec's shape (projects, sources, serve block) and carries the 6 name→dot-path pairs per project.
 
 ---
 
@@ -185,7 +186,9 @@ Consume spec Reuse: `site/` static-site structure (sections/nav idioms; data via
 
 ### Classification: standard
 
-`writeback.py`: runs after every rebuild (called from `collect` and from the bind rebuild) and standalone via `collect.py writeback` (re-push from existing snapshots, no rebuild — for right after field creation). Per project with `write_back.enabled` and non-empty `fields`: resolve issue→item-id via `gh project item-list` with an **explicit `--limit` and a pagination loop until exhausted** (CLI default 30 truncates; canon rule from #24), cached in `state.json`; diff-gate against the last-written cache (compares the written rounded values — rounding noise never writes); write each changed field via `gh project item-edit --id … --field-id … --project-id … --number …` (argv list, one item+field per call). Fail-open: gh/network failure → warning, continue, exit 0; write failure drops that item's cached id (a re-added card gets a new one); issue not on the board → skip with a note. No status filtering (WIP and closed written alike). Empty `fields` → no-op with a log note. **Never** raw GraphQL, **never** field-definition mutations.
+`writeback.py`: runs after every rebuild (called from `collect` and from the bind rebuild) and standalone via `collect.py writeback` (manual re-push from existing snapshots). Per project with `write_back.enabled` and non-empty `fields`: resolve issue→item-id via `gh project item-list` AND field NAME→id via `gh project field-list` — both with an **explicit `--limit` and a pagination loop until exhausted** (CLI default 30 truncates; canon rule from #24), cached in `state.json` (a write failure drops the item's cached id — a re-added card gets a new one); an unknown field name → warning + that field skipped with a «run `fields`» hint; diff-gate against the last-written cache (compares the written rounded values — rounding noise never writes); write each changed field via `gh project item-edit --id … --field-id … --project-id … --number …` (argv list, one item+field per call).
+
+`collect.py fields` (post-G2 amendment): per enabled project — read fields via `gh project field-list`, create the missing ones from the config's 6 canonical names via `gh project field-create --data-type NUMBER` (one call per field, idempotent); an existing name with a non-NUMBER type → loud stop naming the field, zero mutations. Never renames or modifies existing fields, never touches single-select options. Fail-open: gh/network failure → warning, continue, exit 0; write failure drops that item's cached id (a re-added card gets a new one); issue not on the board → skip with a note. No status filtering (WIP and closed written alike). Empty `fields` → no-op with a log note. **Never** raw GraphQL, **never** field-definition mutations.
 
 Consume spec Reuse: `gh_board.py` `gql()` subprocess+error pattern; recon-verified `item-edit`/`field-list`/`item-list` flags; #24 spec pagination rule.
 
@@ -196,6 +199,8 @@ Consume spec Reuse: `gh_board.py` `gql()` subprocess+error pattern; recon-verifi
 - E2E test for scenario 6 passes (RED-GREEN-REFACTOR, stubbed gh): diff-gate writes only changed fields; a gh failure logs a warning and the run still exits 0; disabled project and empty fields → no calls.
 - Unit: dot-path resolver — all 6 canonical paths resolve against a fixture snapshot; an unknown path fails loudly (no silent None written).
 - Unit: pagination loop drains a stub returning multiple pages (>30 items total).
+- Unit: `fields` — missing name → created (stubbed `field-create`), rerun creates nothing, existing non-NUMBER name stops loudly with zero mutations.
+- Unit: unknown field name in write-back → warning + that field skipped only; name→id resolution served by the paginated field-list stub.
 - Unit: cached item id dropped on write failure, re-resolved next run.
 - Unit: values written verbatim from board-ready snapshot fields («48.2», «25.3»).
 
@@ -205,17 +210,17 @@ Consume spec Reuse: `gh_board.py` `gql()` subprocess+error pattern; recon-verifi
 
 ### Classification: small
 
-Complete `token-analytics/README.md`: the cron line (verbatim, with log redirect); board-field creation steps (web UI, one-time per project) + id discovery via `gh project field-list` + the 6 canonical config lines to paste (field id → dot-path, superagents first, memo enablement = config flip); `collect serve` usage; the manual browser checklist (one line per User Scenario); the live-acceptance runbook — real `collect` run, real write-back on a board #4 card, browser pass; the constants-sync note (board block duplicates `gh_board.py` constants until #23's parameterization — check on edit). Then execute live acceptance WITH the user: he creates the 6 fields on board #4 in the web UI and pastes the ids into `config.json`; the session runs a real collect + writeback and verifies one card; results go into the wrap-up report. Memo board #3 stays disabled (fields later = config-only change).
+Complete `token-analytics/README.md`: the cron line (verbatim, with log redirect); field setup = one `python3 collect.py fields` run per enabled project (idempotent; memo enablement = config flip + the same run); `collect serve` usage; the manual browser checklist (one line per User Scenario); the live-acceptance runbook — real `fields` run, real `collect` + `writeback`, browser pass; the constants-sync note (board block duplicates `gh_board.py` constants until #23's parameterization — check on edit). Then execute live acceptance (the user's part is verification only): the session runs `fields` for real on board #4 (creates/validates the 6 NUMBER fields via managed CLI), then a real collect + writeback; the user opens the board in the web UI and confirms the 6 values on a card; results go into the wrap-up report. Memo board #3 stays disabled (enablement = config flip + one `fields` run).
 
 ### Required Docs
 - Spec §Board write-back (field creation, kill switch); §Testing (live acceptance).
 
 ### DoD
 - README covers all of the above with copy-pasteable commands.
-- Live acceptance executed with the user on board #4; the 6 field values verified on at least one card; outcome recorded in the wrap-up report.
+- Live acceptance executed: `fields` created/validated the 6 NUMBER fields on board #4 (managed CLI, zero manual web-UI steps); a real write-back verified on at least one card with the user; outcome recorded in the wrap-up report.
 
 ---
 
 ## Finish
 
-DoD for the whole plan mirrors the spec's Testing section: all unit + E2E suites green locally (`python3 -m unittest discover token-analytics/tests`), the golden check passes locally when present (skips otherwise), live acceptance recorded. The wrap-up report states: files created, test summary, live-acceptance results, and the deliberate follow-ups (memo board enablement, deferred timelines/latency/retries, token-economy.md refresh — all Non-Goals; plus #23's skill rewrite must name `writeback.py` as the recorded second board writer — spec §Relation). The wrap-up also records the confirmed shipping decision: `write_back.fields` lands empty, the user pastes the 6 lines after field creation.
+DoD for the whole plan mirrors the spec's Testing section: all unit + E2E suites green locally (`python3 -m unittest discover token-analytics/tests`), the golden check passes locally when present (skips otherwise), live acceptance recorded. The wrap-up report states: files created, test summary, live-acceptance results, and the deliberate follow-ups (memo board enablement, deferred timelines/latency/retries, token-economy.md refresh — all Non-Goals; plus #23's skill rewrite must name `writeback.py` as the recorded second board writer — spec §Relation). The wrap-up also records the post-G2 amendment as shipped: `fields` subcommand + binding by field name — no manual web-UI field step.
