@@ -178,6 +178,73 @@ def render_plan(mode: str, args, etalon: Etalon, etalon_path: Path,
     return "\n".join(lines)
 
 
+def compare_fields(etalon: Etalon, live: list[dict]) -> dict:
+    """Diff an existing board (gh project field-list JSON entries) against the etalon.
+
+    live entries are filtered to SINGLE_SELECT first — built-in metadata columns
+    (Title/Labels/Assignees/...) are not single-selects and are ignored by that
+    filter. Matching is by exact field/option name (no prefix tolerance: a
+    rename like `In Design (G1a)` vs `In Design` counts as BOTH missing and
+    extra). Returns {"missing_fields", "missing_options", "extra_fields",
+    "extra_options"}; missing lists keep etalon order, extra lists live order.
+    """
+    etalon_names = {f["name"] for f in etalon.fields}
+    live_selects = {e["name"]: e for e in live if e.get("type") == "SINGLE_SELECT"}
+    missing_fields = [f["name"] for f in etalon.fields
+                      if f["name"] not in live_selects]
+    extra_fields = [e["name"] for e in live
+                    if e.get("type") == "SINGLE_SELECT" and e["name"] not in etalon_names]
+    missing_options: dict[str, list[str]] = {}
+    extra_options: dict[str, list[str]] = {}
+    for f in etalon.fields:
+        entry = live_selects.get(f["name"])
+        if entry is None:
+            continue
+        live_opts = [o["name"] for o in entry.get("options") or []]
+        live_set = set(live_opts)
+        etalon_set = set(f["options"])
+        if missing := [o for o in f["options"] if o not in live_set]:
+            missing_options[f["name"]] = missing
+        if extra := [o for o in live_opts if o not in etalon_set]:
+            extra_options[f["name"]] = extra
+    return {"missing_fields": missing_fields, "missing_options": missing_options,
+            "extra_fields": extra_fields, "extra_options": extra_options}
+
+
+def ok_to_adopt(diff: dict) -> bool:
+    """Drift contract verdict: missing field/option -> refuse; extra -> warn-ok."""
+    return not diff["missing_fields"] and not diff["missing_options"]
+
+
+def build_config(project_id: str, project_number: int, owner: str, repo: str,
+                 field_ids: dict[str, str], host_budgets: dict[str, int]) -> dict:
+    """Assemble board_config.json (format v1) as a plain dict.
+
+    Option ids are deliberately absent: they are project-specific and must be
+    read from field-list at run time (rollout-log quirk). host_budgets are
+    copied from the etalon verbatim.
+    """
+    return {
+        "version": 1,
+        "project_id": project_id,
+        "project_number": project_number,
+        "owner": owner,
+        "repo": repo,
+        "fields": dict(field_ids),
+        "host_budgets": dict(host_budgets),
+    }
+
+
+def write_config(path: Path, config: dict) -> None:
+    """Write the config to the effective path (caller resolves --out/default), mkdir parents.
+
+    Conventions mirror subagent-audit.py: utf-8, ensure_ascii=False, indent.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(config, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8")
+
+
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(
         prog="board_bootstrap.py",

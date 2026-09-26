@@ -234,6 +234,159 @@ class TestRenderPlan(unittest.TestCase):
         self.assertEqual(lines[-1].startswith("guard: "), True)
 
 
+def compare_etalon() -> bb.Etalon:
+    """Small etalon fixture for comparison tests (Status + Priority)."""
+    return bb.Etalon(
+        fields=[
+            {"name": "Status", "type": "single_select",
+             "options": ["Hold", "Backlog", "In Design", "Ready to IMPL", "In IMPL"]},
+            {"name": "Priority", "type": "single_select",
+             "options": ["Critical", "High", "Medium", "Low"]},
+        ],
+        host_budgets={"imac": 2, "macbook": 1},
+    )
+
+
+def live_field(name: str, options: list[str], type_: str = "SINGLE_SELECT") -> dict:
+    """One gh `project field-list --format json` entry (option ids included)."""
+    return {
+        "id": f"PVTSSF_{name}",
+        "name": name,
+        "type": type_,
+        "options": [{"id": f"PVTSSO_{name}_{o}", "name": o} for o in options],
+    }
+
+
+def matching_live() -> list[dict]:
+    """Live field list matching compare_etalon() exactly, plus metadata columns."""
+    return [
+        {"id": "PVTSSF_title", "name": "Title", "type": "TITLE", "options": None},
+        live_field("Status", ["Hold", "Backlog", "In Design", "Ready to IMPL", "In IMPL"]),
+        {"id": "PVTSSF_labels", "name": "Labels", "type": "LABELS", "options": None},
+        live_field("Priority", ["Critical", "High", "Medium", "Low"]),
+        {"id": "PVTSSF_assignees", "name": "Assignees", "type": "ASSIGNEES", "options": None},
+    ]
+
+
+class TestCompareFields(unittest.TestCase):
+    """Adopt comparison matrix on fixtures: missing -> refuse, extra -> warn-ok."""
+
+    def test_exact_match_is_ok_to_adopt(self):
+        diff = bb.compare_fields(compare_etalon(), matching_live())
+        self.assertEqual(diff, {"missing_fields": [], "missing_options": {},
+                                "extra_fields": [], "extra_options": {}})
+        self.assertTrue(bb.ok_to_adopt(diff))
+
+    def test_metadata_columns_ignored(self):
+        """Non-single-select entries (Title/Labels/Assignees/Milestones) are not extras."""
+        live = matching_live() + [
+            {"id": "PVTSSF_milestones", "name": "Milestones", "type": "MILESTONE",
+             "options": None}]
+        diff = bb.compare_fields(compare_etalon(), live)
+        self.assertEqual(diff["extra_fields"], [])
+        self.assertTrue(bb.ok_to_adopt(diff))
+
+    def test_missing_field_refuses(self):
+        live = [e for e in matching_live() if e["name"] != "Priority"]
+        diff = bb.compare_fields(compare_etalon(), live)
+        self.assertEqual(diff["missing_fields"], ["Priority"])
+        self.assertEqual(diff["missing_options"], {})
+        self.assertFalse(bb.ok_to_adopt(diff))
+
+    def test_missing_option_refuses(self):
+        live = matching_live()
+        live[1]["options"] = [o for o in live[1]["options"] if o["name"] != "In IMPL"]
+        diff = bb.compare_fields(compare_etalon(), live)
+        self.assertEqual(diff["missing_options"], {"Status": ["In IMPL"]})
+        self.assertEqual(diff["missing_fields"], [])
+        self.assertFalse(bb.ok_to_adopt(diff))
+
+    def test_extra_field_warns_ok(self):
+        live = matching_live() + [live_field("Reviewer", ["me", "you"])]
+        diff = bb.compare_fields(compare_etalon(), live)
+        self.assertEqual(diff["extra_fields"], ["Reviewer"])
+        self.assertEqual(diff["missing_fields"], [])
+        self.assertTrue(bb.ok_to_adopt(diff))
+
+    def test_extra_option_warns_ok(self):
+        live = matching_live()
+        live[1]["options"].append({"id": "PVTSSO_extra", "name": "Whatever"})
+        diff = bb.compare_fields(compare_etalon(), live)
+        self.assertEqual(diff["extra_options"], {"Status": ["Whatever"]})
+        self.assertTrue(bb.ok_to_adopt(diff))
+
+    def test_renamed_option_is_missing_and_extra(self):
+        """Exact match only: `In Design (G1a)` vs `In Design` counts BOTH ways."""
+        live = matching_live()
+        live[1]["options"] = [
+            {"id": "PVTSSO_Status_Hold", "name": "Hold"},
+            {"id": "PVTSSO_Status_Backlog", "name": "Backlog"},
+            {"id": "PVTSSO_Status_r", "name": "In Design (G1a)"},
+            {"id": "PVTSSO_Status_RTI", "name": "Ready to IMPL"},
+            {"id": "PVTSSO_Status_II", "name": "In IMPL"},
+        ]
+        diff = bb.compare_fields(compare_etalon(), live)
+        self.assertEqual(diff["missing_options"], {"Status": ["In Design"]})
+        self.assertEqual(diff["extra_options"], {"Status": ["In Design (G1a)"]})
+        self.assertFalse(bb.ok_to_adopt(diff))
+
+
+class TestBuildConfig(unittest.TestCase):
+    """board_config.json format v1: exact keys, no option ids, budgets verbatim."""
+
+    FIELD_IDS = {"Status": "PVTSSF_1", "Priority": "PVTSSF_2",
+                 "host": "PVTSSF_3", "gate": "PVTSSF_4"}
+    BUDGETS = {"imac": 2, "macbook": 1, "hk": 1, "gcp": 1}
+
+    def build(self, **kw):
+        params = dict(project_id="PVT_1", project_number=4, owner="mkosinov",
+                      repo="superagents", field_ids=self.FIELD_IDS,
+                      host_budgets=self.BUDGETS)
+        params.update(kw)
+        return bb.build_config(**params)
+
+    def test_exact_key_set(self):
+        self.assertEqual(sorted(self.build()),
+                         ["fields", "host_budgets", "owner", "project_id",
+                          "project_number", "repo", "version"])
+
+    def test_version_and_scalars(self):
+        config = self.build()
+        self.assertEqual(config["version"], 1)
+        self.assertEqual(config["project_id"], "PVT_1")
+        self.assertEqual(config["project_number"], 4)
+        self.assertEqual(config["owner"], "mkosinov")
+        self.assertEqual(config["repo"], "superagents")
+
+    def test_fields_map_name_to_field_id_no_option_ids(self):
+        config = self.build()
+        self.assertEqual(config["fields"], self.FIELD_IDS)
+        self.assertTrue(all(isinstance(v, str) for v in config["fields"].values()))
+        dumped = json.dumps(config)
+        self.assertNotIn("options", dumped)
+        self.assertNotIn("PVTSSO", dumped)  # option ids never leak anywhere
+
+    def test_host_budgets_copied_verbatim(self):
+        budgets = {"imac": 2, "macbook": 1}
+        config = self.build(field_ids={"Status": "PVTSSF_x"}, host_budgets=budgets)
+        self.assertEqual(config["host_budgets"], budgets)
+
+
+class TestWriteConfig(unittest.TestCase):
+    """write_config: mkdir parents, indent=2 JSON, round-trips."""
+
+    def test_creates_parents_writes_indented_round_trip(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = Path(td) / "docs" / "board" / "board_config.json"
+            config = bb.build_config("PVT_1", 4, "mkosinov", "superagents",
+                                     {"Status": "PVTSSF_1"}, {"imac": 2})
+            bb.write_config(path, config)
+            self.assertTrue(path.exists())
+            text = path.read_text(encoding="utf-8")
+            self.assertIn('  "version": 1,', text)  # top-level keys at indent=2
+            self.assertEqual(json.loads(text), config)
+
+
 class TestCliDryRun(unittest.TestCase):
     """CLI wiring: --dry-run paths honor --etalon and --out, exit 0, no network."""
 
