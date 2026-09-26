@@ -163,7 +163,7 @@ Test targets (unit, fast):
 **In-repo contracts and patterns:**
 - `docs/specs/2026-09-21-board-bootstrap-design.md` + `docs/plans/2026-09-22-board-bootstrap-plan.md` (#24): board_config.json format v1, etalon location, `adopt` behavior — this spec consumes them verbatim.
 - Current `.zcode/scripts/gh_board.py` twins convention and the live-options pattern (`load_status_field`, :60–70) — kept in the port.
-- `.github/workflows/site.yml` — paths-filtered push/PR trigger pattern the CI mirrors.
+- `.github/workflows/site.yml` — paths-filter trigger syntax reference (push-only; the push + pull_request pattern comes from #24's `board-bootstrap.yml`, see CI).
 - gql-via-`subprocess.run` transport (memo :73) — reused as the CI mock seam.
 
 **Searched, nothing to reuse:** no `docs/domain-rules/` exists in this repo (board rules live in the skills — they stay there); no test infrastructure beyond `site.yml` (`tests/` is created by #24's plan; this issue adds its file next to it).
