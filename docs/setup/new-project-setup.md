@@ -41,6 +41,7 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
 ```jsonc
 {
   "default_agent": "manager",
+  "subagent_depth": 4,
   "permission": {
     "skill": {
       "*": "deny",
@@ -58,6 +59,8 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
   }
 }
 ```
+
+**`subagent_depth: 4`** — the IMPL dispatch chain depth: Manager → Architect → Coder → Tester → Explorer is four subagent levels. Without it the server default blocks the architect's first coder dispatch with "Subagent depth limit reached" (hit live 2026-09-26 on the board-bootstrap IMPL). The config is read at server start — restart the opencode container after editing.
 
 ## Step 3: Configure Spec Review Panel models
 
