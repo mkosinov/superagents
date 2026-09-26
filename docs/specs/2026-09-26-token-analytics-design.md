@@ -195,7 +195,7 @@ Per issue (and per phase): host — from `model_usage` (per-call `model_id`/`age
       "serve": {"host": "127.0.0.1", "port": 8765}
     }
 
-Field ids are discovered with `gh project field-list` (README documents it). The superagents constants mirror the `gh_board.py` convention (same values, kept in sync by hand — two lines, see Relation).
+Field ids are discovered with `gh project field-list` (README documents it). **Shipped state:** `write_back.fields` starts as an empty map `{}` for both projects — the six id→dot-path lines are pasted after the one-time field creation (README); an empty map is a documented write-back no-op. The superagents constants mirror the `gh_board.py` convention (same values, kept in sync by hand — two lines, see Relation).
 
 ## Safety & privacy
 
