@@ -6,10 +6,12 @@ and creates the project, its fields, links the repo, seeds open issues, writes
 docs/board/board_config.json. `adopt` compares an existing project with the
 etalon and writes the config without mutating the board.
 
-Task 4: guards (config exists, repo-linked, title collision) and the live
-`adopt` chain (auth → link verify → field-list → compare → config write;
-adopt never mutates the board). The live `init` chain (create/seed) lands in
-the next task; --dry-run stays offline for both modes.
+Task 5: the live `init` chain, wired to the verified mutation sequence (gh
+2.100.0): create → built-in Status removal (GraphQL option-rewrite fallback
+when undeletable — documented exception, the project is still empty) →
+field-create per etalon field → link → seed open issues with Status=Backlog →
+verification read after every mutation → config write. Mid-run failure prints
+the partial report (what exists, per-resource cleanup, adopt recovery).
 
 Usage:
   python3 .zcode/scripts/board_bootstrap.py init --repo <owner/name> --title <t> \
@@ -26,7 +28,7 @@ import json
 import re
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 # Repo root anchored to the script's own path (both twins resolve the same
@@ -46,6 +48,12 @@ SELECT_TYPES = {"SINGLE_SELECT", "ProjectV2SingleSelectField"}
 # Explicit caps on every list read — no 30-row gh defaults.
 PROJECT_LIST_LIMIT = 1000
 FIELD_LIST_LIMIT = 200
+ITEM_LIST_LIMIT = 1000
+ISSUE_LIST_LIMIT = 10000
+
+# The seed status written onto every newly added item (option id read at
+# run time from field-list — rollout-log quirk: it is project-specific).
+SEED_STATUS_OPTION = "Backlog"
 
 INTROSPECTION_QUERY = 'query{__type(name:"ProjectV2"){fields{name}}}'
 
@@ -228,22 +236,31 @@ def _repo_in_nodes(nodes: list, repo: str) -> bool:
     return False
 
 
+_UNSET = object()  # sentinel: "connection= not passed — introspect inside"
+
+
 def guard_repo_has_project(owner: str, repo: str, *, gh_json=gh_json, gql=gql,
-                           limit: int = PROJECT_LIST_LIMIT) -> Guard:
+                           limit: int = PROJECT_LIST_LIMIT,
+                           projects: list | None = None,
+                           connection=_UNSET) -> Guard:
     """init guard: refuse if ANY open project of the owner links the repo.
 
     Introspects once to find the repository connection, enumerates the owner's
-    open projects (explicit --limit), reads each project's linked repos with
+    open projects (explicit --limit; pass `projects=` to reuse a list already
+    read for another guard — cmd_init lists projects once; pass `connection=`
+    to likewise reuse a schema read), reads each project's linked repos with
     one node query. No connection in the schema → documented downgrade
     (skipped, reported); the guard degrades to config + title checks.
     """
-    connection = find_repo_connection(gql(INTROSPECTION_QUERY))
+    if connection is _UNSET:
+        connection = find_repo_connection(gql(INTROSPECTION_QUERY))
     if connection is None:
         return Guard("skipped",
                      "skipped: no repository connection in schema "
                      "(guard degraded to the config check + title-collision warning)")
-    projects = gh_json(["project", "list", "--owner", owner,
-                        "--format", "json", "--limit", str(limit)])["projects"]
+    if projects is None:
+        projects = gh_json(["project", "list", "--owner", owner,
+                            "--format", "json", "--limit", str(limit)])["projects"]
     if len(projects) >= limit:
         return Guard("refuse",
                      f"owner {owner} has {len(projects)} projects (>= --limit "
@@ -377,12 +394,14 @@ def render_plan(mode: str, args, etalon: Etalon, etalon_path: Path,
 def compare_fields(etalon: Etalon, live: list[dict]) -> dict:
     """Diff an existing board (gh project field-list JSON entries) against the etalon.
 
-    live entries are filtered to SINGLE_SELECT first — built-in metadata columns
-    (Title/Labels/Assignees/...) are not single-selects and are ignored by that
-    filter. Matching is by exact field/option name (no prefix tolerance: a
-    rename like `In Design (G1a)` vs `In Design` counts as BOTH missing and
-    extra). Returns {"missing_fields", "missing_options", "extra_fields",
-    "extra_options"}; missing lists keep etalon order, extra lists live order.
+    live entries are filtered to single-select types first (SELECT_TYPES —
+    "SINGLE_SELECT" historically, "ProjectV2SingleSelectField" live) — built-in
+    metadata columns (Title/Labels/Assignees/...) are not single-selects and
+    are ignored by that filter. Matching is by exact field/option name (no
+    prefix tolerance: a rename like `In Design (G1a)` vs `In Design` counts
+    as BOTH missing and extra). Returns {"missing_fields", "missing_options",
+    "extra_fields", "extra_options"}; missing lists keep etalon order, extra
+    lists live order.
     """
     etalon_names = {f["name"] for f in etalon.fields}
     live_selects = {e["name"]: e for e in live if e.get("type") in SELECT_TYPES}
@@ -468,13 +487,7 @@ def cmd_adopt(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
     if link.status != "ok" or not link.project:
         sys.exit(f"error: adopt #{args.project}: {link.message}")
 
-    listed = gh_json(["project", "field-list", str(args.project), "--owner", owner,
-                      "--format", "json", "--limit", str(FIELD_LIST_LIMIT)])
-    fields = listed["fields"]
-    if len(fields) >= FIELD_LIST_LIMIT:
-        sys.exit(f"error: project #{args.project} has {len(fields)} fields "
-                 f"(>= --limit {FIELD_LIST_LIMIT}): cannot safely compare; "
-                 f"raise the cap in FIELD_LIST_LIMIT")
+    fields = read_fields(args.project, owner, gh_json=gh_json)
 
     diff = compare_fields(etalon, fields)
     if not ok_to_adopt(diff):
@@ -498,6 +511,311 @@ def cmd_adopt(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
                                    host_budgets=etalon.host_budgets))
     print(f"adopted #{args.project} \"{link.project['title']}\" -> {out}")
     return 0
+
+
+def find_status_field(fields: list[dict]) -> dict | None:
+    """The project's single-select "Status" entry (None when absent).
+
+    On a fresh project this is the built-in field every project ships with
+    (options Todo / In Progress / Done); after init it is the etalon Status.
+    Built-in metadata columns (Title/Labels/...) are excluded by the type
+    filter.
+    """
+    return next((f for f in fields if f.get("name") == "Status"
+                 and f.get("type") in SELECT_TYPES), None)
+
+
+def rewrite_status_options(status_field: dict, options: list[str], *, gql=gql) -> dict:
+    """Documented GraphQL exception: rewrite a single-select's option list.
+
+    updateProjectV2Field(input:{fieldId, singleSelectOptions:[{name, color,
+    description}]}) — the full replacement list (omitting an option's id
+    deletes it; GitHub assigns ids to new names). Used ONLY when the built-in
+    Status field proves undeletable and the project is still empty (no card
+    values exist to destroy — the field-mutation ban protects card values).
+    Colors follow the etalon field order; every option is required to carry
+    name+color+description by the schema (verified read-only 2026-09-26).
+    """
+    colors = ["GRAY", "BLUE", "GREEN", "YELLOW", "ORANGE", "RED", "PINK", "PURPLE"]
+    opt_inputs = ", ".join(
+        f'{{name:"{o}", color:{colors[i % len(colors)]}, description:""}}'
+        for i, o in enumerate(options))
+    q = (f'mutation{{updateProjectV2Field(input:{{fieldId:"{status_field["id"]}",'
+         f"singleSelectOptions:[{opt_inputs}]}}){{projectV2{{id}}}}}}")
+    return gql(q)
+
+
+def seed_status_ids(fields: list[dict],
+                    option: str = SEED_STATUS_OPTION) -> tuple[str, str]:
+    """(field_id, option_id) for the seed status, from a field-list payload.
+
+    Rollout-log quirk: ids are project-specific and must never be hardcoded —
+    this is the run-time read.
+    """
+    status = find_status_field(fields)
+    if status is None:
+        sys.exit('error: created project has no single-select field "Status"')
+    for o in status.get("options") or []:
+        if o.get("name") == option:
+            return status["id"], o["id"]
+    sys.exit(f'error: Status field has no option "{option}" to seed items with')
+
+
+def read_fields(project_number: int, owner: str, *, gh_json=gh_json) -> list[dict]:
+    """field-list with the explicit cap; refuses when the cap is hit."""
+    listed = gh_json(["project", "field-list", str(project_number),
+                      "--owner", owner, "--format", "json",
+                      "--limit", str(FIELD_LIST_LIMIT)])
+    fields = listed["fields"]
+    if len(fields) >= FIELD_LIST_LIMIT:
+        sys.exit(f"error: project #{project_number} has {len(fields)} fields "
+                 f"(>= --limit {FIELD_LIST_LIMIT}): cannot safely verify; "
+                 f"raise the cap in FIELD_LIST_LIMIT")
+    return fields
+
+
+def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
+    """Live init: the verified mutation sequence with read-back verification.
+
+    Etalon was parsed strictly first (main). Order: auth pre-flight → guards
+    (config / repo-linked / title-collision warn) → create → built-in Status
+    removal → field-create per etalon field → link → seed open issues with
+    Status=Backlog → write config. EVERY mutation is followed by a
+    verification read; mismatch → stop and report (gh is silent on success —
+    rollout-log quirk). Any failure prints the partial report with the manual
+    cleanup + adopt recovery routes; nothing is auto-deleted.
+    """
+    owner = effective_owner(args)
+    validate_repo(args.repo)
+    repo = args.repo
+    out = effective_config_path(args)
+    state = CreatedState()
+
+    def fail(cause: str) -> int:
+        print(format_partial_failure(state.as_dict(owner, repo), cause))
+        return 1
+
+    # 1. auth pre-flight (etalon already parsed, before any network use).
+    r = gh(["auth", "status"])
+    if r.returncode != 0:
+        sys.exit(f"error: gh auth status failed ({r.stderr.strip()}); "
+                 f"authenticate first")
+
+    # 2. guards — one project-list read feeds the repo + title guards alike.
+    cfg = guard_config_exists(out)
+    if cfg.status == "refuse":
+        sys.exit(f"error: {cfg.message}")
+    projects = gh_json(["project", "list", "--owner", owner, "--format", "json",
+                        "--limit", str(PROJECT_LIST_LIMIT)])["projects"]
+    if len(projects) >= PROJECT_LIST_LIMIT:
+        sys.exit(f"error: owner {owner} has {len(projects)} projects "
+                 f"(>= --limit {PROJECT_LIST_LIMIT}): cannot verify {repo} "
+                 f"is unlinked; raise the cap in PROJECT_LIST_LIMIT")
+    connection = find_repo_connection(gql(INTROSPECTION_QUERY))
+    repo_guard = guard_repo_has_project(owner, repo, gh_json=gh_json, gql=gql,
+                                        projects=projects,
+                                        connection=connection)
+    if repo_guard.status == "refuse":
+        sys.exit(f"error: {repo_guard.message}")
+    if repo_guard.status == "skipped":
+        print(f"warning: {repo_guard.message}")
+    title_guard = guard_title_collision(projects, args.title)
+    if title_guard.status == "warn":
+        print(f"warning: {title_guard.message}")
+
+    # 3. create the project (explicit login, never @me).
+    try:
+        state.project = gh_json(["project", "create", "--owner", owner,
+                                 "--title", args.title, "--format", "json"])
+    except SystemExit as e:
+        return fail(str(e))
+    number = state.project["number"]
+
+    try:
+        # 4. remove the built-in Status field every new project ships with.
+        fields = read_fields(number, owner, gh_json=gh_json)
+        builtin = find_status_field(fields)
+        if builtin is not None:
+            r = gh(["project", "field-delete", "--id", builtin["id"]])
+            if r.returncode == 0:
+                fields = read_fields(number, owner, gh_json=gh_json)
+                if find_status_field(fields) is not None:
+                    return fail("field-delete reported success but the built-in "
+                                "Status field is still present (read-back "
+                                "verification mismatch)")
+            else:
+                # Documented exception: the built-in field proved undeletable
+                # → targeted GraphQL option-list rewrite on the still-empty
+                # project (no card values exist yet to destroy). Step 5 then
+                # treats the rewritten field as the etalon Status.
+                status_def = next((f for f in etalon.fields
+                                   if f["name"] == "Status"), None)
+                if status_def is None:
+                    return fail("cannot drop the built-in Status field: the "
+                                "etalon defines no Status field to rewrite "
+                                "it into (fallback needs an option list)")
+                print(f"warning: field-delete of the built-in Status failed "
+                      f"({r.stderr.strip() or 'no stderr'}); fallback: targeted "
+                      f"GraphQL option-list rewrite of the still-empty "
+                      f"project's field (documented exception to the "
+                      f"field-mutation ban — no card values exist yet)")
+                rewrite_status_options(builtin, status_def["options"], gql=gql)
+                fields = read_fields(number, owner, gh_json=gh_json)
+        # 5. per etalon field: create if absent (etalon order), verify by
+        #    read-back — an existing same-name entry is the fallback-rewritten
+        #    built-in Status; its id is recorded, its options verified.
+        for fdef in etalon.fields:
+            entry = next((f for f in fields if f["name"] == fdef["name"]
+                          and f.get("type") in SELECT_TYPES), None)
+            if entry is None:
+                gh_json(["project", "field-create", str(number), "--owner", owner,
+                         "--name", fdef["name"], "--data-type", "SINGLE_SELECT",
+                         "--single-select-options", ",".join(fdef["options"]),
+                         "--format", "json"])
+                fields = read_fields(number, owner, gh_json=gh_json)
+                entry = next((f for f in fields if f["name"] == fdef["name"]
+                              and f.get("type") in SELECT_TYPES), None)
+                if entry is None:
+                    return fail(f'field-create of "{fdef["name"]}" reported '
+                                f"success but the field is missing from the "
+                                f"read-back (verification mismatch)")
+            diff = compare_fields(
+                Etalon(fields=[fdef], host_budgets={}), fields)
+            if diff["missing_options"].get(fdef["name"]):
+                return fail(f'field "{fdef["name"]}" is missing options after '
+                            f"creation: {diff['missing_options'][fdef['name']]} "
+                            f"(verification mismatch)")
+            state.fields.append((fdef["name"], entry["id"]))
+        final_check = compare_fields(etalon, fields)
+        if not ok_to_adopt(final_check):
+            return fail("created field set does not match the etalon after "
+                        f"creation (verification mismatch): {format_diff(final_check)}")
+
+        # 6. link the repo; verify the link with a node read (connection
+        #    introspected once, before the guards — reused here).
+        gh_json(["project", "link", str(number), "--owner", owner,
+                 "--repo", repo])
+        if connection:
+            q = ('query{node(id:"%s"){...on ProjectV2{number title %s'
+                 '(first:100){nodes{owner{login} name}}}}}'
+                 % (state.project["id"], connection))
+            nodes = gql(q)["node"][connection]["nodes"]
+            if not _repo_in_nodes(nodes, repo):
+                return fail(f"project link reported success but the read-back "
+                            f"does not show {repo} among the linked "
+                            f"repositories (verification mismatch)")
+        else:
+            print("warning: cannot verify the repo link: no repository "
+                  "connection in schema (introspection) — documented "
+                  "downgrade, gh's exit code is all we have")
+
+        # 7. seed open issues: ONE capped list read, then add + edit + verify
+        #    per issue (all ids read at run time — never hardcoded).
+        issues = gh_json(["issue", "list", "--repo", repo, "--state", "open",
+                          "--limit", str(ISSUE_LIST_LIMIT), "--json", "number,url"])
+        if len(issues) >= ISSUE_LIST_LIMIT:
+            return fail(f"repo {repo} has {len(issues)} open issues "
+                        f"(>= --limit {ISSUE_LIST_LIMIT}): refusing to seed a "
+                        f"truncated board; raise the cap in ISSUE_LIST_LIMIT "
+                        f"and re-run (after manual cleanup or adopt recovery)")
+        status_field_id, backlog_id = seed_status_ids(fields)
+        for issue in issues:
+            added = gh_json(["project", "item-add", str(number), "--owner", owner,
+                             "--url", issue["url"], "--format", "json"])
+            item_id = added["id"]
+            items = gh_json(["project", "item-list", str(number), "--owner", owner,
+                             "--format", "json", "--limit",
+                             str(ITEM_LIST_LIMIT)])["items"]
+            if len(items) >= ITEM_LIST_LIMIT:
+                return fail(f"project #{number} already has {len(items)} items "
+                            f"(>= --limit {ITEM_LIST_LIMIT}): cannot verify "
+                            f"seeding; raise the cap in ITEM_LIST_LIMIT")
+            if not any(i.get("id") == item_id for i in items):
+                return fail(f'item-add of {issue["url"]} reported success but '
+                            f"the item is missing from the read-back "
+                            f"(verification mismatch)")
+            gh_json(["project", "item-edit", "--project-id", state.project["id"],
+                     "--id", item_id, "--field-id", status_field_id,
+                     "--single-select-option-id", backlog_id])
+            items = gh_json(["project", "item-list", str(number), "--owner", owner,
+                             "--format", "json", "--limit",
+                             str(ITEM_LIST_LIMIT)])["items"]
+            row = next((i for i in items if i.get("id") == item_id), None)
+            if row is None or row.get("status") != SEED_STATUS_OPTION:
+                got = row.get("status") if row else "missing"
+                return fail(f'Status edit of item {item_id} ({issue["url"]}) '
+                            f"did not read back as {SEED_STATUS_OPTION} "
+                            f"(verification mismatch; got {got!r})")
+            state.items.append((issue["number"], issue["url"], item_id))
+    except SystemExit as e:
+        return fail(str(e))
+
+    # 8. write the config (ids read back live; budgets verbatim from etalon).
+    field_ids = {name: fid for name, fid in state.fields}
+    write_config(out, build_config(project_id=state.project["id"],
+                                   project_number=number, owner=owner,
+                                   repo=repo.split("/")[1], field_ids=field_ids,
+                                   host_budgets=etalon.host_budgets))
+    print(f'init #{number} "{args.title}" ({state.project["id"]}) '
+          f"-> {out}")
+    return 0
+
+
+def format_partial_failure(created: dict, cause: str) -> str:
+    """Render the mid-run failure report for a partial init.
+
+    `created` is a CreatedState.as_dict(): {"project": row|None, "owner",
+    "repo", "fields": [(name, id)], "items": [(number, url, item_id)]}.
+    The report names every resource that exists, the per-resource cleanup
+    route (items and fields from the project's web board page; the project
+    itself from its web Settings — no automatic deletion), and the adopt
+    recovery route (`adopt <number> --repo ...` refuses with the difference
+    list until the board matches the etalon, then writes the config).
+    """
+    lines = ["partial init FAILED — no automatic deletion (the API has no "
+             "transactions; auto-deleting risks destroying pre-existing "
+             "resources). What was created:"]
+    p = created.get("project")
+    if p:
+        lines.append(f'- project #{p["number"]} "{p["title"]}" ({p["id"]})')
+    else:
+        lines.append("- nothing (the failure happened before the project "
+                     "was created)")
+    if created.get("fields"):
+        names = ", ".join(f'{n} ({fid})' for n, fid in created["fields"])
+        lines.append(f"- fields created: {names}")
+    if created.get("items"):
+        items = ", ".join(f'#{num} {url} ({iid})' for num, url, iid
+                          in created["items"])
+        lines.append(f"- items added: {items}")
+    lines.append(f"failure: {cause}")
+    if p:
+        lines.append(
+            "manual cleanup (web): remove the items and the fields from the "
+            "project's board page; delete the project from its Settings page "
+            f'(or `gh project delete {p["number"]} --owner {created["owner"]}` '
+            "where the local gh has it — gh 2.100 does, older releases do "
+            "not). This script never deletes anything automatically")
+        lines.append(
+            f'or recover: board_bootstrap.py adopt {p["number"]} '
+            f'--repo {created["owner"]}/{created["repo"].split("/")[-1]} '
+            f'--owner {created["owner"]} — adopt refuses with the difference '
+            "list until the board matches the etalon, then writes the config "
+            "and the rollout continues by hand")
+    return "\n".join(lines)
+
+
+@dataclass
+class CreatedState:
+    """What the current init run has created so far (the repair input)."""
+
+    project: dict | None = None
+    fields: list = field(default_factory=list)  # [(name, field_id)] creation order
+    items: list = field(default_factory=list)   # [(number, url, item_id)] add order
+
+    def as_dict(self, owner: str, repo: str) -> dict:
+        return {"project": self.project, "owner": owner, "repo": repo,
+                "fields": list(self.fields), "items": list(self.items)}
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -542,7 +860,7 @@ def main(argv=None):
         return
     if args.mode == "adopt":
         sys.exit(cmd_adopt(args, etalon))
-    sys.exit(f"error: live 'init' is not implemented yet (use --dry-run)")
+    sys.exit(cmd_init(args, etalon))
 
 
 if __name__ == "__main__":

@@ -10,12 +10,14 @@ import argparse
 import contextlib
 import io
 import json
+import re
 import subprocess
 import sys
 import tempfile
 import types
 import unittest
 from pathlib import Path
+from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / ".zcode" / "scripts"))
@@ -574,8 +576,17 @@ class TestGuardRepoHasProject(unittest.TestCase):
     def test_works_with_linked_repositories_connection(self):
         fake = FakeGh(introspect=introspection("linkedRepositories"))
         v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
-                                      gh_json=fake.gh_json, gql=fake.gql)
+                                       gh_json=fake.gh_json, gql=fake.gql)
         self.assertEqual(v.status, "refuse")  # PVT_4 fixture links the repo
+
+    def test_preloaded_projects_skip_the_list_read(self):
+        """Carry-over A: cmd_init lists projects once, guards reuse the rows."""
+        fake = FakeGh(nodes_by_id={"PVT_4": NODES_MEMO, "PVT_3": []})
+        v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
+                                      projects=PROJECTS,
+                                      gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "ok")
+        self.assertFalse(any(c[1:3] == ("project", "list") for c in fake.calls))
 
 
 class TestVerifyProjectLinksRepo(unittest.TestCase):
@@ -905,6 +916,507 @@ class TestCliDryRun(unittest.TestCase):
             self.assertNotEqual(r.returncode, 0)
             self.assertIn(str(etalon), r.stderr)
             self.assertIn("no board-etalon block", r.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Task 5 fixtures: init wiring. NEVER a real gh call — FakeGh only.
+
+INIT_ETALON = bb.Etalon(
+    fields=[
+        {"name": "Status", "type": "single_select",
+         "options": ["Hold", "Backlog", "In IMPL"]},
+        {"name": "Priority", "type": "single_select",
+         "options": ["Critical", "High", "Medium", "Low"]},
+    ],
+    host_budgets={"imac": 2, "macbook": 1},
+)
+
+
+def builtin_field() -> dict:
+    """The built-in Status single-select every new project ships with."""
+    return gh_field("Status", ["Todo", "In Progress", "Done"])
+
+
+class InitGh:
+    """FakeGh extension answering the full init sequence.
+
+    Emulates gh semantics faithfully (gh 2.100.0 --help + the rollout log):
+    mutations mutate internal state and stay silent on success; failures
+    raise SystemExit exactly like the real gh_json wrapper; field-list /
+    item-list reflect current state; ids are minted per resource at run time.
+    """
+
+    def __init__(self, *, projects=None, linked_pids=None, issues=None,
+                 fail_verb=None, fail_object=None, auth_rc=0):
+        self.projects = projects if projects is not None else []
+        self.linked_pids = linked_pids if linked_pids is not None else set()
+        self.issues = issues if issues is not None else [
+            {"number": 1, "url": "https://github.com/mkosinov/superagents/issues/1"},
+            {"number": 2, "url": "https://github.com/mkosinov/superagents/issues/2"},
+        ]
+        self.fail_verb = fail_verb      # e.g. "link" — its FIRST call fails
+        self.fail_object = fail_object  # e.g. {"field-create": "Priority"} —
+        self._failed_verbs = set()      #   the named object always fails
+        self.auth_rc = auth_rc
+        self.auth_stderr = "" if auth_rc == 0 else "not logged in"
+        self.calls = []
+        # state of the project created by this run
+        self.created = None       # {"id", "number", "title"}
+        self.fields = [builtin_field()]  # fresh projects ship the built-in
+        self.items = []           # live item entries
+        self._ids = iter(range(1000, 2000))
+        self.linked = False
+
+    def _nid(self, prefix: str) -> str:
+        return f"{prefix}_{next(self._ids)}"
+
+    def _boom(self, argv: str) -> SystemExit:
+        return SystemExit(f"gh error ({argv}): simulated failure")
+
+    def _should_fail(self, verb: str, obj: str | None) -> bool:
+        if self.fail_object and verb in self.fail_object \
+                and self.fail_object[verb] == obj:
+            return True
+        if self.fail_verb and verb == self.fail_verb and verb not in self._failed_verbs:
+            self._failed_verbs.add(verb)
+            return True
+        return False
+
+    def gh(self, argv):
+        self.calls.append(("gh", *argv))
+        if len(argv) > 1 and argv[1] == "field-delete":
+            # mutations are silent: exit status only (verified by read-back)
+            fid = argv[argv.index("--id") + 1]
+            if self._should_fail("field-delete", fid):
+                return types.SimpleNamespace(
+                    returncode=1, stderr="gh: cannot delete built-in field")
+            self.fields = [f for f in self.fields if f["id"] != fid]
+            return types.SimpleNamespace(returncode=0, stderr="")
+        return types.SimpleNamespace(returncode=self.auth_rc,
+                                     stderr=self.auth_stderr)
+
+    def gh_json(self, argv):
+        self.calls.append(("gh", *argv))
+        verb = argv[1] if len(argv) > 1 else ""
+        if argv[0] == "issue" and verb == "list":
+            if self._should_fail("issue-list", None):
+                raise self._boom("gh issue list")
+            return list(self.issues)
+        if argv[0] == "project" and verb == "list":
+            return {"projects": list(self.projects)}
+        if verb == "create":
+            if self._should_fail("create", None):
+                raise self._boom("gh project create")
+            self.created = {"id": "PVT_1010", "number": 7,
+                            "title": argv[argv.index("--title") + 1]}
+            return dict(self.created)
+        if verb == "field-list":
+            return {"fields": [dict(f, options=list(f["options"]))
+                               for f in self.fields]}
+        if verb == "field-create":
+            name = argv[argv.index("--name") + 1]
+            if self._should_fail("field-create", name):
+                raise self._boom(f"gh project field-create --name {name}")
+            opts = argv[argv.index("--single-select-options") + 1].split(",")
+            self.fields.append(gh_field(name, opts, "ProjectV2SingleSelectField"))
+            return {}
+        if verb == "link":
+            if self._should_fail("link", None):
+                raise self._boom("gh project link")
+            self.linked = True
+            return {}
+        if verb == "item-list":
+            return {"items": [dict(i) for i in self.items]}
+        if verb == "item-add":
+            url = argv[argv.index("--url") + 1]
+            if self._should_fail("item-add", url):
+                raise self._boom(f"gh project item-add --url {url}")
+            number = int(url.rsplit("/", 1)[1])
+            self.items.append({"id": f"PVTI_{number}", "number": number,
+                               "url": url, "status": None})
+            return {"id": f"PVTI_{number}"}
+        if verb == "item-edit":
+            iid = argv[argv.index("--id") + 1]
+            if self._should_fail("item-edit", iid):
+                raise self._boom(f"gh project item-edit --id {iid}")
+            fid = argv[argv.index("--field-id") + 1]
+            oid = argv[argv.index("--single-select-option-id") + 1]
+            field = next(f for f in self.fields if f["id"] == fid)
+            opt = next(o for o in field["options"] if o["id"] == oid)
+            for it in self.items:
+                if it["id"] == iid:
+                    it["status"] = opt["name"]
+            return {}
+        raise AssertionError(f"unexpected gh json call: {argv}")
+
+    def gql(self, query):
+        self.calls.append(("gql", query))
+        if "__type" in query:
+            return introspection("repositories")
+        if "updateProjectV2Field" in query:
+            names = re.findall(r'\{name:"([^"]*)"', query)
+            for f in self.fields:
+                if f["name"] == "Status":
+                    f["options"] = [{"id": self._nid("PVTSSO"), "name": n}
+                                    for n in names]
+            return {"updateProjectV2Field": {"projectV2": {"id": "PVT_1010"}}}
+        pids = [p["id"] for p in self.projects]
+        if self.created:
+            pids.append(self.created["id"])
+        pid = next(pid for pid in pids if f'"{pid}"' in query)
+        row = next(p for p in self.projects + ([self.created] if self.created else [])
+                   if p["id"] == pid)
+        nodes = ([{"owner": {"login": "mkosinov"}, "name": "superagents"}]
+                 if (pid in self.linked_pids or (self.created and pid == self.created["id"]
+                                                 and self.linked)) else [])
+        return {"node": {"id": pid, "number": row["number"], "title": row["title"],
+                         "repositories": {"nodes": nodes}}}
+
+
+class TestFormatPartialFailure(unittest.TestCase):
+    """The partial-failure report: what exists, per-resource cleanup, adopt."""
+
+    def test_full_report_after_field_and_seed_stages(self):
+        created = {
+            "project": {"id": "PVT_kwDOABVmAs4A", "number": 7, "title": "B"},
+            "owner": "mkosinov", "repo": "mkosinov/superagents",
+            "fields": [("Status", "PVTSSF_1"), ("Priority", "PVTSSF_2")],
+            "items": [(1, "https://github.com/mkosinov/superagents/issues/1", "PVTI_1"),
+                      (2, "https://github.com/mkosinov/superagents/issues/2", "PVTI_2")],
+        }
+        text = bb.format_partial_failure(created, "boom at item-edit")
+        self.assertIn("PVT_kwDOABVmAs4A", text)
+        self.assertIn("#7", text)
+        self.assertIn("Status", text)
+        self.assertIn("PVTSSF_1", text)
+        self.assertIn("PVTI_2", text)
+        self.assertIn("boom at item-edit", text)
+        # per-resource cleanup route (web board page), not just project-level
+        self.assertIn("web", text.lower())
+        # adopt recovery route with the runnable command shape
+        self.assertIn("adopt 7", text)
+        self.assertIn("--repo mkosinov/superagents", text)
+
+    def test_minimal_report_after_create_only(self):
+        created = {"project": {"id": "PVT_x", "number": 3, "title": "T"},
+                   "owner": "mkosinov", "repo": "mkosinov/superagents",
+                   "fields": [], "items": []}
+        text = bb.format_partial_failure(created, "gh: field-delete failed")
+        self.assertIn("PVT_x", text)
+        self.assertIn("#3", text)
+        self.assertIn("field-delete", text)
+        self.assertIn("adopt 3", text)
+        # nothing created besides the project: no empty field/item bullets
+        self.assertNotIn("fields created", text)
+        self.assertNotIn("items added", text)
+
+    def test_report_when_nothing_was_created(self):
+        created = {"project": None, "owner": "mkosinov",
+                   "repo": "mkosinov/superagents", "fields": [], "items": []}
+        text = bb.format_partial_failure(created, "gh error (create): boom")
+        self.assertIn("nothing", text.lower())
+        self.assertIn("boom", text)
+        self.assertNotIn("adopt ", text)  # no number exists to adopt
+
+
+class TestCmdInit(unittest.TestCase):
+    """init wiring on fixtures: exact argv sequence, refusals, recovery."""
+
+    def run_init(self, fake, args, etalon=None):
+        """Capture stdout/stderr; cmd_init signals via return code / SystemExit."""
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = bb.cmd_init(args, etalon or INIT_ETALON,
+                             gh=fake.gh, gh_json=fake.gh_json, gql=fake.gql)
+        return rc, out.getvalue(), err.getvalue()
+
+    AUTH = ("gh", "auth", "status")
+
+    def LIST(self, owner="mkosinov"):
+        return ("gh", "project", "list", "--owner", owner,
+                "--format", "json", "--limit", "1000")
+
+    def FIELD_LIST(self):
+        return ("gh", "project", "field-list", "7", "--owner", "mkosinov",
+                 "--format", "json", "--limit", "200")
+
+    def ITEM_LIST(self):
+        return ("gh", "project", "item-list", "7", "--owner", "mkosinov",
+                 "--format", "json", "--limit", "1000")
+
+    def test_happy_path_argv_sequence(self):
+        """The verified mutation sequence, --limit on every list read."""
+        fake = InitGh()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            rc, stdout, _ = self.run_init(
+                fake, init_args(title="New Board", out=str(out)))
+            self.assertEqual(rc, 0, stdout)
+            # 1. auth pre-flight; 2. ONE project list read feeding both guards
+            self.assertEqual(fake.calls[0], self.AUTH)
+            self.assertEqual(fake.calls[1], self.LIST())
+            self.assertEqual(fake.calls[2][0], "gql")  # guard introspection
+            self.assertIn("__type", fake.calls[2][1])
+            self.assertEqual(sum(1 for c in fake.calls
+                                 if c[1:3] == ("project", "list")), 1)
+            # 3. create (explicit owner, never @me)
+            self.assertEqual(
+                fake.calls[3],
+                ("gh", "project", "create", "--owner", "mkosinov",
+                 "--title", "New Board", "--format", "json"))
+            # 4. field-list (builtin lookup) → field-delete → verify read-back
+            self.assertEqual(fake.calls[4], self.FIELD_LIST())
+            self.assertEqual(
+                fake.calls[5],
+                ("gh", "project", "field-delete", "--id", "PVTSSF_Status"))
+            self.assertEqual(fake.calls[6], self.FIELD_LIST())
+            self.assertNotIn("Todo", json.dumps(fake.fields))  # builtin gone
+            # 5. one field-create per etalon field (etalon order) + verify read
+            creates = [c for c in fake.calls if c[1:3] == ("project", "field-create")]
+            self.assertEqual(
+                creates[0],
+                ("gh", "project", "field-create", "7", "--owner", "mkosinov",
+                 "--name", "Status", "--data-type", "SINGLE_SELECT",
+                 "--single-select-options", "Hold,Backlog,In IMPL",
+                 "--format", "json"))
+            self.assertEqual(creates[1][creates[1].index("--name") + 1], "Priority")
+            self.assertEqual(creates[1][creates[1].index("--single-select-options") + 1],
+                             "Critical,High,Medium,Low")
+            field_lists = [c for c in fake.calls if c[1:3] == ("project", "field-list")]
+            self.assertEqual(len(field_lists), 4)  # lookup + 3 verify reads
+            # 6. link
+            self.assertIn(("gh", "project", "link", "7", "--owner", "mkosinov",
+                           "--repo", "mkosinov/superagents"), fake.calls)
+            link_i = fake.calls.index(("gh", "project", "link", "7", "--owner",
+                                       "mkosinov", "--repo", "mkosinov/superagents"))
+            # …verified by a node read (repos connection), not assumed
+            self.assertEqual(fake.calls[link_i + 1][0], "gql")
+            self.assertIn('"PVT_1010"', fake.calls[link_i + 1][1])
+            self.assertIn("repositories", fake.calls[link_i + 1][1])
+            # 7. seed: ONE issue list call, explicit --limit 10000, json fields
+            lists = [c for c in fake.calls if c[1:3] == ("issue", "list")]
+            self.assertEqual(len(lists), 1)
+            self.assertEqual(
+                lists[0],
+                ("gh", "issue", "list", "--repo", "mkosinov/superagents",
+                 "--state", "open", "--limit", "10000", "--json", "number,url"))
+            adds = [c for c in fake.calls if c[1:3] == ("project", "item-add")]
+            self.assertEqual(len(adds), 2)
+            for i, c in enumerate(adds, start=1):
+                self.assertEqual(
+                    c,
+                    ("gh", "project", "item-add", "7", "--owner", "mkosinov",
+                     "--url", f"https://github.com/mkosinov/superagents/issues/{i}",
+                     "--format", "json"))
+            # item-edit: ids read at run time (project id from create json,
+            # field id from field-list, option id from field-list)
+            edits = [c for c in fake.calls if c[1:3] == ("project", "item-edit")]
+            self.assertEqual(len(edits), 2)
+            opt_id = next(o["id"] for f in fake.fields if f["name"] == "Status"
+                          for o in f["options"] if o["name"] == "Backlog")
+            for c in edits:
+                self.assertEqual(
+                    c,
+                    ("gh", "project", "item-edit", "--project-id", "PVT_1010",
+                     "--id", c[c.index("--id") + 1], "--field-id", "PVTSSF_Status",
+                     "--single-select-option-id", opt_id))
+            self.assertEqual(
+                edits[0][edits[0].index("--id") + 1], "PVTI_1")
+            self.assertEqual(
+                edits[1][edits[1].index("--id") + 1], "PVTI_2")
+            # 8. verification read after EVERY item mutation (add and edit)
+            item_lists = [c for c in fake.calls if c[1:3] == ("project", "item-list")]
+            self.assertEqual(len(item_lists), 4)
+            self.assertTrue(all(c == self.ITEM_LIST() for c in item_lists))
+            # 9. config written with live ids
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["project_id"], "PVT_1010")
+            self.assertEqual(config["project_number"], 7)
+            self.assertEqual(config["fields"],
+                             {"Status": "PVTSSF_Status", "Priority": "PVTSSF_Priority"})
+            self.assertEqual(config["host_budgets"], {"imac": 2, "macbook": 1})
+            self.assertIn("init #7", stdout)
+
+    def test_owner_flag_overrides_repo_owner(self):
+        fake = InitGh()
+        with tempfile.TemporaryDirectory() as td:
+            rc, _, _ = self.run_init(
+                fake, init_args(title="New Board", owner="someone",
+                                out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 0)
+            self.assertEqual(
+                fake.calls[3],
+                ("gh", "project", "create", "--owner", "someone",
+                 "--title", "New Board", "--format", "json"))
+
+    def test_issue_list_cap_refuses_with_report(self):
+        """Returned length hits the cap → refuse naming it, no seeding."""
+        fake = InitGh(issues=[{"number": i, "url": f"u/{i}"} for i in range(3)])
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            with mock.patch.object(bb, "ISSUE_LIST_LIMIT", 2):
+                rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 1)
+            self.assertIn("--limit 2", stdout)
+            self.assertIn("raise", stdout)
+            self.assertIn("adopt 7", stdout)  # recovery route still printed
+            self.assertFalse(out.exists())
+            self.assertFalse(any(c[1:3] == ("project", "item-add")
+                                 for c in fake.calls))
+
+    def test_verification_mismatch_stops_and_reports(self):
+        """item-list read-back disagrees with what was added → stop, report."""
+        fake = InitGh()
+        original = fake.gh_json
+
+        def gh_json(argv):
+            r = original(argv)
+            if argv[1] == "item-list":
+                r = {"items": r["items"][:-1]}  # read-back hides the last item
+            return r
+        fake.gh_json = gh_json
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 1)
+            self.assertIn("mismatch", stdout.lower())
+            self.assertIn("adopt 7", stdout)
+            self.assertFalse(out.exists())
+
+    def test_auth_failure_refuses_naming_it(self):
+        fake = InitGh(auth_rc=1)
+        with tempfile.TemporaryDirectory() as td:
+            with contextlib.redirect_stderr(io.StringIO()) as err:
+                with self.assertRaises(SystemExit) as ctx:
+                    bb.cmd_init(init_args(out=str(Path(td) / "c.json")),
+                                INIT_ETALON, gh=fake.gh, gh_json=fake.gh_json,
+                                gql=fake.gql)
+            self.assertIn("auth status", str(ctx.exception) + err.getvalue())
+            self.assertIn("authenticate", str(ctx.exception) + err.getvalue())
+            self.assertEqual(fake.calls, [self.AUTH])  # nothing after
+
+    def test_existing_config_refuses_before_any_mutation(self):
+        fake = InitGh()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            with self.assertRaises(SystemExit) as ctx:
+                bb.cmd_init(init_args(out=str(out)), INIT_ETALON,
+                            gh=fake.gh, gh_json=fake.gh_json, gql=fake.gql)
+            self.assertIn("duplicate project", str(ctx.exception))
+            # etalon → auth → guards: only the auth call happened, no mutations
+            self.assertEqual(fake.calls, [self.AUTH])
+            self.assertEqual(out.read_text(encoding="utf-8"), "{}")
+
+    def test_repo_already_linked_refuses_before_create(self):
+        fake = InitGh(projects=[{"number": 4, "id": "PVT_4", "title": "Old",
+                                 "closed": False}],
+                      linked_pids={"PVT_4"})
+        with tempfile.TemporaryDirectory() as td:
+            with self.assertRaises(SystemExit) as ctx:
+                bb.cmd_init(init_args(out=str(Path(td) / "c.json")), INIT_ETALON,
+                            gh=fake.gh, gh_json=fake.gh_json, gql=fake.gql)
+            self.assertIn("already linked", str(ctx.exception))
+            created = [c for c in fake.calls if c[1:3] == ("project", "create")]
+            self.assertEqual(created, [])  # no mutation after refusal
+
+    def test_title_collision_warns_and_proceeds(self):
+        fake = InitGh(projects=[{"number": 4, "id": "PVT_4", "title": "New Board",
+                                 "closed": False}])
+        with tempfile.TemporaryDirectory() as td:
+            rc, stdout, _ = self.run_init(
+                fake, init_args(title="New Board", out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 0)
+            self.assertIn("title collision", stdout.lower())
+
+    def test_midrun_failure_reports_created_and_recovery(self):
+        """field-create for Priority fails → report + NO further mutations."""
+        fake = InitGh(fail_object={"field-create": "Priority"})
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 1)
+            self.assertIn("partial init", stdout.lower())
+            self.assertIn("PVT_1010", stdout)
+            self.assertIn("#7", stdout)
+            self.assertIn("Status", stdout)       # the created field is named
+            self.assertIn("adopt 7", stdout)
+            self.assertIn("web", stdout.lower())  # per-resource cleanup route
+            self.assertFalse(out.exists())
+            after = [c for c in fake.calls
+                     if c[1:3] in (("project", "link"), ("issue", "list"),
+                                   ("project", "item-add"))]
+            self.assertEqual(after, [])  # stopped at the failure point
+
+    def test_midrun_failure_at_link(self):
+        fake = InitGh(fail_verb="link")
+        with tempfile.TemporaryDirectory() as td:
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 1)
+            self.assertIn("partial init", stdout.lower())
+            self.assertIn("adopt 7", stdout)
+            seeded = [c for c in fake.calls if c[1:3] == ("issue", "list")]
+            self.assertEqual(seeded, [])
+
+    def test_midrun_failure_at_item_add(self):
+        fake = InitGh(fail_object={
+            "item-add": "https://github.com/mkosinov/superagents/issues/2"})
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 1)
+            self.assertIn("adopt 7", stdout)
+            self.assertIn("issues/1", stdout)  # the one added item is named
+            self.assertFalse(out.exists())
+
+    def test_midrun_failure_at_create_reports_nothing_created(self):
+        fake = InitGh(fail_verb="create")
+        with tempfile.TemporaryDirectory() as td:
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 1)
+            self.assertIn("partial init", stdout.lower())
+            self.assertIn("project create", stdout)
+            # nothing was created: no bogus resources, no adopt route
+            self.assertIn("nothing", stdout.lower())
+            self.assertNotIn("adopt ", stdout)
+
+    def test_field_delete_failure_uses_graphql_fallback(self):
+        """Built-in Status undeletable → documented GraphQL option-list
+        rewrite on the still-empty project; the sequence continues."""
+        fake = InitGh(fail_object={"field-delete": "PVTSSF_Status"})
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 0, stdout)
+            self.assertIn("fallback", stdout.lower())
+            mutations = [c for c in fake.calls if c[0] == "gql"
+                         and "updateProjectV2Field" in c[1]]
+            self.assertEqual(len(mutations), 1)
+            self.assertIn('"PVTSSF_Status"', mutations[0][1])
+            self.assertIn('name:"Hold"', mutations[0][1])
+            # Status is NOT re-created (the rewrite made it the etalon field)
+            created_names = [c[c.index("--name") + 1] for c in fake.calls
+                             if c[1:3] == ("project", "field-create")]
+            self.assertEqual(created_names, ["Priority"])
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["project_id"], "PVT_1010")
+            self.assertEqual(config["fields"]["Status"], "PVTSSF_Status")
+
+    def test_fallback_failure_stops_with_partial_report(self):
+        """GraphQL fallback also fails → stop with the partial report."""
+        fake = InitGh(fail_object={"field-delete": "PVTSSF_Status"})
+        original = fake.gql
+
+        def gql(query):
+            if "updateProjectV2Field" in query:
+                raise SystemExit("gh api error: graphql refused the mutation")
+            return original(query)
+        fake.gql = gql
+        with tempfile.TemporaryDirectory() as td:
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 1)
+            self.assertIn("partial init", stdout.lower())
+            self.assertIn("adopt 7", stdout)
 
 
 if __name__ == "__main__":
