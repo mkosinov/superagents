@@ -7,10 +7,13 @@ stdlib unittest only (repo has no pytest). The module under test lives in
 .zcode/scripts/ (the .opencode/scripts/ copy is a byte-identical twin).
 """
 import argparse
+import contextlib
+import io
 import json
 import subprocess
 import sys
 import tempfile
+import types
 import unittest
 from pathlib import Path
 
@@ -385,6 +388,471 @@ class TestWriteConfig(unittest.TestCase):
             text = path.read_text(encoding="utf-8")
             self.assertIn('  "version": 1,', text)  # top-level keys at indent=2
             self.assertEqual(json.loads(text), config)
+
+
+# ---------------------------------------------------------------------------
+# Task 4 fixtures: guards, adopt wiring. NEVER a real gh call — FakeGh only.
+
+def introspection(*connection_names: str) -> dict:
+    """Schema-introspection fixture: __type.fields[].name list."""
+    names = ("id", "number", "title", *connection_names)
+    return {"__type": {"fields": [{"name": n} for n in names]}}
+
+
+PROJECTS = [
+    {"number": 4, "id": "PVT_4", "title": "Superagents", "closed": False},
+    {"number": 3, "id": "PVT_3", "title": "Memo Project", "closed": False},
+]
+NODES_SUPERAGENTS = [{"owner": {"login": "mkosinov"}, "name": "superagents"}]
+NODES_MEMO = [{"owner": {"login": "mkosinov"}, "name": "memo"}]
+
+
+class FakeGh:
+    """Fixture-backed stand-in for the thin gh wrappers; records every argv.
+
+    gql answers introspection queries from `introspection` and node queries by
+    the PVT id embedded in the query, keyed by the connection name the query
+    asked for — mirroring the documented query shapes, nothing else.
+    """
+
+    def __init__(self, *, introspect=None, projects=None, nodes_by_id=None,
+                 fields=None):
+        self.introspect = introspect if introspect is not None else introspection("repositories")
+        self.projects = projects if projects is not None else PROJECTS
+        self.nodes_by_id = nodes_by_id if nodes_by_id is not None else {
+            "PVT_4": NODES_SUPERAGENTS, "PVT_3": NODES_MEMO}
+        self.fields = fields if fields is not None else []
+        self.auth_rc = 0
+        self.auth_stderr = ""
+        self.calls = []
+
+    def gh(self, argv):
+        self.calls.append(("gh", *argv))
+        return types.SimpleNamespace(returncode=self.auth_rc, stderr=self.auth_stderr)
+
+    def gh_json(self, argv):
+        self.calls.append(("gh", *argv))
+        if argv[:2] == ["project", "list"]:
+            return {"projects": self.projects}
+        if argv[:2] == ["project", "field-list"]:
+            return {"fields": self.fields}
+        raise AssertionError(f"unexpected gh json call: {argv}")
+
+    def gql(self, query):
+        self.calls.append(("gql", query))
+        if "__type" in query:
+            return self.introspect
+        pid = next(pid for pid in self.nodes_by_id if f'"{pid}"' in query)
+        conn = "linkedRepositories" if "linkedRepositories" in query else "repositories"
+        meta = {k: v for k, v in self.nodes_by_id_meta(pid).items() if k != "id"}
+        return {"node": {**meta, conn: {"nodes": self.nodes_by_id[pid]}}}
+
+    def nodes_by_id_meta(self, pid):
+        return next(p for p in self.projects if p["id"] == pid)
+
+
+def init_args(**kw):
+    ns = dict(mode="init", repo="mkosinov/superagents", title="New Board",
+              owner=None, etalon=None, out=None, force=False, dry_run=False)
+    ns.update(kw)
+    return argparse.Namespace(**ns)
+
+
+def adopt_args(**kw):
+    ns = dict(mode="adopt", project=4, repo="mkosinov/superagents",
+              owner=None, etalon=None, out=None, force=False, dry_run=False)
+    ns.update(kw)
+    return argparse.Namespace(**ns)
+
+
+def gh_field(name: str, options: list[str], type_: str = "ProjectV2SingleSelectField") -> dict:
+    """One live gh field-list entry (real gh type names, real id shapes)."""
+    return {
+        "id": f"PVTSSF_{name}",
+        "name": name,
+        "type": type_,
+        "options": [{"id": f"PVTSSO_{name}_{o}", "name": o} for o in options],
+    }
+
+
+def gh_matching_live() -> list[dict]:
+    """Live-typed field list matching compare_etalon() (Status + Priority)."""
+    return [
+        {"id": "PVTF_Title", "name": "Title", "type": "ProjectV2Field", "options": None},
+        gh_field("Status", ["Hold", "Backlog", "In Design", "Ready to IMPL", "In IMPL"]),
+        {"id": "PVTF_Labels", "name": "Labels", "type": "ProjectV2Field", "options": None},
+        gh_field("Priority", ["Critical", "High", "Medium", "Low"]),
+    ]
+
+
+class TestGuardConfigExists(unittest.TestCase):
+    """Local damage-prevention guard: the config path is checked offline."""
+
+    def test_ok_when_config_absent(self):
+        v = bb.guard_config_exists(Path("/no/such/board_config.json"))
+        self.assertEqual(v.status, "ok")
+
+    def test_refusal_names_path_and_damage(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            v = bb.guard_config_exists(out)
+            self.assertEqual(v.status, "refuse")
+            self.assertIn(str(out), v.message)
+            # mandated damage sentence, verbatim
+            self.assertIn("a second run creates a duplicate project, re-seeds "
+                          "the issues as duplicate cards, and overwrites the config",
+                          v.message)
+            self.assertIn("--force", v.message)  # the adopt escape hatch is named
+
+    def test_force_allows_deliberate_overwrite(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            v = bb.guard_config_exists(out, force=True)
+            self.assertEqual(v.status, "ok")
+            self.assertIn("deliberate", v.message)
+
+
+class TestFindRepoConnection(unittest.TestCase):
+    """Schema introspection: which ProjectV2 connection links repositories."""
+
+    def test_prefers_linked_repositories(self):
+        schema = introspection("linkedRepositories", "repositories")
+        self.assertEqual(bb.find_repo_connection(schema), "linkedRepositories")
+
+    def test_falls_back_to_repositories(self):
+        self.assertEqual(bb.find_repo_connection(introspection("repositories")),
+                         "repositories")
+
+    def test_none_when_schema_has_no_connection(self):
+        self.assertIsNone(bb.find_repo_connection(introspection()))
+        self.assertIsNone(bb.find_repo_connection({}))
+
+    def test_live_shape_from_the_real_schema(self):
+        """The actual introspection payload (pinned 2026-09-26): repositories."""
+        schema = {"__type": {"fields": [
+            {"name": n} for n in ("id", "number", "title", "fields", "items",
+                                  "repositories", "closed", "owner")]}}
+        self.assertEqual(bb.find_repo_connection(schema), "repositories")
+
+
+class TestGuardRepoHasProject(unittest.TestCase):
+    """init guard: refuse if ANY open project of the owner links the repo."""
+
+    def test_refuses_when_a_project_links_the_repo(self):
+        fake = FakeGh()
+        v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
+                                      gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "refuse")
+        self.assertIn("#4", v.message)
+        self.assertIn("Superagents", v.message)
+        self.assertIn("mkosinov/superagents", v.message)
+
+    def test_ok_when_no_project_links_the_repo(self):
+        fake = FakeGh(nodes_by_id={"PVT_4": NODES_MEMO, "PVT_3": []})
+        v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
+                                      gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "ok")
+
+    def test_downgrades_when_schema_has_no_connection(self):
+        fake = FakeGh(introspect=introspection())
+        v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
+                                      gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "skipped")
+        self.assertIn("skipped: no repository connection in schema", v.message)
+        # degradation happens before enumeration: no project list read
+        self.assertFalse(any(c[1:3] == ("project", "list") for c in fake.calls))
+
+    def test_refuses_when_list_hits_the_cap(self):
+        fake = FakeGh()
+        v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
+                                      gh_json=fake.gh_json, gql=fake.gql, limit=2)
+        self.assertEqual(v.status, "refuse")
+        self.assertIn("--limit 2", v.message)
+
+    def test_works_with_linked_repositories_connection(self):
+        fake = FakeGh(introspect=introspection("linkedRepositories"))
+        v = bb.guard_repo_has_project("mkosinov", "mkosinov/superagents",
+                                      gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "refuse")  # PVT_4 fixture links the repo
+
+
+class TestVerifyProjectLinksRepo(unittest.TestCase):
+    """adopt guard (inverse contract): refuse unless THE project links --repo."""
+
+    def test_ok_when_linked_and_carries_project_payload(self):
+        fake = FakeGh()
+        v = bb.verify_project_links_repo(4, "mkosinov", "mkosinov/superagents",
+                                         projects=PROJECTS, gql=fake.gql)
+        self.assertEqual(v.status, "ok")
+        self.assertEqual(v.project, PROJECTS[0])  # id feeds build_config
+
+    def test_default_path_lists_with_explicit_limit(self):
+        fake = FakeGh()
+        v = bb.verify_project_links_repo(4, "mkosinov", "mkosinov/superagents",
+                                         gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "ok")
+        self.assertIn(("gh", "project", "list", "--owner", "mkosinov",
+                       "--format", "json", "--limit", "1000"), fake.calls)
+
+    def test_refuses_when_project_not_linked(self):
+        fake = FakeGh(nodes_by_id={"PVT_4": NODES_MEMO})
+        v = bb.verify_project_links_repo(4, "mkosinov", "mkosinov/superagents",
+                                         projects=PROJECTS, gql=fake.gql)
+        self.assertEqual(v.status, "refuse")
+        self.assertIn("not linked", v.message)
+        self.assertIn("mkosinov/memo", v.message)  # names what IS linked
+
+    def test_refuses_when_project_number_unknown(self):
+        fake = FakeGh()
+        v = bb.verify_project_links_repo(99, "mkosinov", "mkosinov/superagents",
+                                         gh_json=fake.gh_json, gql=fake.gql)
+        self.assertEqual(v.status, "refuse")
+        self.assertIn("#99", v.message)
+        self.assertIn("not found", v.message)
+
+    def test_refuses_when_connection_missing(self):
+        fake = FakeGh(introspect=introspection())
+        v = bb.verify_project_links_repo(4, "mkosinov", "mkosinov/superagents",
+                                         projects=PROJECTS, gql=fake.gql)
+        self.assertEqual(v.status, "refuse")
+        self.assertIn("no repository connection in schema", v.message)
+
+
+class TestGuardTitleCollision(unittest.TestCase):
+    """Equal title among the owner's open projects: warn only, naming both."""
+
+    def test_warns_naming_existing_and_requested_title(self):
+        v = bb.guard_title_collision(PROJECTS, "Superagents")
+        self.assertEqual(v.status, "warn")
+        self.assertIn("#4", v.message)
+        self.assertIn("Superagents", v.message)
+
+    def test_ok_when_no_collision(self):
+        v = bb.guard_title_collision(PROJECTS, "A Fresh Title")
+        self.assertEqual(v.status, "ok")
+
+
+class TestCompareFieldsGhTypes(unittest.TestCase):
+    """compare_fields accepts the real gh type names, not just the fixture one."""
+
+    def test_live_select_type_recognized(self):
+        diff = bb.compare_fields(compare_etalon(), gh_matching_live())
+        self.assertEqual(diff["missing_fields"], [])
+        self.assertTrue(bb.ok_to_adopt(diff))
+
+    def test_live_metadata_columns_are_not_extras(self):
+        diff = bb.compare_fields(compare_etalon(), gh_matching_live() + [
+            {"id": "PVTF_Milestone", "name": "Milestone",
+             "type": "ProjectV2Field", "options": None}])
+        self.assertEqual(diff["extra_fields"], [])
+        self.assertTrue(bb.ok_to_adopt(diff))
+
+
+class TestPlanGuards(unittest.TestCase):
+    """Dry-run guard verdicts: local ones real, network ones deferred; strings."""
+
+    def test_init_local_verdict_plus_two_deferred(self):
+        out = Path("/tmp/nowhere/board_config.json")
+        lines = bb.plan_guards("init", init_args(out=str(out)), Path("/tmp/e.md"))
+        self.assertEqual(len(lines), 3)
+        self.assertTrue(lines[0].startswith("guard: ok:"))
+        self.assertIn(str(out), lines[0])
+        self.assertIn("read at run time", lines[1])
+        self.assertIn("mkosinov/superagents", lines[1])
+        self.assertIn("read at run time", lines[2])
+
+    def test_init_existing_config_renders_report_only_refusal(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            lines = bb.plan_guards("init", init_args(out=str(out)), Path("/tmp/e.md"))
+            self.assertIn("guard: refuse:", lines[0])
+            self.assertIn("duplicate project", lines[0])
+            self.assertIn("report-only", lines[0])
+
+    def test_adopt_existing_config_names_force(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            lines = bb.plan_guards("adopt", adopt_args(out=str(out)), Path("/tmp/e.md"))
+            self.assertEqual(len(lines), 1)
+            self.assertIn("guard: refuse:", lines[0])
+            self.assertIn("--force", lines[0])
+
+    def test_adopt_force_renders_deliberate_overwrite(self):
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            lines = bb.plan_guards("adopt", adopt_args(out=str(out), force=True),
+                                   Path("/tmp/e.md"))
+            self.assertTrue(lines[0].startswith("guard: ok:"))
+            self.assertIn("deliberate overwrite", lines[0])
+
+
+class TestCliDryRunGuards(unittest.TestCase):
+    """Dry-run stays report-only: guard refusals never change the exit code."""
+
+    SCRIPT = REPO / ".zcode" / "scripts" / "board_bootstrap.py"
+
+    def run_cli(self, *cli_args):
+        return subprocess.run([sys.executable, str(self.SCRIPT), *cli_args],
+                              capture_output=True, text=True)
+
+    def etalon_in(self, td):
+        etalon = Path(td) / "etalon.md"
+        etalon.write_text(doc(json.dumps(valid_block())), encoding="utf-8")
+        return etalon
+
+    def test_init_existing_config_exit_zero_with_damage_line(self):
+        with tempfile.TemporaryDirectory() as td:
+            etalon = self.etalon_in(td)
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            r = self.run_cli("init", "--dry-run", "--repo", "mkosinov/superagents",
+                             "--title", "T", "--etalon", str(etalon), "--out", str(out))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("duplicate project", r.stdout)
+            self.assertIn("report-only", r.stdout)
+            self.assertEqual(out.read_text(encoding="utf-8"), "{}")  # untouched
+
+    def test_adopt_existing_config_exit_zero(self):
+        with tempfile.TemporaryDirectory() as td:
+            etalon = self.etalon_in(td)
+            out = Path(td) / "board_config.json"
+            out.write_text("{}", encoding="utf-8")
+            r = self.run_cli("adopt", "4", "--dry-run", "--repo", "mkosinov/superagents",
+                             "--etalon", str(etalon), "--out", str(out))
+            self.assertEqual(r.returncode, 0, r.stderr)
+            self.assertIn("--force", r.stdout)
+
+    def test_malformed_repo_refuses(self):
+        with tempfile.TemporaryDirectory() as td:
+            etalon = self.etalon_in(td)
+            r = self.run_cli("init", "--dry-run", "--repo", "noslash",
+                             "--title", "T", "--etalon", str(etalon))
+            self.assertNotEqual(r.returncode, 0)
+            self.assertIn("owner/name", r.stderr)
+
+
+class TestCmdAdopt(unittest.TestCase):
+    """Live adopt wiring on fixtures: mandated order, refusals, config write."""
+
+    def run_adopt(self, fake, args, etalon=None):
+        """Adopt prints its success line; silence it unless asserted."""
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = bb.cmd_adopt(args, etalon or compare_etalon(),
+                              gh=fake.gh, gh_json=fake.gh_json, gql=fake.gql)
+        return rc, buf.getvalue()
+
+    def test_happy_path_order_config_written_no_mutations(self):
+        fake = FakeGh(fields=gh_matching_live())
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            self.run_adopt(fake, adopt_args(out=str(out)))            # mandated step order: auth → project list → introspection → node
+            # link query → field-list. Nothing else — adopt never mutates.
+            self.assertEqual(fake.calls[0], ("gh", "auth", "status"))
+            self.assertEqual(fake.calls[1], ("gh", "project", "list", "--owner",
+                                             "mkosinov", "--format", "json",
+                                             "--limit", "1000"))
+            self.assertEqual(fake.calls[2][0], "gql")
+            self.assertIn("__type", fake.calls[2][1])
+            self.assertEqual(fake.calls[3][0], "gql")
+            self.assertIn('"PVT_4"', fake.calls[3][1])
+            self.assertEqual(fake.calls[4], ("gh", "project", "field-list", "4",
+                                             "--owner", "mkosinov", "--format",
+                                             "json", "--limit", "200"))
+            self.assertEqual(len(fake.calls), 5)
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["project_id"], "PVT_4")
+            self.assertEqual(config["project_number"], 4)
+            self.assertEqual(config["owner"], "mkosinov")
+            self.assertEqual(config["repo"], "superagents")
+            self.assertEqual(config["fields"],
+                             {"Status": "PVTSSF_Status", "Priority": "PVTSSF_Priority"})
+            self.assertEqual(config["host_budgets"], {"imac": 2, "macbook": 1})
+
+    def test_auth_failure_refuses(self):
+        fake = FakeGh(fields=gh_matching_live())
+        fake.auth_rc, fake.auth_stderr = 1, "not logged in"
+        with tempfile.TemporaryDirectory() as td:
+            with self.assertRaises(SystemExit) as ctx:
+                self.run_adopt(fake, adopt_args(out=str(Path(td) / "c.json")))
+            self.assertIn("auth status", str(ctx.exception))
+
+    def test_unlinked_project_refuses_before_field_list(self):
+        fake = FakeGh(fields=gh_matching_live(), nodes_by_id={"PVT_4": NODES_MEMO})
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            with self.assertRaises(SystemExit) as ctx:
+                self.run_adopt(fake, adopt_args(out=str(out)))
+            self.assertIn("not linked", str(ctx.exception))
+            self.assertFalse(out.exists())
+            self.assertFalse(any(c[1:3] == ("project", "field-list") for c in fake.calls))
+
+    def test_unknown_project_number_refuses(self):
+        fake = FakeGh(fields=gh_matching_live())
+        with tempfile.TemporaryDirectory() as td:
+            with self.assertRaises(SystemExit) as ctx:
+                self.run_adopt(fake, adopt_args(project=99, out=str(Path(td) / "c.json")))
+            self.assertIn("not found", str(ctx.exception))
+
+    def test_field_list_cap_refuses(self):
+        fields = [gh_field(f"F{i:03d}", ["x"]) for i in range(200)]
+        fake = FakeGh(fields=fields)
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            with self.assertRaises(SystemExit) as ctx:
+                self.run_adopt(fake, adopt_args(out=str(out)))
+            self.assertIn("--limit 200", str(ctx.exception))
+            self.assertFalse(out.exists())
+
+    def test_missing_refuses_with_full_difference_list(self):
+        fields = gh_matching_live()
+        fields = [e for e in fields if e["name"] != "Priority"]  # field missing
+        fields[1]["options"] = [o for o in fields[1]["options"]
+                                if o["name"] != "In IMPL"]        # option missing
+        fake = FakeGh(fields=fields)
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            with self.assertRaises(SystemExit) as ctx:
+                self.run_adopt(fake, adopt_args(out=str(out)))
+            msg = str(ctx.exception)
+            self.assertIn("Priority", msg)   # full list: the missing field
+            self.assertIn("In IMPL", msg)    # …and the missing option
+            self.assertFalse(out.exists())
+
+    def test_extra_warns_and_proceeds(self):
+        fields = gh_matching_live() + [gh_field("Reviewer", ["me", "you"])]
+        fake = FakeGh(fields=fields)
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            _, stdout = self.run_adopt(fake, adopt_args(out=str(out)))
+            self.assertIn("Reviewer", stdout)
+            self.assertIn("warning", stdout)
+            self.assertTrue(out.exists())  # drift contract: extras proceed
+
+    def test_existing_config_refuses_naming_force(self):
+        fake = FakeGh(fields=gh_matching_live())
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text('{"old": true}', encoding="utf-8")
+            with self.assertRaises(SystemExit) as ctx:
+                self.run_adopt(fake, adopt_args(out=str(out)))
+            self.assertIn("--force", str(ctx.exception))
+            self.assertIn(out.read_text(encoding="utf-8"), '{"old": true}')
+
+    def test_force_overwrites_config(self):
+        fake = FakeGh(fields=gh_matching_live())
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "board_config.json"
+            out.write_text('{"old": true}', encoding="utf-8")
+            rc, _ = self.run_adopt(fake, adopt_args(out=str(out), force=True))
+            self.assertEqual(rc, 0)
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["project_id"], "PVT_4")
 
 
 class TestCliDryRun(unittest.TestCase):
