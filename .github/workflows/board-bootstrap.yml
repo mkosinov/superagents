@@ -1,0 +1,26 @@
+name: board-bootstrap
+on:
+  push:
+    paths: [".zcode/scripts/board_bootstrap.py", ".opencode/scripts/board_bootstrap.py", "docs/board/board-etalon.md", "tests/**"]
+  pull_request:
+    paths: [".zcode/scripts/board_bootstrap.py", ".opencode/scripts/board_bootstrap.py", "docs/board/board-etalon.md", "tests/**"]
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m unittest discover -s tests -v
+      - name: init dry-run renders the plan
+        run: |
+          python3 .zcode/scripts/board_bootstrap.py init --repo example/tool --title "Smoke" --dry-run | tee /tmp/plan.txt
+          grep -q 'etalon: docs/board/board-etalon.md' /tmp/plan.txt
+          grep -q 'config: docs/board/board_config.json' /tmp/plan.txt
+          grep -q 'remove built-in field Status' /tmp/plan.txt
+      - name: adopt dry-run renders the comparison plan
+        run: |
+          python3 .zcode/scripts/board_bootstrap.py adopt 1 --repo example/tool --dry-run | tee /tmp/aplan.txt
+          grep -q 'etalon: docs/board/board-etalon.md' /tmp/aplan.txt
+          grep -q 'guard:' /tmp/aplan.txt
