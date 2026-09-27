@@ -18,7 +18,7 @@ cp -R <superagents-checkout>/.zcode/ .zcode/
 
 Then adapt for the project:
 
-- `.zcode/scripts/gh_board.py` AND `.opencode/scripts/gh_board.py` (identical copies) — create a GitHub Project for the new repo and bake its constants (`PROJECT_ID`, field/option IDs via the graphql query in the script header) into BOTH. Shipped values are the reference project (memo, Project #3) — replace them.
+- GitHub Project — copy `docs/board/board-etalon.md` from the canon checkout (the copy steps below ship only `.zcode/` and `.opencode/`, not `docs/`), or point `--etalon` at it; then run `board_bootstrap.py init` (or `adopt <number>` for an existing board) from either script copy — the twins are identical. The config lands at `docs/board/board_config.json` (`--out` for another repo) — commit it. **Transitional:** until #23 lands, `gh_board.py`'s constants (`PROJECT_ID`, field IDs — the graphql query in the script header) are still baked by hand into both twins; the committed config is what #23's parameterization consumes.
 - `.zcode/skills/design-phase/SKILL.md` — repo paths (pre-flight git directory), board statuses if your chain differs.
 - Models resolve via the shared omniroute gateway combos (`omniroute/panel-*`, `omniroute/plan-reviewer`) — machine-level user config, nothing per-project.
 
