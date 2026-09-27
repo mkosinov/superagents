@@ -1,7 +1,7 @@
 ---
 description: Plan reviewer. Verifies that a plan faithfully and completely expands the approved spec BEFORE any code is written (G2, DESIGN phase).
 mode: subagent
-model: omniroute/plan-reviewer
+model: opencode/big-pickle
 temperature: 0.1
 permission:
   read: allow

@@ -1,7 +1,7 @@
 ---
 description: Eyes for text-only agents — reads screenshots and images and answers concrete questions about what is visible. Dispatch with absolute image path(s) + a question when you cannot view an image yourself.
 mode: subagent
-model: omniroute/zai/glm-5.3-flash
+model: zai/glm-5.3-flash
 variant: max
 temperature: 0.1
 ---

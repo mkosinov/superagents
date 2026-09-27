@@ -1,7 +1,7 @@
 ---
 description: Project scribe — updates documentation, status files, and tracks progress after any agent completes work.
 mode: subagent
-model: omniroute/flash
+model: zai/glm-5.3-flash
 temperature: 0.3
 ---
 

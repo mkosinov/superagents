@@ -1,7 +1,7 @@
 ---
 description: Test environment specialist. Prepares the dev/test environment (servers, ports, DB seed, health) and runs test suites. Reports compact pass/fail results only.
 mode: subagent
-model: omniroute/flash
+model: zai/glm-5.3-flash
 variant: max
 temperature: 0.2
 permission:

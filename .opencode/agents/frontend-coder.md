@@ -1,7 +1,7 @@
 ---
 description: Frontend developer — implements UI components and pages in Next.js 14 with TypeScript and Tailwind CSS.
 mode: subagent
-model: omniroute/coder
+model: zai/glm-5.3
 temperature: 0.3
 permission:
   skill:

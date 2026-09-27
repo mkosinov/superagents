@@ -1,7 +1,7 @@
 ---
 description: Spec panel reviewer — application security perspective. Finds authentication, authorization/role, and security-model breakage risks in spec documents; returns an explicit no-attack-surface verdict when a spec touches none.
 mode: subagent
-model: omniroute/panel-security
+model: opencode/mimo-v2.6-flash-free
 temperature: 0.1
 permission:
   read: allow

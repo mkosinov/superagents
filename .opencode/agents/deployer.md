@@ -1,7 +1,7 @@
 ---
 description: Handles deployment to production. Manages releases, CI/CD, monitoring, and rollback.
 mode: subagent
-model: omniroute/flash
+model: zai/glm-5.3-flash
 temperature: 0.1
 ---
 

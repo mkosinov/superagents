@@ -1,7 +1,7 @@
 ---
 description: Workflow manager. Single entry point. Brainstorming with the user, human gates, scratchpad owner, phase dispatch to @architect, FasTP direct dispatch to coders.
 mode: primary
-model: omniroute/architect
+model: zai/glm-5.3
 variant: high
 temperature: 0.3
 permission:

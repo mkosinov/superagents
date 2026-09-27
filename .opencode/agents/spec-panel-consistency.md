@@ -1,7 +1,7 @@
 ---
 description: Spec panel reviewer — consistency perspective. Finds contradictions within the spec and conflicts with existing code, domain rules, and conventions.
 mode: subagent
-model: omniroute/panel-consistency
+model: opencode/ling-3.0-flash-fin-free
 temperature: 0.1
 permission:
   read: allow
