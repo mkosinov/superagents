@@ -151,6 +151,20 @@ def effective_config_path(args) -> Path:
     return Path(args.out) if args.out else DEFAULT_CONFIG
 
 
+def display_path(path: Path) -> Path:
+    """Plan-line rendering: repo-relative inside the repo root, as given outside.
+
+    The dry-run etalon/config lines are a stable CI-grep contract
+    ("docs/board/board-etalon.md") — relative output survives different
+    checkouts (CI runner vs local), absolute output does not. Explicit
+    --etalon/--out targets outside the repo keep their given form.
+    """
+    try:
+        return path.relative_to(REPO_ROOT)
+    except ValueError:
+        return path
+
+
 def gh(argv: list[str]):
     """Thin gh runner (argv list, never shell=True) — mirrors gh_board.py."""
     return subprocess.run(["gh", *argv], capture_output=True, text=True)
@@ -372,7 +386,7 @@ def render_plan(mode: str, args, etalon: Etalon, etalon_path: Path,
     comparison instead of the create/link lines. Guard verdicts appended
     report-only, one line per guard.
     """
-    lines = [f"etalon: {etalon_path}"]
+    lines = [f"etalon: {display_path(etalon_path)}"]
     if mode == "init":
         lines.append(f'project: create "{args.title}" (owner {effective_owner(args)})')
         lines.append("remove built-in field Status (Todo / In Progress / Done)")
@@ -386,7 +400,7 @@ def render_plan(mode: str, args, etalon: Etalon, etalon_path: Path,
         lines.append("refuse: missing field or option; "
                      "warn: extra field or option (drift contract)")
         lines.append(f"verify: project #{args.project} is linked to {args.repo}")
-    lines.append(f"config: {effective_config_path(args)}")
+    lines.append(f"config: {display_path(effective_config_path(args))}")
     lines.extend(guard_verdicts)
     return "\n".join(lines)
 

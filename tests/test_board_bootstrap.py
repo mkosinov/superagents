@@ -211,7 +211,7 @@ class TestRenderPlan(unittest.TestCase):
         self.assertEqual(lines[4], "create Priority: Critical | High")
         self.assertIn("link: mkosinov/superagents", lines)
         self.assertIn("seed: open issues would be listed live (--dry-run: no network)", lines)
-        self.assertIn("config: " + str(REPO / "docs" / "board" / "board_config.json"), lines)
+        self.assertIn("config: docs/board/board_config.json", lines)
         # one guard line per guard verdict, after the plan body
         self.assertEqual(lines[-1], "guard: config exists at /tmp/out/board_config.json: not-checked-yet (planned)")
         self.assertEqual(sum(1 for l in lines if l.startswith("guard: ")), 1)
@@ -228,6 +228,21 @@ class TestRenderPlan(unittest.TestCase):
         lines = self.lines("init", self.args_with(out="/tmp/out/board_config.json"))
         self.assertIn("config: /tmp/out/board_config.json", lines)
 
+    def test_default_config_renders_repo_relative(self):
+        """Plan lines print repo-relative paths (stable CI grep contract)."""
+        lines = self.lines("init")
+        self.assertIn("config: docs/board/board_config.json", lines)
+
+    def test_etalon_inside_repo_renders_repo_relative(self):
+        etalon_in_repo = REPO / "docs" / "board" / "board-etalon.md"
+        lines = bb.render_plan("init", self.args, self.etalon, etalon_in_repo,
+                               self.guards).splitlines()
+        self.assertEqual(lines[0], "etalon: docs/board/board-etalon.md")
+
+    def test_outside_repo_paths_render_as_given(self):
+        lines = self.lines("init")
+        self.assertEqual(lines[0], "etalon: /tmp/some/board-etalon.md")
+
     def test_adopt_prints_comparison_instead_of_create_link(self):
         lines = self.lines("adopt", self.args_with(mode="adopt", project=4))
         self.assertEqual(lines[0], "etalon: /tmp/some/board-etalon.md")
@@ -235,7 +250,7 @@ class TestRenderPlan(unittest.TestCase):
         self.assertIn("refuse: missing field or option; warn: extra field or option (drift contract)", lines)
         create_lines = [l for l in lines if l.startswith("create ") or l.startswith("link: ")]
         self.assertEqual(create_lines, [])
-        self.assertIn("config: " + str(REPO / "docs" / "board" / "board_config.json"), lines)
+        self.assertIn("config: docs/board/board_config.json", lines)
         self.assertEqual(lines[-1].startswith("guard: "), True)
 
 
@@ -884,6 +899,14 @@ class TestCliDryRun(unittest.TestCase):
                              "--title", "Superagents", "--etalon", str(etalon))
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertIn(f"etalon: {etalon}", r.stdout)
+
+    def test_init_dry_run_default_paths_are_repo_relative(self):
+        """The CI contract: default etalon/config render as repo-relative."""
+        r = self.run_cli("init", "--dry-run", "--repo", "example/tool",
+                         "--title", "Smoke")
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertIn("etalon: docs/board/board-etalon.md", r.stdout)
+        self.assertIn("config: docs/board/board_config.json", r.stdout)
 
     def test_init_dry_run_out_override(self):
         with tempfile.TemporaryDirectory() as td:
