@@ -18,7 +18,7 @@ jobs:
           python3 .zcode/scripts/board_bootstrap.py init --repo example/tool --title "Smoke" --dry-run | tee /tmp/plan.txt
           grep -q 'etalon: docs/board/board-etalon.md' /tmp/plan.txt
           grep -q 'config: docs/board/board_config.json' /tmp/plan.txt
-          grep -q 'remove built-in field Status' /tmp/plan.txt
+          grep -q 'synced in place' /tmp/plan.txt
       - name: adopt dry-run renders the comparison plan
         run: |
           python3 .zcode/scripts/board_bootstrap.py adopt 1 --repo example/tool --dry-run | tee /tmp/aplan.txt
