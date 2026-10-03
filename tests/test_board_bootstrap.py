@@ -206,9 +206,13 @@ class TestRenderPlan(unittest.TestCase):
         lines = self.lines("init")
         self.assertEqual(lines[0], "etalon: /tmp/some/board-etalon.md")
         self.assertEqual(lines[1], 'project: create "Superagents" (owner mkosinov)')
-        self.assertEqual(lines[2], "remove built-in field Status (Todo / In Progress / Done)")
-        self.assertEqual(lines[3], "create Status: Hold | Backlog | In IMPL")
-        self.assertEqual(lines[4], "create Priority: Critical | High")
+        self.assertEqual(
+            lines[2],
+            "fields: created when absent; existing same-name fields get "
+            "their options synced in place (built-in fields cannot "
+            "be deleted)")
+        self.assertEqual(lines[3], "Status: Hold | Backlog | In IMPL")
+        self.assertEqual(lines[4], "Priority: Critical | High")
         self.assertIn("link: mkosinov/superagents", lines)
         self.assertIn("seed: open issues would be listed live (--dry-run: no network)", lines)
         self.assertIn("config: docs/board/board_config.json", lines)
@@ -983,9 +987,11 @@ class InitGh:
         self.auth_rc = auth_rc
         self.auth_stderr = "" if auth_rc == 0 else "not logged in"
         self.calls = []
+        self.item_list_lag = []  # queued stale item-list snapshots served first
         # state of the project created by this run
         self.created = None       # {"id", "number", "title"}
         self.fields = [builtin_field()]  # fresh projects ship the built-in
+        self._builtin_fids = {self.fields[0]["id"]}  # undeletable, live truth
         self.items = []           # live item entries
         self._ids = iter(range(1000, 2000))
         self.linked = False
@@ -1010,10 +1016,40 @@ class InitGh:
         if len(argv) > 1 and argv[1] == "field-delete":
             # mutations are silent: exit status only (verified by read-back)
             fid = argv[argv.index("--id") + 1]
+            if fid in self._builtin_fids:
+                # live truth (pinned 2026-10-03): built-in fields cannot be
+                # deleted — the API refuses them, always.
+                return types.SimpleNamespace(
+                    returncode=1,
+                    stderr="GraphQL: Only custom fields can be deleted. "
+                           "(deleteProjectV2Field)")
             if self._should_fail("field-delete", fid):
                 return types.SimpleNamespace(
                     returncode=1, stderr="gh: cannot delete built-in field")
             self.fields = [f for f in self.fields if f["id"] != fid]
+            return types.SimpleNamespace(returncode=0, stderr="")
+        if len(argv) > 1 and argv[1] == "link":
+            # live truth (gh 2.100.0): `project link` is a silent-success
+            # mutation — rc only, NO stdout, and its help lists no --format.
+            if self._should_fail("link", None):
+                return types.SimpleNamespace(returncode=1,
+                                             stderr="gh: link failed")
+            self.linked = True
+            return types.SimpleNamespace(returncode=0, stderr="")
+        if len(argv) > 1 and argv[1] == "item-edit":
+            # live truth (gh 2.100.0): `project item-edit` is likewise a
+            # silent-success mutation — rc only, NO stdout, no --format.
+            iid = argv[argv.index("--id") + 1]
+            if self._should_fail("item-edit", iid):
+                return types.SimpleNamespace(returncode=1,
+                                             stderr="gh: item-edit failed")
+            fid = argv[argv.index("--field-id") + 1]
+            oid = argv[argv.index("--single-select-option-id") + 1]
+            fld = next(f for f in self.fields if f["id"] == fid)
+            opt = next(o for o in fld["options"] if o["id"] == oid)
+            for it in self.items:
+                if it["id"] == iid:
+                    it["status"] = opt["name"]
             return types.SimpleNamespace(returncode=0, stderr="")
         return types.SimpleNamespace(returncode=self.auth_rc,
                                      stderr=self.auth_stderr)
@@ -1043,12 +1079,12 @@ class InitGh:
             opts = argv[argv.index("--single-select-options") + 1].split(",")
             self.fields.append(gh_field(name, opts, "ProjectV2SingleSelectField"))
             return {}
-        if verb == "link":
-            if self._should_fail("link", None):
-                raise self._boom("gh project link")
-            self.linked = True
-            return {}
         if verb == "item-list":
+            if self.item_list_lag:
+                # live truth (2026-10-03): the Projects API is eventually
+                # consistent — an immediate item-list after item-add/-edit
+                # can serve a STALE snapshot missing the fresh change.
+                return {"items": [dict(i) for i in self.item_list_lag.pop(0)]}
             return {"items": [dict(i) for i in self.items]}
         if verb == "item-add":
             url = argv[argv.index("--url") + 1]
@@ -1058,18 +1094,6 @@ class InitGh:
             self.items.append({"id": f"PVTI_{number}", "number": number,
                                "url": url, "status": None})
             return {"id": f"PVTI_{number}"}
-        if verb == "item-edit":
-            iid = argv[argv.index("--id") + 1]
-            if self._should_fail("item-edit", iid):
-                raise self._boom(f"gh project item-edit --id {iid}")
-            fid = argv[argv.index("--field-id") + 1]
-            oid = argv[argv.index("--single-select-option-id") + 1]
-            field = next(f for f in self.fields if f["id"] == fid)
-            opt = next(o for o in field["options"] if o["id"] == oid)
-            for it in self.items:
-                if it["id"] == iid:
-                    it["status"] = opt["name"]
-            return {}
         raise AssertionError(f"unexpected gh json call: {argv}")
 
     def gql(self, query):
@@ -1077,12 +1101,16 @@ class InitGh:
         if "__type" in query:
             return introspection("repositories")
         if "updateProjectV2Field" in query:
+            # live semantics: singleSelectOptions is the FULL replacement
+            # list for the field named by input.fieldId; omitted option ids
+            # are re-assigned. Payload exposes projectV2Field (2026-10-03).
+            fid = re.search(r'fieldId:"([^"]*)"', query).group(1)
             names = re.findall(r'\{name:"([^"]*)"', query)
             for f in self.fields:
-                if f["name"] == "Status":
+                if f["id"] == fid:
                     f["options"] = [{"id": self._nid("PVTSSO"), "name": n}
                                     for n in names]
-            return {"updateProjectV2Field": {"projectV2": {"id": "PVT_1010"}}}
+            return {"updateProjectV2Field": {"projectV2Field": {"id": fid}}}
         pids = [p["id"] for p in self.projects]
         if self.created:
             pids.append(self.created["id"])
@@ -1187,26 +1215,28 @@ class TestCmdInit(unittest.TestCase):
                 fake.calls[3],
                 ("gh", "project", "create", "--owner", "mkosinov",
                  "--title", "New Board", "--format", "json"))
-            # 4. field-list (builtin lookup) → field-delete → verify read-back
+            # 4. field-list (lookup) → IN-PLACE option sync of the built-in
+            #    Status (field-delete is never called — built-ins are
+            #    undeletable) → verify read-back
             self.assertEqual(fake.calls[4], self.FIELD_LIST())
-            self.assertEqual(
-                fake.calls[5],
-                ("gh", "project", "field-delete", "--id", "PVTSSF_Status"))
+            self.assertFalse(any(c[1:3] == ("project", "field-delete")
+                                 for c in fake.calls))
+            self.assertEqual(fake.calls[5][0], "gql")
+            self.assertIn("updateProjectV2Field", fake.calls[5][1])
+            self.assertIn('fieldId:"PVTSSF_Status"', fake.calls[5][1])
             self.assertEqual(fake.calls[6], self.FIELD_LIST())
             self.assertNotIn("Todo", json.dumps(fake.fields))  # builtin gone
-            # 5. one field-create per etalon field (etalon order) + verify read
+            # 5. field-create for ABSENT fields only (etalon order) + verify read
             creates = [c for c in fake.calls if c[1:3] == ("project", "field-create")]
+            self.assertEqual(len(creates), 1)  # Status synced, not created
             self.assertEqual(
                 creates[0],
                 ("gh", "project", "field-create", "7", "--owner", "mkosinov",
-                 "--name", "Status", "--data-type", "SINGLE_SELECT",
-                 "--single-select-options", "Hold,Backlog,In IMPL",
+                 "--name", "Priority", "--data-type", "SINGLE_SELECT",
+                 "--single-select-options", "Critical,High,Medium,Low",
                  "--format", "json"))
-            self.assertEqual(creates[1][creates[1].index("--name") + 1], "Priority")
-            self.assertEqual(creates[1][creates[1].index("--single-select-options") + 1],
-                             "Critical,High,Medium,Low")
             field_lists = [c for c in fake.calls if c[1:3] == ("project", "field-list")]
-            self.assertEqual(len(field_lists), 4)  # lookup + 3 verify reads
+            self.assertEqual(len(field_lists), 3)  # lookup + 2 verify reads
             # 6. link
             self.assertIn(("gh", "project", "link", "7", "--owner", "mkosinov",
                            "--repo", "mkosinov/superagents"), fake.calls)
@@ -1232,7 +1262,8 @@ class TestCmdInit(unittest.TestCase):
                      "--url", f"https://github.com/mkosinov/superagents/issues/{i}",
                      "--format", "json"))
             # item-edit: ids read at run time (project id from create json,
-            # field id from field-list, option id from field-list)
+            # field id from field-list, option id from field-list); a plain
+            # silent gh call — no --format (live: rc only, no stdout)
             edits = [c for c in fake.calls if c[1:3] == ("project", "item-edit")]
             self.assertEqual(len(edits), 2)
             opt_id = next(o["id"] for f in fake.fields if f["name"] == "Status"
@@ -1272,6 +1303,137 @@ class TestCmdInit(unittest.TestCase):
                 ("gh", "project", "create", "--owner", "someone",
                  "--title", "New Board", "--format", "json"))
 
+    def test_builtin_status_options_synced_in_place(self):
+        """The live defect (2026-09-27 run): built-in Status fields cannot
+        be deleted ("Only custom fields can be deleted"), so init must
+        converge the field IN PLACE — one updateProjectV2Field mutation
+        rewriting singleSelectOptions on the existing field id — and must
+        never call field-delete for it."""
+        fake = InitGh()
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 0, stdout)
+            # field-delete is never attempted (live: built-ins are undeletable)
+            self.assertFalse(any(c[1:3] == ("project", "field-delete")
+                                 for c in fake.calls),
+                             f"field-delete called: {fake.calls}")
+            # exactly ONE option-sync mutation, on the EXISTING built-in id
+            muts = [c[1] for c in fake.calls
+                    if c[0] == "gql" and "updateProjectV2Field" in c[1]]
+            self.assertEqual(len(muts), 1)
+            m = muts[0]
+            self.assertIn('fieldId:"PVTSSF_Status"', m)  # input.fieldId
+            self.assertIn("singleSelectOptions:[", m)     # input shape
+            self.assertIn('name:"Hold"', m)
+            self.assertIn("color:", m)                    # required enum
+            self.assertIn('description:""', m)            # required string
+            # response projection: the payload scalar only — projectV2Field
+            # is a UNION (direct subselections are invalid GraphQL and abort
+            # the whole mutation; verified live 2026-10-03)
+            self.assertIn("{clientMutationId}", m)
+            self.assertNotIn("projectV2", m)
+            # Status is NOT re-created; the synced field IS the etalon Status
+            created = [c[c.index("--name") + 1] for c in fake.calls
+                       if c[1:3] == ("project", "field-create")]
+            self.assertEqual(created, ["Priority"])
+            # read-back truth: etalon options, id unchanged
+            status = next(f for f in fake.fields if f["name"] == "Status")
+            self.assertEqual([o["name"] for o in status["options"]],
+                             ["Hold", "Backlog", "In IMPL"])
+            self.assertNotIn("Todo", json.dumps(fake.fields))
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["fields"]["Status"], "PVTSSF_Status")
+
+    def test_field_sync_is_idempotent_on_rerun(self):
+        """Convergence after a mid-way failure: a same-name field already in
+        etalon shape is left untouched (no re-create, no option rewrite);
+        absent fields are created; the run completes."""
+        fake = InitGh()
+        fake.fields = [gh_field("Status", ["Hold", "Backlog", "In IMPL"])]
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 0, stdout)
+            self.assertFalse(any(c[0] == "gql" and "updateProjectV2Field" in c[1]
+                                 for c in fake.calls))
+            self.assertFalse(any(c[1:3] == ("project", "field-create")
+                                 and c[c.index("--name") + 1] == "Status"
+                                 for c in fake.calls))
+            created = [c[c.index("--name") + 1] for c in fake.calls
+                       if c[1:3] == ("project", "field-create")]
+            self.assertEqual(created, ["Priority"])
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["fields"]["Status"], "PVTSSF_Status")
+
+    def test_project_link_is_a_silent_gh_call_not_json(self):
+        """Live truth (gh 2.100.0, 2026-10-03): `project link` succeeds
+        silently — rc 0, NO stdout, no --format in its help. init must call
+        it as a plain rc-checked gh command (the JSON wrapper crashed live
+        on the empty output) and verify the link via the node read-back."""
+        fake = InitGh()
+        with tempfile.TemporaryDirectory() as td:
+            rc, stdout, _ = self.run_init(
+                fake, init_args(out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 0, stdout)
+            links = [c for c in fake.calls if c[1:3] == ("project", "link")]
+            self.assertEqual(len(links), 1)
+            self.assertNotIn("--format", links[0])  # plain gh call
+            # the link is still verified by the node read-back right after
+            i = fake.calls.index(links[0])
+            self.assertEqual(fake.calls[i + 1][0], "gql")
+            self.assertIn("repositories", fake.calls[i + 1][1])
+
+    def test_item_edit_is_a_silent_gh_call_not_json(self):
+        """Live truth (gh 2.100.0, 2026-10-03): `project item-edit` is a
+        silent-success mutation — rc only, NO stdout (its help lists no
+        --format). init must call it as a plain rc-checked gh command; the
+        status change is verified by the settled item-list read-back."""
+        fake = InitGh()
+        with tempfile.TemporaryDirectory() as td:
+            rc, stdout, _ = self.run_init(
+                fake, init_args(out=str(Path(td) / "c.json")))
+            self.assertEqual(rc, 0, stdout)
+            edits = [c for c in fake.calls if c[1:3] == ("project", "item-edit")]
+            self.assertEqual(len(edits), 2)
+            for c in edits:
+                self.assertNotIn("--format", c)  # plain gh call
+            # every edit is followed by a settle read of item-list
+            for c in edits:
+                i = fake.calls.index(c)
+                self.assertEqual(
+                    fake.calls[i + 1][1:3], ("project", "item-list"))
+
+    def test_item_readback_settles_past_eventual_consistency(self):
+        """Live defect (2026-10-03 run): item-add succeeds but an immediate
+        item-list can serve a stale snapshot missing the new item — the
+        verification must retry briefly, not declare a mismatch at the
+        first read."""
+        fake = InitGh()
+        # first read after each add/edit serves a stale (empty) snapshot
+        fake.item_list_lag = [[], []]
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            with mock.patch.object(bb, "ITEM_SETTLE_DELAY", 0):
+                rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 0, stdout)
+            config = json.loads(out.read_text(encoding="utf-8"))
+            self.assertEqual(config["project_id"], "PVT_1010")
+
+    def test_item_that_never_appears_still_fails_with_report(self):
+        """Settle retries are bounded: an item that never shows up in the
+        read-back is still a verification mismatch → partial report."""
+        fake = InitGh()
+        fake.item_list_lag = [[]] * 30  # more stale reads than settle attempts
+        with tempfile.TemporaryDirectory() as td:
+            out = Path(td) / "c.json"
+            with mock.patch.object(bb, "ITEM_SETTLE_DELAY", 0):
+                rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            self.assertEqual(rc, 1)
+            self.assertIn("partial init", stdout.lower())
+            self.assertIn("adopt 7", stdout)
+            self.assertFalse(out.exists())
+
     def test_issue_list_cap_refuses_with_report(self):
         """Returned length hits the cap → refuse naming it, no seeding."""
         fake = InitGh(issues=[{"number": i, "url": f"u/{i}"} for i in range(3)])
@@ -1300,7 +1462,8 @@ class TestCmdInit(unittest.TestCase):
         fake.gh_json = gh_json
         with tempfile.TemporaryDirectory() as td:
             out = Path(td) / "c.json"
-            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
+            with mock.patch.object(bb, "ITEM_SETTLE_DELAY", 0):
+                rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
             self.assertEqual(rc, 1)
             self.assertIn("mismatch", stdout.lower())
             self.assertIn("adopt 7", stdout)
@@ -1403,31 +1566,9 @@ class TestCmdInit(unittest.TestCase):
             self.assertIn("nothing", stdout.lower())
             self.assertNotIn("adopt ", stdout)
 
-    def test_field_delete_failure_uses_graphql_fallback(self):
-        """Built-in Status undeletable → documented GraphQL option-list
-        rewrite on the still-empty project; the sequence continues."""
-        fake = InitGh(fail_object={"field-delete": "PVTSSF_Status"})
-        with tempfile.TemporaryDirectory() as td:
-            out = Path(td) / "c.json"
-            rc, stdout, _ = self.run_init(fake, init_args(out=str(out)))
-            self.assertEqual(rc, 0, stdout)
-            self.assertIn("fallback", stdout.lower())
-            mutations = [c for c in fake.calls if c[0] == "gql"
-                         and "updateProjectV2Field" in c[1]]
-            self.assertEqual(len(mutations), 1)
-            self.assertIn('"PVTSSF_Status"', mutations[0][1])
-            self.assertIn('name:"Hold"', mutations[0][1])
-            # Status is NOT re-created (the rewrite made it the etalon field)
-            created_names = [c[c.index("--name") + 1] for c in fake.calls
-                             if c[1:3] == ("project", "field-create")]
-            self.assertEqual(created_names, ["Priority"])
-            config = json.loads(out.read_text(encoding="utf-8"))
-            self.assertEqual(config["project_id"], "PVT_1010")
-            self.assertEqual(config["fields"]["Status"], "PVTSSF_Status")
-
-    def test_fallback_failure_stops_with_partial_report(self):
-        """GraphQL fallback also fails → stop with the partial report."""
-        fake = InitGh(fail_object={"field-delete": "PVTSSF_Status"})
+    def test_option_sync_failure_stops_with_partial_report(self):
+        """The in-place option sync fails → stop with the partial report."""
+        fake = InitGh()
         original = fake.gql
 
         def gql(query):

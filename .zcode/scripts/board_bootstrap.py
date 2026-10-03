@@ -7,11 +7,13 @@ docs/board/board_config.json. `adopt` compares an existing project with the
 etalon and writes the config without mutating the board.
 
 Task 5: the live `init` chain, wired to the verified mutation sequence (gh
-2.100.0): create → built-in Status removal (GraphQL option-rewrite fallback
-when undeletable — documented exception, the project is still empty) →
-field-create per etalon field → link → seed open issues with Status=Backlog →
-verification read after every mutation → config write. Mid-run failure prints
-the partial report (what exists, per-resource cleanup, adopt recovery).
+2.100.0): create → per-field create-or-sync (the built-in Status CANNOT be
+deleted — the API refuses built-ins with "Only custom fields can be
+deleted" — so its option list is rewritten IN PLACE on the existing field
+id via updateProjectV2Field; verified against the live schema 2026-10-03)
+→ link → seed open issues with Status=Backlog → verification read after
+every mutation → config write. Mid-run failure prints the partial report
+(what exists, per-resource cleanup, adopt recovery).
 
 Usage:
   python3 .zcode/scripts/board_bootstrap.py init --repo <owner/name> --title <t> \
@@ -28,6 +30,7 @@ import json
 import re
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -381,17 +384,19 @@ def render_plan(mode: str, args, etalon: Etalon, etalon_path: Path,
                 guard_verdicts: list[str]) -> str:
     """Offline text tree of what WOULD happen. Zero network calls.
 
-    init: etalon → project create → built-in Status removal → one line per
-    etalon field → repo link → seeding → config path. adopt: the planned
-    comparison instead of the create/link lines. Guard verdicts appended
-    report-only, one line per guard.
+    init: etalon → project create → per-field create-or-in-place-sync → repo
+    link → seeding → config path. adopt: the planned comparison instead of
+    the create/sync/link lines. Guard verdicts appended report-only, one
+    line per guard.
     """
     lines = [f"etalon: {display_path(etalon_path)}"]
     if mode == "init":
         lines.append(f'project: create "{args.title}" (owner {effective_owner(args)})')
-        lines.append("remove built-in field Status (Todo / In Progress / Done)")
+        lines.append("fields: created when absent; existing same-name fields get "
+                     "their options synced in place (built-in fields cannot "
+                     "be deleted)")
         for f in etalon.fields:
-            lines.append(f'create {f["name"]}: ' + " | ".join(f["options"]))
+            lines.append(f'{f["name"]}: ' + " | ".join(f["options"]))
         lines.append(f"link: {args.repo}")
         lines.append("seed: open issues would be listed live (--dry-run: no network)")
     else:
@@ -539,23 +544,43 @@ def find_status_field(fields: list[dict]) -> dict | None:
                  and f.get("type") in SELECT_TYPES), None)
 
 
-def rewrite_status_options(status_field: dict, options: list[str], *, gql=gql) -> dict:
-    """Documented GraphQL exception: rewrite a single-select's option list.
+# Legal option colors, live enum order (ProjectV2SingleSelectFieldOptionColor,
+# introspected 2026-10-03): cycled per option position, etalon order.
+OPTION_COLORS = ["GRAY", "BLUE", "GREEN", "YELLOW", "ORANGE", "RED", "PINK", "PURPLE"]
 
-    updateProjectV2Field(input:{fieldId, singleSelectOptions:[{name, color,
-    description}]}) — the full replacement list (omitting an option's id
-    deletes it; GitHub assigns ids to new names). Used ONLY when the built-in
-    Status field proves undeletable and the project is still empty (no card
-    values exist to destroy — the field-mutation ban protects card values).
-    Colors follow the etalon field order; every option is required to carry
-    name+color+description by the schema (verified read-only 2026-09-26).
+
+def sync_field_options(field: dict, options: list[str], *, gql=gql) -> dict:
+    """Rewrite a single-select field's option list IN PLACE (live-verified
+    schema, 2026-10-03):
+
+      mutation{updateProjectV2Field(input:{fieldId, singleSelectOptions:
+      [{name, color, description}, ...]}){clientMutationId}}
+
+    - fieldId is the EXISTING field's id. Built-in fields cannot be deleted
+      ("Only custom fields can be deleted") — including every fresh
+      project's Status (Todo / In Progress / Done) — so init converges the
+      built-in Status onto the etalon options right on that field.
+    - singleSelectOptions is the FULL replacement list. An option whose id
+      is omitted gets a fresh id; name+color+description are all required
+      by ProjectV2SingleSelectFieldOptionInput (color from OPTION_COLORS).
+    - The response projection is the payload scalar clientMutationId. The
+      payload's other field, projectV2Field, is a UNION
+      (ProjectV2FieldConfiguration) — direct subselections are invalid
+      GraphQL ("Selections can't be made directly on unions"), which
+      aborted the whole mutation in both earlier live attempts
+      ({projectV2{id}} does not exist; {projectV2Field{id}} needs inline
+      fragments). The return value is ignored either way: success is
+      verified by the field-list read-back, as with every gh mutation.
+
+    Card-value safety: the only value init ever stamps is Status=Backlog
+    (SEED_STATUS_OPTION), and every etalon Status list contains Backlog, so
+    a replacement never destroys a seeded value. Nothing else seeds values.
     """
-    colors = ["GRAY", "BLUE", "GREEN", "YELLOW", "ORANGE", "RED", "PINK", "PURPLE"]
     opt_inputs = ", ".join(
-        f'{{name:"{o}", color:{colors[i % len(colors)]}, description:""}}'
+        f'{{name:"{o}", color:{OPTION_COLORS[i % len(OPTION_COLORS)]}, description:""}}'
         for i, o in enumerate(options))
-    q = (f'mutation{{updateProjectV2Field(input:{{fieldId:"{status_field["id"]}",'
-         f"singleSelectOptions:[{opt_inputs}]}}){{projectV2{{id}}}}}}")
+    q = (f'mutation{{updateProjectV2Field(input:{{fieldId:"{field["id"]}",'
+         f"singleSelectOptions:[{opt_inputs}]}}){{clientMutationId}}}}")
     return gql(q)
 
 
@@ -588,14 +613,63 @@ def read_fields(project_number: int, owner: str, *, gh_json=gh_json) -> list[dic
     return fields
 
 
+# Settle retries for item read-backs: the Projects API is eventually
+# consistent — an immediate item-list after item-add / item-edit can serve
+# a stale snapshot missing the fresh change (live-verified 2026-10-03: a
+# just-added item was absent from the first read and present ~2s later).
+ITEM_SETTLE_ATTEMPTS = 6
+ITEM_SETTLE_DELAY = 1.0  # seconds between reads
+
+
+def settle_item_row(project_number: int, owner: str, item_id: str, *,
+                    want_status: str | None = None, gh_json=gh_json,
+                    attempts: int | None = None,
+                    delay: float | None = None) -> tuple[list, dict | None]:
+    """Read item-list until item_id appears (with status want_status, when
+    given) or the attempts run out — the settle-retry for eventual
+    consistency. Returns (final_items, row-or-None); row None after the
+    last attempt is the settled mismatch verdict. Raises SystemExit when a
+    read hits the item cap (same refusal as elsewhere)."""
+    attempts = ITEM_SETTLE_ATTEMPTS if attempts is None else attempts
+    delay = ITEM_SETTLE_DELAY if delay is None else delay
+    def one_read() -> list:
+        items = gh_json(["project", "item-list", str(project_number),
+                         "--owner", owner, "--format", "json", "--limit",
+                         str(ITEM_LIST_LIMIT)])["items"]
+        if len(items) >= ITEM_LIST_LIMIT:
+            raise SystemExit(f"error: project #{project_number} already has "
+                             f"{len(items)} items (>= --limit "
+                             f"{ITEM_LIST_LIMIT}): cannot verify seeding; "
+                             f"raise the cap in ITEM_LIST_LIMIT")
+        return items
+
+    def verdict(items: list) -> dict | None:
+        row = next((i for i in items if i.get("id") == item_id), None)
+        if row is None:
+            return None
+        if want_status is not None and row.get("status") != want_status:
+            return None
+        return row
+
+    items = one_read()
+    for _ in range(attempts - 1):
+        if verdict(items) is not None:
+            return items, verdict(items)
+        time.sleep(delay)
+        items = one_read()
+    return items, verdict(items)
+
+
 def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
     """Live init: the verified mutation sequence with read-back verification.
 
     Etalon was parsed strictly first (main). Order: auth pre-flight → guards
-    (config / repo-linked / title-collision warn) → create → built-in Status
-    removal → field-create per etalon field → link → seed open issues with
-    Status=Backlog → write config. EVERY mutation is followed by a
-    verification read; mismatch → stop and report (gh is silent on success —
+    (config / repo-linked / title-collision warn) → create → per etalon field
+    create-or-sync (absent fields are created; an existing same-name field —
+    the built-in Status, or a prior partial run's — gets its option list
+    synced in place, since built-ins cannot be deleted) → link → seed open
+    issues with Status=Backlog → write config. EVERY mutation is followed by
+    a verification read; mismatch → stop and report (gh is silent on success —
     rollout-log quirk). Any failure prints the partial report with the manual
     cleanup + adopt recovery routes; nothing is auto-deleted.
     """
@@ -646,38 +720,19 @@ def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
     number = state.project["number"]
 
     try:
-        # 4. remove the built-in Status field every new project ships with.
+        # 4+5. per etalon field, in etalon order: create when absent; when a
+        #      same-name single-select already exists (a fresh project's
+        #      built-in Status, or a prior partial run's field), converge its
+        #      option list IN PLACE — built-in fields cannot be deleted
+        #      ("Only custom fields can be deleted"), and an idempotent
+        #      re-run must not touch a field that already matches. Every
+        #      mutation is verified by a read-back.
         fields = read_fields(number, owner, gh_json=gh_json)
-        builtin = find_status_field(fields)
-        if builtin is not None:
-            r = gh(["project", "field-delete", "--id", builtin["id"]])
-            if r.returncode == 0:
-                fields = read_fields(number, owner, gh_json=gh_json)
-                if find_status_field(fields) is not None:
-                    return fail("field-delete reported success but the built-in "
-                                "Status field is still present (read-back "
-                                "verification mismatch)")
-            else:
-                # Documented exception: the built-in field proved undeletable
-                # → targeted GraphQL option-list rewrite on the still-empty
-                # project (no card values exist yet to destroy). Step 5 then
-                # treats the rewritten field as the etalon Status.
-                status_def = next((f for f in etalon.fields
-                                   if f["name"] == "Status"), None)
-                if status_def is None:
-                    return fail("cannot drop the built-in Status field: the "
-                                "etalon defines no Status field to rewrite "
-                                "it into (fallback needs an option list)")
-                print(f"warning: field-delete of the built-in Status failed "
-                      f"({r.stderr.strip() or 'no stderr'}); fallback: targeted "
-                      f"GraphQL option-list rewrite of the still-empty "
-                      f"project's field (documented exception to the "
-                      f"field-mutation ban — no card values exist yet)")
-                rewrite_status_options(builtin, status_def["options"], gql=gql)
-                fields = read_fields(number, owner, gh_json=gh_json)
-        # 5. per etalon field: create if absent (etalon order), verify by
-        #    read-back — an existing same-name entry is the fallback-rewritten
-        #    built-in Status; its id is recorded, its options verified.
+        if find_status_field(fields) is not None and \
+                not any(f["name"] == "Status" for f in etalon.fields):
+            print("warning: the project's built-in Status field cannot be "
+                  "deleted (the API refuses built-in fields) and the etalon "
+                  "defines no Status field; it remains as an extra field")
         for fdef in etalon.fields:
             entry = next((f for f in fields if f["name"] == fdef["name"]
                           and f.get("type") in SELECT_TYPES), None)
@@ -693,11 +748,20 @@ def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
                     return fail(f'field-create of "{fdef["name"]}" reported '
                                 f"success but the field is missing from the "
                                 f"read-back (verification mismatch)")
+            elif [o["name"] for o in entry.get("options") or []] != fdef["options"]:
+                sync_field_options(entry, fdef["options"], gql=gql)
+                fields = read_fields(number, owner, gh_json=gh_json)
+                entry = next((f for f in fields if f["name"] == fdef["name"]
+                              and f.get("type") in SELECT_TYPES), None)
+                if entry is None:
+                    return fail(f'option sync of "{fdef["name"]}" reported '
+                                f"success but the field is missing from the "
+                                f"read-back (verification mismatch)")
             diff = compare_fields(
                 Etalon(fields=[fdef], host_budgets={}), fields)
             if diff["missing_options"].get(fdef["name"]):
                 return fail(f'field "{fdef["name"]}" is missing options after '
-                            f"creation: {diff['missing_options'][fdef['name']]} "
+                            f"sync: {diff['missing_options'][fdef['name']]} "
                             f"(verification mismatch)")
             state.fields.append((fdef["name"], entry["id"]))
         final_check = compare_fields(etalon, fields)
@@ -705,10 +769,15 @@ def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
             return fail("created field set does not match the etalon after "
                         f"creation (verification mismatch): {format_diff(final_check)}")
 
-        # 6. link the repo; verify the link with a node read (connection
-        #    introspected once, before the guards — reused here).
-        gh_json(["project", "link", str(number), "--owner", owner,
-                 "--repo", repo])
+        # 6. link the repo; `project link` is a silent-success mutation (rc
+        #    only, no stdout — its help lists no --format flag), so it is a
+        #    plain rc-checked gh call, verified by the node read below
+        #    (connection introspected once, before the guards — reused).
+        r = gh(["project", "link", str(number), "--owner", owner,
+                "--repo", repo])
+        if r.returncode != 0:
+            return fail(f"gh project link failed: "
+                        f"{r.stderr.strip() or 'no stderr'}")
         if connection:
             q = ('query{node(id:"%s"){...on ProjectV2{number title %s'
                  '(first:100){nodes{owner{login} name}}}}}'
@@ -724,7 +793,10 @@ def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
                   "downgrade, gh's exit code is all we have")
 
         # 7. seed open issues: ONE capped list read, then add + edit + verify
-        #    per issue (all ids read at run time — never hardcoded).
+        #    per issue (all ids read at run time — never hardcoded). The
+        #    read-backs settle-retry: the Projects API is eventually
+        #    consistent and a fresh add/edit can be missing from an
+        #    immediate item-list (live-verified 2026-10-03).
         issues = gh_json(["issue", "list", "--repo", repo, "--state", "open",
                           "--limit", str(ISSUE_LIST_LIMIT), "--json", "number,url"])
         if len(issues) >= ISSUE_LIST_LIMIT:
@@ -737,29 +809,31 @@ def cmd_init(args, etalon: Etalon, *, gh=gh, gh_json=gh_json, gql=gql) -> int:
             added = gh_json(["project", "item-add", str(number), "--owner", owner,
                              "--url", issue["url"], "--format", "json"])
             item_id = added["id"]
-            items = gh_json(["project", "item-list", str(number), "--owner", owner,
-                             "--format", "json", "--limit",
-                             str(ITEM_LIST_LIMIT)])["items"]
-            if len(items) >= ITEM_LIST_LIMIT:
-                return fail(f"project #{number} already has {len(items)} items "
-                            f"(>= --limit {ITEM_LIST_LIMIT}): cannot verify "
-                            f"seeding; raise the cap in ITEM_LIST_LIMIT")
-            if not any(i.get("id") == item_id for i in items):
+            _, row = settle_item_row(number, owner, item_id, gh_json=gh_json)
+            if row is None:
                 return fail(f'item-add of {issue["url"]} reported success but '
-                            f"the item is missing from the read-back "
-                            f"(verification mismatch)")
-            gh_json(["project", "item-edit", "--project-id", state.project["id"],
-                     "--id", item_id, "--field-id", status_field_id,
-                     "--single-select-option-id", backlog_id])
-            items = gh_json(["project", "item-list", str(number), "--owner", owner,
-                             "--format", "json", "--limit",
-                             str(ITEM_LIST_LIMIT)])["items"]
-            row = next((i for i in items if i.get("id") == item_id), None)
-            if row is None or row.get("status") != SEED_STATUS_OPTION:
-                got = row.get("status") if row else "missing"
+                            f"the item never appeared in the read-back "
+                            f"(settled after {ITEM_SETTLE_ATTEMPTS} reads "
+                            f"{ITEM_SETTLE_DELAY:.0f}s apart — verification "
+                            f"mismatch)")
+            # `project item-edit` is another silent-success mutation (rc
+            # only, no stdout — its help lists no --format flag): plain
+            # rc-checked gh call, verified by the settled read below.
+            r = gh(["project", "item-edit", "--project-id", state.project["id"],
+                    "--id", item_id, "--field-id", status_field_id,
+                    "--single-select-option-id", backlog_id])
+            if r.returncode != 0:
+                return fail(f"gh project item-edit of {issue['url']} failed: "
+                            f"{r.stderr.strip() or 'no stderr'}")
+            _, row = settle_item_row(number, owner, item_id,
+                                     want_status=SEED_STATUS_OPTION,
+                                     gh_json=gh_json)
+            if row is None:
                 return fail(f'Status edit of item {item_id} ({issue["url"]}) '
-                            f"did not read back as {SEED_STATUS_OPTION} "
-                            f"(verification mismatch; got {got!r})")
+                            f"did not settle to {SEED_STATUS_OPTION} "
+                            f"(after {ITEM_SETTLE_ATTEMPTS} reads "
+                            f"{ITEM_SETTLE_DELAY:.0f}s apart — verification "
+                            f"mismatch)")
             state.items.append((issue["number"], issue["url"], item_id))
     except SystemExit as e:
         return fail(str(e))
