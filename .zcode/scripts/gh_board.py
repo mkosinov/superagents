@@ -10,6 +10,7 @@ Usage (from repo root):
   python3 .zcode/scripts/gh_board.py status N "In IMPL"          — move a card's status
   python3 .zcode/scripts/gh_board.py merged N PR ["short title"] — append the "Recently merged" line (scratchpad v2)
   python3 .zcode/scripts/gh_board.py issue N                      — standard issue view: state, labels, body
+  python3 .zcode/scripts/gh_board.py gate N value|none           — set/clear the card's gate marker (blocked/auto-retry/hang)
 
 Project constants are hardcoded (IDs are stable for Project #4).
 The script is part of the host/container seam and travels via git.
@@ -37,11 +38,15 @@ PROJECT_NUM = 4
 NEXT_UP_FIELD = "PVTSSF_lAHOA-0Z984BXl3ZzhZEGRs"
 NEXT_UP_OPTS = {"1": "ad936c13", "2": "8167d82e", "3": "ece04007"}
 
+GATE_FIELD_NAME = "gate"  # single-select pipeline marker; options user-managed in the web UI (blocked / auto-retry / hang)
+
 # Statuses are read live from the board (the option list is user-managed in
 # the web UI — e.g. "Not planned" was added there 2026-09-09; never hardcode).
 
 _status_field_id = None
 _status_opts = None
+_gate_field_id = None
+_gate_field_opts = None
 
 
 def gql(query: str) -> dict:
@@ -58,16 +63,23 @@ def gql(query: str) -> dict:
 
 
 def load_status_field():
-    global _status_field_id, _status_opts
+    global _status_field_id, _status_opts, _gate_field_id, _gate_field_opts
     if _status_field_id:
         return
     d = gql(f'query {{ node(id: "{PROJECT_ID}") {{ ... on ProjectV2 {{ fields(first: 30) {{ nodes {{ __typename ... on ProjectV2SingleSelectField {{ id name options {{ id name }} }} }} }} }} }} }}')
     for f in d["node"]["fields"]["nodes"]:
-        if f["__typename"] == "ProjectV2SingleSelectField" and f["name"] == "Status":
+        if f["__typename"] != "ProjectV2SingleSelectField":
+            continue
+        if f["name"] == "Status":
             _status_field_id = f["id"]
             _status_opts = {o["name"]: o["id"] for o in f["options"]}
-            return
-    sys.exit("Status field not found")
+        elif f["name"] == GATE_FIELD_NAME:
+            _gate_field_id = f["id"]
+            _gate_field_opts = {o["name"]: o["id"] for o in f["options"]}
+    if not _status_field_id:
+        sys.exit("Status field not found")
+    if not _gate_field_id:
+        sys.exit(f"'{GATE_FIELD_NAME}' single-select field not found — create it on the project (options: blocked, auto-retry, hang)")
 
 
 def items_with_fields() -> list[dict]:
@@ -91,6 +103,7 @@ def items_with_fields() -> list[dict]:
             "state": c["state"],
             "status": vals.get("Status"),
             "next_up": vals.get("Next Up"),
+            "gate": vals.get(GATE_FIELD_NAME),
         })
     return out
 
@@ -108,7 +121,7 @@ def find_item(number: int) -> dict:
     return {
         "item_id": d2["addProjectV2ItemById"]["item"]["id"],
         "number": number, "title": issue["title"], "state": issue["state"],
-        "status": None, "next_up": None,
+        "status": None, "next_up": None, "gate": None,
     }
 
 
@@ -138,9 +151,9 @@ def cmd_show(arg: str):
         if not items:
             print("Board is empty.")
             return
-        print(f"{'#':>5}  {'Status':<18} {'NextUp':<6}  Title")
+        print(f"{'#':>5}  {'Status':<18} {'NextUp':<6} {'Gate':<10}  Title")
         for it in items:
-            print(f"{it['number']:>5}  {(it['status'] or '-'):<18} {(it['next_up'] or '-'):<6}  {it['title']} [{it['state']}]")
+            print(f"{it['number']:>5}  {(it['status'] or '-'):<18} {(it['next_up'] or '-'):<6} {(it['gate'] or '-'):<10}  {it['title']} [{it['state']}]")
         return
     if not arg.isdigit():
         sys.exit("argument must be an issue number or 'all'")
@@ -150,6 +163,7 @@ def cmd_show(arg: str):
             print(f"#{number} [{it['state']}] {it['title']}")
             print(f"  Status: {it['status'] or '-'}")
             print(f"  Next Up: {it['next_up'] or '-'}")
+            print(f"  Gate: {it['gate'] or '-'}")
             return
     sys.exit(f"#{number} is not on the board. It is added automatically by the first set-next-up/status call.")
 
@@ -190,6 +204,33 @@ def cmd_status(number: int, status: str):
     it = find_item(number)
     set_field(it["item_id"], _status_field_id, _status_opts[status])
     print(f"#{number}: Status → {status}")
+
+
+def cmd_gate(number: int, value: str):
+    """Set/clear the card's gate marker (single-select): blocked = an IMPL
+    blocker awaiting the user, auto-retry = a temporary upstream pause the
+    watcher stamps and clears itself, hang = the hang monitor's frozen-call
+    suspicion; none = cleared. Idempotent (memo parity, 2026-10-06): the
+    monitor may call it every cycle — re-setting the current value (or
+    clearing an already-empty gate) prints "gate unchanged" and performs no
+    GraphQL write. The option list is user-managed in the web UI (2026-09-09
+    accident rule) — the script only reads it and sets values."""
+    load_status_field()
+    it = find_item(number)
+    if value == "none":
+        if not it["gate"]:
+            print(f"#{number}: gate unchanged (empty)")
+            return
+        set_field(it["item_id"], _gate_field_id, None)
+        print(f"#{number}: gate cleared")
+        return
+    if value not in _gate_field_opts:
+        sys.exit(f"Unknown gate '{value}'. Available: {', '.join(_gate_field_opts)}, none")
+    if (it["gate"] or "").lower() == value.lower():
+        print(f"#{number}: gate unchanged ({value})")
+        return
+    set_field(it["item_id"], _gate_field_id, _gate_field_opts[value])
+    print(f"#{number}: gate → {value}")
 
 
 def cmd_issue(number: int):
@@ -275,6 +316,8 @@ if __name__ == "__main__":
         cmd_shift()
     elif cmd == "status" and len(args) == 3:
         cmd_status(int(args[1]), args[2])
+    elif cmd == "gate" and len(args) == 3:
+        cmd_gate(int(args[1]), args[2])
     elif cmd == "merged" and len(args) >= 3:
         cmd_merged(int(args[1]), int(args[2]), " ".join(args[3:]).strip())
     elif cmd == "issue" and len(args) == 2:

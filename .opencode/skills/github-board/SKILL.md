@@ -15,6 +15,7 @@ The board = the development trajectory (durable, cross-session). The scratchpad 
 - **Status** — lifecycle stage: `Backlog → In Design (G1a) → Spec OK (G1b) → Ready to IMPL (G2) → In IMPL → PR (G7) → In-main → deployed`
 - **Priority** — importance (Critical/High/Medium/Low)
 - **Next Up** (1/2/3) — the user's explicit queue: which task to take next. Only the manager changes it, on the user's word.
+- **Gate** — single-select pipeline marker: `blocked` = an IMPL blocker awaiting the user, `auto-retry` = a temporary upstream pause the watcher stamps and clears itself, `hang` = the hang monitor's frozen-call suspicion (machine-set, auto-cleared when the chain revives). Set/clear via `gh_board.py gate` (idempotent); the option list itself is user-managed in the web UI.
 
 Status is gate-anchored: each status names the last workflow gate passed. Flip it at gate approval, not by feel. Single exception: `In IMPL` flips at IMPL dispatch, before G3 evidence exists — a flip placed after the blocking dispatch lands hours late or never (see touchpoint below). (In Review and Staging / QA were removed — never used.)
 
@@ -38,6 +39,7 @@ python3 .opencode/scripts/gh_board.py show all                    # the whole bo
 python3 .opencode/scripts/gh_board.py set-next-up 176 1          # put an issue in the queue (1|2|3); "none" — remove
 python3 .opencode/scripts/gh_board.py shift                      # after Next Up 1 completes: clear it, shift 2→1, 3→2
 python3 .opencode/scripts/gh_board.py status 176 "In IMPL"       # move a card's status
+python3 .opencode/scripts/gh_board.py gate 176 auto-retry       # set/clear the gate marker (blocked|auto-retry|hang; none clears; idempotent)
 python3 .opencode/scripts/gh_board.py merged 176 177 "short title" # v2: append the "Recently merged" scratchpad line
 ```
 
@@ -61,7 +63,7 @@ An issue is automatically added to the board on the first set/status call if it 
 ## Rules
 
 - ALL board interaction — reads AND writes — goes through this script only. NEVER hand-write `gh api graphql` against the project: reads waste calls and have historically gone wrong (wrong owner type, nonexistent fields), and field-definition mutations destroy data.
-- Changing the status option list (adding/renaming statuses) is **user-only, via the GitHub web UI**. The agent never runs `updateProjectV2Field`: the mutation replaces the whole option list and detaches every card's value (2026-09-09: 65/69 cards lost Status this way). Need a new status → ask the user to add it in the web UI.
+- Changing the Status or gate option list (adding/renaming options) is **user-only, via the GitHub web UI**. The agent never runs `updateProjectV2Field`: the mutation replaces the whole option list and detaches every card's value (2026-09-09: 65/69 cards lost Status this way). Need a new status → ask the user to add it in the web UI.
 - Next Up — max 3 positions, no duplicates (the script frees an occupied position automatically).
 - Don't move Status on every micro-task — only when the whole task's stage changes.
 - FasTP fixes without an issue: don't touch the board. FasTP on an issue: Status In IMPL → In-main as usual.
