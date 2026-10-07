@@ -2,8 +2,10 @@
 
 Reads the host zcode DB and the opencode container DB, maps sessions to
 issues, attributes design/IMPL phases, aggregates tokens and active time,
-and writes atomic snapshots under data/. Aggregation/snapshots are filled
-in by later tasks of #26; this file currently provides:
+and writes atomic snapshots under data/. Everything except the CLI entry
+point (`run_collect` — a later task of #26) lives here:
+
+Source readers (spec §Sources and access):
 
 * `read_host(db_path)`       — sqlite3, read-only URI + PRAGMA busy_timeout=5000;
 * `read_container(c, path)`  — `docker exec <c> sqlite3 -readonly -json <db>
@@ -355,9 +357,11 @@ def _atomic_write_json(path, payload) -> None:
     """Write JSON atomically: tmp file + os.replace (spec §Snapshots).
 
     Sorted keys, UTF-8, indented — hand-editable and byte-deterministic.
-    All snapshot writers are serialized by data/.lock so a fixed tmp name
-    is safe. A failure anywhere between tmp creation and replace removes
-    the tmp file and re-raises — the previous file stays intact.
+    Writers get serialized by data/.lock once the CLI task of #26 lands;
+    until then concurrent collect runs are unsupported — that assumption
+    is what makes a fixed tmp name safe. A failure anywhere between tmp
+    creation and replace removes the tmp file and re-raises — the
+    previous file stays intact.
     """
     tmp = os.fspath(path) + ".tmp"
     try:
@@ -661,14 +665,30 @@ def _fold_t_children(nodes: list) -> list:
     return folded
 
 
-def _build_node(session, children_map, metrics, fold_t=False) -> dict:
+def _build_node(session, children_map, metrics, fold_t=False, visited=None,
+                allowed=None) -> dict:
     """Session → tree node whose tokens/active are its WHOLE subtree's
-    aggregate (own session + descendants, any nesting depth)."""
+    aggregate (own session + descendants, any nesting depth).
+
+    Cycle-safe like `_root_id_of`: `visited` collects the ids already
+    built on this descent, so a parent cycle (A↔B or a self-parent)
+    stops descending at the repeat instead of recursing forever, and
+    `allowed` (the root's group_by_root member ids, passed by
+    aggregate) keeps the tree consistent with the accounting — a
+    cyclic sibling that group_by_root made its own root is drilled
+    into only under itself. Ids are unique per source, so on
+    well-formed trees both guards prune nothing.
+    """
+    visited = visited if visited is not None else set()
+    visited.add(session["id"])
     rec = metrics.get(session["id"]) or {}
     tokens = dict(rec.get("tokens") or _zero_tokens())
     active_ms = rec.get("active_ms") or 0
-    children = [_build_node(child, children_map, metrics)
-                for child in children_map.get(session["id"], [])]
+    children = [_build_node(child, children_map, metrics, visited=visited,
+                            allowed=allowed)
+                for child in children_map.get(session["id"], [])
+                if child["id"] not in visited
+                and (allowed is None or child["id"] in allowed)]
     if fold_t:  # T-folding applies to IMPL-root children only, not deeper
         children = _fold_t_children(children)
     for child in children:
@@ -759,8 +779,12 @@ def aggregate(host, container, config, overrides=None, titles=None) -> dict:
                     phase_acc["active_ms"] += rec["active_ms"]
                     if source == "container":
                         total = sum(rec["tokens"].values())
-                        phase_acc["by_model"][rec["model"]] = (
-                            phase_acc["by_model"].get(rec["model"], 0) + total)
+                        # a blank model string yields None — unattributed,
+                        # like every other missing name (one bad row must
+                        # not kill the collect run in _bars' sort)
+                        model = rec["model"] or UNATTRIBUTED
+                        phase_acc["by_model"][model] = (
+                            phase_acc["by_model"].get(model, 0) + total)
                         agent = rec["agent"] or UNATTRIBUTED
                         phase_acc["by_agent"][agent] = (
                             phase_acc["by_agent"].get(agent, 0) + total)
@@ -778,8 +802,9 @@ def aggregate(host, container, config, overrides=None, titles=None) -> dict:
                         agent = row.get("agent") or UNATTRIBUTED
                         phase_acc["by_agent"][agent] = (
                             phase_acc["by_agent"].get(agent, 0) + total)
-            phase_acc["roots"].append(_build_node(root, children_map, metrics,
-                                                  fold_t=(phase == "impl")))
+            phase_acc["roots"].append(_build_node(
+                root, children_map, metrics, fold_t=(phase == "impl"),
+                allowed={member["id"] for member in groups[root_id]}))
 
     snapshots = {key: _make_snapshot(key, acc, config, titles)
                  for key, acc in issues.items()}
@@ -973,8 +998,12 @@ def write_snapshots(data_dir, aggregated, sources=None) -> None:
     totals/phase split/last activity, sorted by spend desc, plus
     per-source availability), `unmatched.json`; removes snapshot files of
     issues that no longer have mapped sessions (their index entries are
-    gone with the rewrite); creates `state.json` when missing (write-back
-    caches only — nothing else ever goes in it here).
+    gone with the rewrite) and sweeps stale `*.tmp` leftovers a killed
+    run may have left in issues/ (the sweep runs after every current
+    write — `_atomic_write_json` renames or deletes each tmp — so any
+    `*.tmp` still present is by definition orphaned); creates
+    `state.json` when missing (write-back caches only — nothing else
+    ever goes in it here).
     """
     directory = os.fspath(data_dir)
     issues_dir = os.path.join(directory, ISSUES_DIRNAME)
@@ -1005,10 +1034,16 @@ def write_snapshots(data_dir, aggregated, sources=None) -> None:
                        {"issues": index_rows, "sources": dict(sources or {})})
     _atomic_write_json(os.path.join(directory, UNMATCHED_FILENAME),
                        aggregated.get("unmatched", []))
+    # Stale sweep, post-write: vanished issues lose their .json; any
+    # *.tmp left is a SIGKILL leftover from an earlier run (this run's
+    # tmps are all renamed or deleted by _atomic_write_json by now).
     with os.scandir(issues_dir) as entries:
         for entry in entries:
-            if entry.is_file() and entry.name.endswith(".json") \
-                    and entry.name not in current:
+            if not entry.is_file():
+                continue
+            if entry.name.endswith(".json") and entry.name not in current:
+                os.unlink(entry.path)
+            elif entry.name.endswith(".tmp"):
                 os.unlink(entry.path)
     state_path = os.path.join(directory, STATE_FILENAME)
     if not os.path.exists(state_path):

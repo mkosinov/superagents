@@ -25,7 +25,15 @@ DoD coverage (spec §Token accounting, §Active model time and calendar span,
 - determinism: two rebuilds over the same fixture → byte-identical files;
 - stale removal: an issue whose sessions vanish loses file + index entry;
 - atomic write: a failure mid-write leaves the previous file intact, no
-  tmp leftovers;
+  tmp leftovers; a SIGKILL-leftover `*.tmp` inside issues/ is swept by
+  the next run's stale scan;
+- hardening: container session with an empty/blank model string mixes
+  with modeled sessions without killing `_bars` (None sorts against str
+  → TypeError); a parent cycle (A↔B, self-parent) builds a finite tree
+  instead of RecursionError; both sources None → empty aggregate;
+  zero-turn host session; override to a nonexistent issue → «issue #N»
+  fallback title; host child of a container root (cross-source dangling
+  parent) fail-opens to its own root;
 - titles: one bulk gh call per repo per run (exact argv pinned via a fake
   gh executable, like test_readers.py pins docker); gh failure → «issue #N»
   fallback; closed issues keep the last known (cached) title;
@@ -365,6 +373,142 @@ class AggregateBarsTests(unittest.TestCase):
         self.assertEqual(p1["agent"], "zcode-mystery")  # raw agent string kept
 
 
+class HardeningTests(unittest.TestCase):
+    """Robustness pins from the quality review of b85f273."""
+
+    def test_container_none_model_mixed_with_modeled_sessions(self):
+        # one blank-model session among modeled ones: `_bars` sorts bar
+        # rows by (-tokens, name) — a None model name next to a string
+        # is a TypeError on the tie-break that must never kill a collect
+        # run; it lands under «—» like every other unattributed name
+        blank = fixtures.make_container_session(
+            "r2", "/root/workspace/memo", "#700 blank model",
+            created=T0, updated=T0 + HOUR)
+        blank["model"] = ""    # _container_model_id → None (empty string)
+        sessions = [
+            fixtures.make_container_session(
+                "r1", "/root/workspace/memo", "#700 plain",
+                model="claude-opus-4-6", created=T0, updated=T0 + HOUR),
+            blank,
+        ]
+        snap = _snap(container={"sessions": sessions}, project="memo", issue=700)
+        expected = [{"model": "claude-opus-4-6", "tokens": 6_550},
+                    {"model": "—", "tokens": 6_550}]   # tie → name asc
+        self.assertEqual(snap["by_model"], expected)
+        self.assertEqual(snap["phases"]["impl"]["by_model"], expected)
+        self.assertEqual(sum(b["tokens"] for b in snap["by_model"]),
+                         snap["tokens"]["total"])      # 2 × 6_550
+
+    def test_parent_cycle_builds_finite_tree(self):
+        # A↔B parent cycle + a self-parent session: group_by_root treats
+        # each as its own root (cycle-safe since 707bf43) — _build_node
+        # must stop descending too instead of recursing to RecursionError,
+        # and the tree must stay consistent with the accounting: b's spend
+        # belongs to b's own unmatched row, not to issue 700's tree
+        sessions = [
+            fixtures.make_host_session("a", "/root/workspace/memo", "#700 cycle a",
+                                       parent_id="b", created=T0, updated=T0 + MIN),
+            fixtures.make_host_session("b", "/root/workspace/memo", "helper b",
+                                       parent_id="a", created=T0, updated=T0 + MIN),
+            fixtures.make_host_session("s", "/root/workspace/memo", "self parent #700",
+                                       parent_id="s", created=T0, updated=T0 + MIN),
+        ]
+        turns = [fixtures.make_turn(s["id"], s["id"] + "/t1") for s in sessions]
+        aggregated = collector.aggregate(
+            {"sessions": sessions, "turns": turns, "models": []}, None, CONFIG)
+        snap = aggregated["issues"][("memo", 700)]
+        tree = snap["phases"]["design"]["tree"]
+        self.assertEqual(sorted(n["session_id"] for n in tree), ["a", "s"])
+        self.assertEqual(_find(tree, "a")["children"], [])   # cyclic child not drilled
+        self.assertEqual(_find(tree, "s")["children"], [])   # self-parent pruned
+        # tree reconciles with the accounting: a + s only…
+        self.assertEqual(sum(n["tokens"]["total"] for n in tree),
+                         snap["tokens"]["total"])
+        self.assertEqual(snap["tokens"]["total"], 2 * 6_550)
+        # …while b (own root, issue-less title) lands in the unmatched table
+        self.assertEqual([r["session_id"] for r in aggregated["unmatched"]], ["b"])
+
+    def test_dag_grandchild_counted_once(self):
+        # two parents sharing one grandchild: the shared subtree must
+        # not be double-counted in either parent's node
+        sessions = [
+            fixtures.make_host_session("r", "/root/workspace/memo", "#700 dag",
+                                       created=T0, updated=T0 + MIN),
+            fixtures.make_host_session("p1", "/root/workspace/memo", "panel one",
+                                       parent_id="r", created=T0, updated=T0 + MIN),
+            fixtures.make_host_session("p2", "/root/workspace/memo", "panel two",
+                                       parent_id="r", created=T0, updated=T0 + MIN),
+            fixtures.make_host_session("g", "/root/workspace/memo", "shared grandchild",
+                                       parent_id="p1", created=T0, updated=T0 + MIN),
+            # g re-parented under p2 as well is impossible (single parent
+            # column), so the once-only guarantee here pins the visited
+            # guard's benign side: no node lost on legit trees
+        ]
+        turns = [fixtures.make_turn(s["id"], s["id"] + "/t1") for s in sessions]
+        snap = _snap(host={"sessions": sessions, "turns": turns, "models": []},
+                     project="memo", issue=700)
+        tree = snap["phases"]["design"]["tree"]
+        self.assertEqual(len(tree), 1)                 # one root, full family
+        self.assertEqual(tree[0]["tokens"]["total"], 4 * 6_550)
+        p1, p2 = _find(tree, "p1"), _find(tree, "p2")
+        self.assertEqual([c["session_id"] for c in p1["children"]], ["g"])
+        self.assertEqual(p2["children"], [])
+        self.assertEqual(p1["tokens"]["total"], 2 * 6_550)
+        self.assertEqual(p2["tokens"]["total"], 6_550)
+
+
+class EdgeCoverageTests(unittest.TestCase):
+    """Currently-correct-but-untested edges pinned per the quality review."""
+
+    def test_both_sources_unavailable_yields_empty_result(self):
+        aggregated = collector.aggregate(None, None, CONFIG)
+        self.assertEqual(aggregated, {"issues": {}, "unmatched": []})
+
+    def test_zero_turn_host_session(self):
+        # a root with no turn_usage/model_usage rows still maps, phases,
+        # spans (created→updated) and drills down — just with zero spend
+        sessions = [fixtures.make_host_session(
+            "r", "/root/workspace/memo", "#700 silent",
+            created=T0, updated=T0 + 30 * MIN)]
+        snap = _snap(host={"sessions": sessions, "turns": [], "models": []},
+                     project="memo", issue=700)
+        self.assertEqual(snap["tokens"]["total"], 0)
+        self.assertEqual(snap["tokens"]["total_m"], 0.0)
+        self.assertEqual(snap["active_ms"], 0)
+        self.assertEqual(snap["active"]["hours"], 0.0)
+        self.assertEqual(snap["by_model"], [])
+        self.assertEqual(snap["phases"]["design"]["calendar"],
+                         {"ms": 30 * MIN, "days": None, "hours": 0.5})
+        node = snap["phases"]["design"]["tree"][0]
+        self.assertEqual((node["session_id"], node["children"]), ("r", []))
+        self.assertEqual(node["tokens"]["total"], 0)
+
+    def test_override_to_nonexistent_issue_gets_fallback_title(self):
+        overrides = {"h-loose": {"project": "memo", "issue": 9999}}
+        aggregated = collector.aggregate(fixtures.host_scenario(), None, CONFIG,
+                                         overrides=overrides, titles={})
+        snap = aggregated["issues"][("memo", 9999)]
+        self.assertEqual(snap["title"], "issue #9999")   # gh knows no such issue
+        self.assertEqual(snap["title_source"], "fallback")
+        self.assertEqual(snap["tokens"]["total"], 6_550)  # h-loose subtree
+        self.assertEqual(aggregated["unmatched"], [])      # override bound it
+
+    def test_host_child_of_container_root_fail_open(self):
+        # cross-source dangling parent: a host session pointing at a
+        # container-only parent id is its own root (parent not in the
+        # host by_id) — no crash, no cross-source stitching
+        host = fixtures.host_scenario()
+        host["sessions"].append(fixtures.make_host_session(
+            "h-cross", "/root/workspace/memo", "panel work #327",
+            parent_id="c-marathon", created=T0, updated=T0 + MIN))
+        host["turns"].append(fixtures.make_turn("h-cross", "h-cross/t1"))
+        snap = _snap(host=host)    # container payload deliberately absent
+        node = _find(snap["phases"]["design"]["tree"], "h-cross")
+        self.assertIsNotNone(node)                       # own root, host design
+        self.assertEqual(node["tokens"]["total"], 6_550)
+        self.assertEqual(snap["tokens"]["total"], 91_700 + 6_550)
+
+
 class SnapshotShapeTests(unittest.TestCase):
     def test_snapshot_toplevel_shape_and_board_values(self):
         titles = {"mkosinov/memo": {"327": "каскад удаления"}}
@@ -508,6 +652,20 @@ class RebuildAndFilesTests(unittest.TestCase):
                              ["memo-327.json", "memo-331.json"])
             index2 = json.loads((Path(tmp) / "index.json").read_text(encoding="utf-8"))
             self.assertEqual([r["issue"] for r in index2["issues"]], [327, 331])
+
+    def test_stale_tmp_files_in_issues_dir_swept(self):
+        # a SIGKILL between tmp creation and os.replace leaves issues/*.tmp
+        # behind; the stale sweep runs after all current writes (whose tmps
+        # are renamed or deleted by then), so every *.tmp it sees is stale
+        host = fixtures.host_scenario()
+        with tempfile.TemporaryDirectory() as tmp:
+            self._rebuild(tmp, host, fixtures.container_scenario())
+            orphan = Path(tmp) / "issues" / "memo-999.json.tmp"
+            orphan.write_text('{"partial": ', encoding="utf-8")
+            self._rebuild(tmp, host, fixtures.container_scenario())
+            names = sorted(p.name for p in (Path(tmp) / "issues").iterdir())
+        self.assertEqual(names, ["memo-327.json", "memo-331.json",
+                                 "memo-335.json"])  # orphan .tmp gone, rest intact
 
     def test_failed_mid_write_leaves_previous_file_intact(self):
         host, container = fixtures.host_scenario(), fixtures.container_scenario()
