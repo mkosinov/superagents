@@ -2,21 +2,38 @@
 """collect.py — CLI entry for token-analytics (#26).
 
 Subcommands:
-  collect     run one collection pass (host + container sources -> snapshot)
+  collect     run one collection pass (host + container sources -> data/)
   serve       static viewer + JSON API (server.py)
   writeback   board write-back via managed gh CLI (writeback.py)
 
-Skeleton only: the handlers print «not implemented» and exit; the real
-logic lands with tasks 2-8 of #26.
+`collect` (Task 5) wires the full pipeline via collector.run_collect:
+readers -> mapping -> aggregation -> snapshots -> write-back hook, the
+whole write phase under an exclusive flock on data/.lock — a second
+run finding the lock held logs «skipped: previous run still active»
+and exits 0. Warnings always go to stderr; under cron they land in
+data/collect.log via the README's redirect. serve/writeback remain
+stubs until their tasks of #26.
 """
 import argparse
+import os
 import sys
+
+import collector
+
+DEFAULT_CONFIG = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 
 def cmd_collect(args: argparse.Namespace) -> int:
-    """Stub: one collection pass -> data/ snapshot (later tasks of #26)."""
-    print("collect: not implemented", file=sys.stderr)
-    return 1
+    """One collection pass: locked readers -> rebuild -> write-back hook."""
+    try:
+        config = collector.load_config(args.config)
+    except (OSError, ValueError) as exc:
+        print("collect: cannot load config " + str(args.config) + ": "
+              + str(exc), file=sys.stderr)
+        return 1  # a broken config is not fail-open, unlike source failures
+    collector.run_collect(config, collector.data_dir_for(args.config))
+    return 0  # lock-skip and fail-open source losses both stay 0
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
@@ -40,6 +57,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_collect = sub.add_parser(
         "collect", help="run one collection pass (sources -> snapshot in data/)"
+    )
+    p_collect.add_argument(
+        "--config", default=DEFAULT_CONFIG,
+        help="path to config.json (default: the config.json next to this script)",
     )
     p_collect.set_defaults(func=cmd_collect)
 

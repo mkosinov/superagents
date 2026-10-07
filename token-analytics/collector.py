@@ -2,8 +2,9 @@
 
 Reads the host zcode DB and the opencode container DB, maps sessions to
 issues, attributes design/IMPL phases, aggregates tokens and active time,
-and writes atomic snapshots under data/. Everything except the CLI entry
-point (`run_collect` — a later task of #26) lives here:
+and writes atomic snapshots under data/. The one-collection-pass entry
+point `run_collect` (Task 5) wires it all under data/.lock and calls the
+write-back hook (a no-op stub in writeback.py until Task 8):
 
 Source readers (spec §Sources and access):
 
@@ -46,7 +47,13 @@ and calendar span, §Drill-down tree, §By-model and by-agent aggregates,
   `state.json` exists (write-back caches only);
 * `fetch_issue_titles(repo)` / `refresh_titles(...)` — one bulk
   `gh issue list` argv call per repo per run; `data/titles.json` is the
-  offline fallback cache (closed issues keep the last known title).
+  offline fallback cache (closed issues keep the last known title);
+* `run_collect(config, data_dir)` — the CLI's one pass: exclusive
+  flock on `data/.lock` for the whole write phase (a concurrent run
+  logs «skipped: previous run still active» and returns "skipped" —
+  the caller exits 0), then readers → rebuild → write-back hook;
+  `load_config(path)` / `data_dir_for(config_path)` pin the config
+  and its sibling data/ dir (spec §Directory layout, §Config file).
 
 Determinism: every JSON write goes through `_atomic_write_json`
 (tmp + `os.replace`, `sort_keys=True`, `ensure_ascii=False`) and no
@@ -61,6 +68,7 @@ Safety invariants (grep-checked by tests/test_readers.py):
 """
 
 import datetime
+import fcntl
 import json
 import os
 import re
@@ -357,11 +365,11 @@ def _atomic_write_json(path, payload) -> None:
     """Write JSON atomically: tmp file + os.replace (spec §Snapshots).
 
     Sorted keys, UTF-8, indented — hand-editable and byte-deterministic.
-    Writers get serialized by data/.lock once the CLI task of #26 lands;
-    until then concurrent collect runs are unsupported — that assumption
-    is what makes a fixed tmp name safe. A failure anywhere between tmp
-    creation and replace removes the tmp file and re-raises — the
-    previous file stays intact.
+    Writers are serialized by the exclusive flock on data/.lock that
+    `run_collect` holds for the whole write phase (Task 5) — that
+    serialization is what makes a fixed tmp name safe. A failure
+    anywhere between tmp creation and replace removes the tmp file and
+    re-raises — the previous file stays intact.
     """
     tmp = os.fspath(path) + ".tmp"
     try:
@@ -1071,5 +1079,88 @@ def rebuild(host, container, config, data_dir, overrides=None, fetch_titles=None
     return aggregated
 
 
-def run_collect(config: dict) -> None:
-    """Stub: one collection pass; filled in by later tasks of #26."""
+# --- Collection pass: config plumbing + the locked pipeline entry ------------
+# (spec §Collection runs, §Config file, §Snapshots and state)
+
+LOCK_FILENAME = ".lock"
+SKIP_MESSAGE = "skipped: previous run still active"
+
+
+def load_config(path) -> dict:
+    """Read config.json (committed, no secrets — spec §Config file).
+
+    A config that cannot be read or parsed is a loud error raised to
+    the caller — unlike source failures this is NOT fail-open: without
+    a valid config there is nothing sensible to collect.
+    """
+    with open(path, "r", encoding="utf-8") as fh:
+        config = json.load(fh)
+    if not isinstance(config, dict):
+        raise ValueError("config must be a JSON object")
+    return config
+
+
+def data_dir_for(config_path) -> str:
+    """The data dir for a config path: the `data/` sibling of the config
+    file (spec §Directory layout — data/ belongs to the token-analytics/
+    layout the config lives in; a tmp fixture config yields a tmp data
+    dir, which is what keeps test paths injectable)."""
+    parent = os.path.dirname(os.path.abspath(os.fspath(config_path)))
+    return os.path.join(parent, "data")
+
+
+def _read_host_source(config):
+    """Config's zcode_host entry → reader payload (None when unconfigured
+    or unavailable — the reader itself warns fail-open)."""
+    spec = (config.get("sources") or {}).get("zcode_host") or {}
+    db = spec.get("db")
+    if not db:
+        return None
+    return read_host(os.path.expanduser(db))
+
+
+def _read_container_source(config):
+    """Config's opencode_container entry → reader payload (None when
+    unconfigured or unavailable — fail-open per source)."""
+    spec = (config.get("sources") or {}).get("opencode_container") or {}
+    container = spec.get("container")
+    db = spec.get("db")
+    if not container or not db:
+        return None
+    return read_container(container, os.path.expanduser(db))
+
+
+def run_collect(config: dict, data_dir) -> str:
+    """One full collection pass under data/.lock (spec §Collection runs).
+
+    Acquires an exclusive flock on `data/.lock` for the whole write
+    phase; a second run finding the lock held logs «skipped: previous
+    run still active» on stderr (cron redirects it into
+    data/collect.log) and returns "skipped" — the caller exits 0 either
+    way. With the lock: readers → rebuild (mapping + aggregation +
+    snapshots, per-source availability into index.json) → the write-back
+    hook `writeback.run_after_rebuild` (a no-op stub until Task 8).
+    Source failures stay fail-open: readers warn + return None, the
+    other source still rebuilds, the run returns "ok".
+    """
+    # Imported here rather than at module top: keeps collector importable
+    # standalone whatever writeback grows to import (Task 8).
+    import writeback
+
+    directory = os.fspath(data_dir)
+    os.makedirs(directory, exist_ok=True)
+    lock_fd = os.open(os.path.join(directory, LOCK_FILENAME),
+                      os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print(SKIP_MESSAGE, file=sys.stderr)
+            return "skipped"
+        host = _read_host_source(config)
+        container = _read_container_source(config)
+        rebuild(host, container, config, directory)
+        writeback.run_after_rebuild(config, directory)
+        return "ok"
+    finally:
+        os.close(lock_fd)  # releases the flock (never held on "skipped")
