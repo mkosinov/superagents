@@ -84,3 +84,19 @@ Real calls against the real board — run from `token-analytics/`, `gh` must be 
         gh project item-list 4 --owner mkosinov --format json
 
 4. **Browser pass** — `python3 collect.py serve`, walk the checklist above; open the board in the GitHub web UI and confirm the 6 values on a card. Record: created fields, collect warnings, cards written, 2–3 sample values, deviations.
+
+## IMPL wrap-up (2026-10-07, #26)
+
+**Shipped:** collector (dual-source read, mapping, phase attribution, aggregation, snapshots) + static viewer + board write-back, per `docs/specs/2026-09-26-token-analytics-design.md`. All 9 plan tasks DONE, two-stage reviews passed, quality findings fixed.
+
+**Tests:** 186 pass / 0 fail / 1 skip (`python3 -m unittest discover token-analytics/tests`; the golden test skips by design when the golden file is absent).
+
+**Live acceptance (real data, container DB):** 6 canonical NUMBER fields created on board #4 via managed `gh project field-create` (idempotent rerun verified); real collect + diff-gated write-back — card #26 got 6/6 values (tokens 35.4 / design 35.2 / IMPL 0.2; hours 261.7 / 261.7 / 0), card #24 4/6 (impl phase legitimately absent — skipped by design); rerun wrote nothing (diff-gate proven). Host DB absent in this container → source failed open per design (warning, exit 0). Visual gate: PASS after one fix round (proportional bars, table scroll containers).
+
+**Known deviations/notes:**
+1. gh CLI exposes no list cursor → pagination drains via explicit `--limit` growth (verified vs gh 2.100.0).
+2. `field-list` JSON cannot distinguish NUMBER/TEXT → the loud non-NUMBER stop covers single-select/iteration only; a TEXT clash degrades fail-open (documented above and in code).
+3. Viewer gained two architect-acked additive snapshot fields (`approx` on tree nodes, `projects` in index.json).
+4. Title-mode phase heuristic misses «#N IMPL …» root titles — the designed fix path (overrides/bind) was used and works; follow-up candidate.
+
+**Deliberate follow-ups (Non-Goals per spec):** memo board #3 enablement (config flip + one `fields` run); timelines/latency/retries; token-economy.md refresh; #23 skill rewrite must name `writeback.py` as the second board writer.
