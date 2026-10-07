@@ -1,8 +1,8 @@
 # token-analytics
 
-Per-issue token & duration analytics: collector, static viewer, and GitHub board write-back (#26) — skeleton; see `docs/specs/2026-09-26-token-analytics-design.md`.
+Per-issue token & duration analytics: collector, static viewer, and GitHub board write-back (#26) — see `docs/specs/2026-09-26-token-analytics-design.md`.
 
-Implemented so far: source readers in `collector.py` (`read_host` — sqlite3 read-only URI + `PRAGMA busy_timeout=5000`; `read_container` — `docker exec <c> sqlite3 -readonly -json <db> .timeout 5000 <SQL>`, argv list only; both fail-open: warning + `None`, exit code unaffected); session→issue mapping + design/IMPL phase attribution (`attribute_project`, `extract_issue`, overrides, `group_by_root`, `phase_for_root`, `build_unmatched`); aggregation + snapshot writing — `aggregate(...)` builds per-issue snapshot dicts (5 token components + raw-sum total, active model time, per-phase calendar span, recursive drill-down tree with `T<N>` folding on IMPL-root children and agent-labeled design children, `by_model`/`by_agent` bars, board-ready `tokens.total_m` / `active.hours` values rounded 1 dp), `rebuild(...)` persists `data/issues/<project>-<N>.json` + `index.json` + `unmatched.json` + `titles.json` (gh cache, one bulk `gh issue list` per repo per run) atomically and byte-deterministically, drops stale issue files, creates `state.json` (write-back caches only); the `collect` subcommand (`collect.py` → `collector.run_collect`) wires readers → mapping → aggregation → snapshots → write-back hook (`writeback.run_after_rebuild`, no-op until Task 8) under an exclusive `flock` on `data/.lock`; the `serve` subcommand (`server.py`, Task 7) serves the viewer + snapshots + the bind API.
+Implemented so far: source readers in `collector.py` (`read_host` — sqlite3 read-only URI + `PRAGMA busy_timeout=5000`; `read_container` — `docker exec <c> sqlite3 -readonly -json <db> .timeout 5000 <SQL>`, argv list only; both fail-open: warning + `None`, exit code unaffected); session→issue mapping + design/IMPL phase attribution (`attribute_project`, `extract_issue`, overrides, `group_by_root`, `phase_for_root`, `build_unmatched`); aggregation + snapshot writing — `aggregate(...)` builds per-issue snapshot dicts (5 token components + raw-sum total, active model time, per-phase calendar span, recursive drill-down tree with `T<N>` folding on IMPL-root children and agent-labeled design children, `by_model`/`by_agent` bars, board-ready `tokens.total_m` / `active.hours` values rounded 1 dp), `rebuild(...)` persists `data/issues/<project>-<N>.json` + `index.json` + `unmatched.json` + `titles.json` (gh cache, one bulk `gh issue list` per repo per run) atomically and byte-deterministically, drops stale issue files, creates `state.json` (write-back caches only); the `collect` subcommand (`collect.py` → `collector.run_collect`) wires readers → mapping → aggregation → snapshots → write-back (`writeback.run_after_rebuild`) under an exclusive `flock` on `data/.lock`; the `serve` subcommand (`server.py`, Task 7) serves the viewer + snapshots + the bind API; board write-back + the `writeback`/`fields` subcommands (`writeback.py`, Task 8) push snapshot metrics to GitHub Projects boards via the managed gh CLI.
 
 ## Collect
 
@@ -18,6 +18,19 @@ The data dir is the `data/` sibling of the config file. The whole write phase ru
 Tests (stdlib `unittest`, offline — fixture DBs are generated into tmp dirs at test time):
 
     python3 -m unittest discover token-analytics/tests -v
+
+## Board write-back
+
+Every `collect` pass (and the serve bind rebuild) ends by pushing each issue's board-ready values (tokens in millions, hours — 1 decimal, verbatim from the snapshot: «48.2», «25.3») onto that project's own GitHub Projects board, for every project with `write_back.enabled: true` and a non-empty `fields` map (name → snapshot dot-path, binding by NAME). The managed gh CLI only — `gh project item-edit --id … --field-id … --project-id … --number …`, one item+field per call; never raw GraphQL, never field-definition mutations.
+
+    python3 collect.py writeback                  # manual re-push from existing data/ snapshots
+    python3 collect.py fields                     # one run per project after enabling write_back
+
+- **`fields` (one run per project)**: creates the configured missing fields via `gh project field-create --data-type NUMBER` (idempotent — rerun creates nothing). An existing field name with a definitely non-NUMBER type (single-select, iteration) stops loudly naming the field, changing nothing. Never renames fields, never touches single-select options.
+- **Diff-gate**: the last WRITTEN value per project+issue+field is cached in `data/state.json`; an unchanged (rounded) value is never re-written — rounding noise never hits the board. The cache updates only after a successful write.
+- **Item/field ids**: resolved per run via `gh project item-list`/`field-list` with an explicit `--limit` and a drain loop until exhausted (the CLI's default 30 silently truncates); item ids cached in `state.json`, and a failed write drops the cached id (a re-added card gets a new one — re-resolved next run). An unknown field name warns with a «run `collect.py fields`» hint and skips only that field.
+- **Fail-open everywhere**: a gh/network failure logs a warning and the run still exits 0; an issue not on its project's board is skipped with a note; WIP and closed issues are written alike (no status filtering). `write_back.enabled: false` skips the whole stage; an empty `fields` map is a documented no-op with a log note.
+- `collect.py writeback` takes the same `flock` as `collect` (a busy lock skips, exit 0).
 
 ## Serve
 
