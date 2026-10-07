@@ -5,3 +5,6 @@ worktrees/
 # Python
 __pycache__/
 *.pyc
+
+# token-analytics: personal metrics never enter git
+token-analytics/data/
