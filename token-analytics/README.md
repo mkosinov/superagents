@@ -26,7 +26,9 @@ Every `collect` pass (and the serve bind rebuild) ends by pushing each issue's b
     python3 collect.py writeback                  # manual re-push from existing data/ snapshots
     python3 collect.py fields                     # one run per project after enabling write_back
 
-- **`fields` (one run per project)**: creates the configured missing fields via `gh project field-create --data-type NUMBER` (idempotent — rerun creates nothing). An existing field name with a definitely non-NUMBER type (single-select, iteration) stops loudly naming the field, changing nothing. Never renames fields, never touches single-select options.
+- **`fields` (one run per project)**: creates the configured missing fields via `gh project field-create --data-type NUMBER` (idempotent — rerun creates nothing). An existing field name with a definitely non-NUMBER type (single-select, iteration) stops loudly naming the field, changing nothing. Never renames fields, never touches single-select options. Validate the result (and see created vs pre-existing) with `gh project field-list <N> --owner <owner> --format json` — the 6 canonical fields must all be `ProjectV2Field` with NUMBER semantics (gh reports the base type for numeric fields).
+- **Enabling memo (or any project) later**: flip `write_back.enabled` to `true` in `config.json`, run `python3 collect.py fields` once for that project's board — nothing else. The 6 canonical name→dot-path lines already ship in the config; disabling again is just the flip back (the stage skips, board values stay as last written).
+- **Constants sync (until #23)**: the superagents `board` block (`owner`/`project_number`/`project_id`) duplicates the constants at the top of `.zcode/scripts/gh_board.py` (`OWNER`/`REPO`/`PROJECT_ID` — same values, kept in sync by hand, two lines). If you edit either side, check the other; the duplication goes away with #23's parameterization.
 - **Diff-gate**: the last WRITTEN value per project+issue+field is cached in `data/state.json`; an unchanged (rounded) value is never re-written — rounding noise never hits the board. The cache updates only after a successful write. A corrupt cache entry (state.json is hand-editable) resets with a warning instead of crashing the run, and entries for issues whose snapshots no longer exist are pruned after each pass — the cache never grows forever.
 - **Item/field ids**: resolved per run via `gh project item-list`/`field-list` with an explicit `--limit` and a drain loop until exhausted (the CLI's default 30 silently truncates); item ids cached in `state.json`, and a failed write drops the cached id (a re-added card gets a new one — re-resolved next run). An unknown field name warns with a «run `collect.py fields`» hint and skips only that field.
 - **Fail-open everywhere**: a gh/network failure logs a warning and the run still exits 0; an issue not on its project's board is skipped with a note; WIP and closed issues are written alike (no status filtering). `write_back.enabled: false` skips the whole stage; an empty `fields` map is a documented no-op with a log note.
@@ -49,11 +51,36 @@ Guards, always on: `Host` must be the bound `127.0.0.1:8765`/`localhost:8765` (D
 
 Static dashboard in `viewer/` (`index.html` + `lib.js` + `app.js` + `style.css`; vanilla, no build step, no external references), served at the root by `collect serve` — it fetches `/data/index.json`, `/data/unmatched.json`, `/data/issues/<project>-<N>.json` and posts binds to `/api/bind`. Pure formatting/navigation helpers live in `lib.js` (DOM-free, CommonJS export guard) and are unit-tested under `node` in `tests/test_viewer.py`.
 
-Manual browser checklist (draft; final acceptance polish at Task 9):
+Manual browser checklist — one line per spec User Scenario (`python3 collect.py serve`, open `http://127.0.0.1:8765`):
 
-- [ ] Open `127.0.0.1:8765` — project tabs (one per project, «Несопоставленные» last) + a source-availability line; the strongest project's tab opens first.
-- [ ] Issue table sorted by token total desc; columns: title (with issue №), tokens human («12.4M» / «830K», raw total in the tooltip), active time human («1ч 24м»), last activity date, design/IMPL mini-split chips; a WIP row shows accrued totals and its real date — no invented completion status anywhere.
-- [ ] A project with zero issues (tab exists via `index.json` `projects`) renders an explicit empty state.
-- [ ] Click a row → issue page: phase cards (absent phase hidden, not zero-filled), 5 token components + total, active time, secondary line «календарно: 3 дня» / «календарно: 9 ч»; by-model and by-agent horizontal CSS bars (issue-level and per phase).
-- [ ] Drill-down tree: expand/collapse at any depth; container-time nodes carry the «≈» mark and the tree shows «≈ сумма по параллельным дочерним сессиям» once; session nodes have a «Привязать» button (rebind path), T-fold nodes don't.
-- [ ] «Несопоставленные» tab: table + «Привязать» per row → dialog (project prefilled when attributable, issue №, phase) → POST → the row moves into the issue; without the server running the dialog shows a plain failure message.
+- [ ] **1 Dashboard overview** — project tabs (one per project, «Несопоставленные» last) + a source-availability line, strongest project first; issue table sorted by token total desc (title with issue №, tokens human «12.4M»/«830K» + raw total in the tooltip, active time human «1ч 24м», last activity date, design/IMPL mini-split chips); a WIP row shows accrued totals and its real date; a zero-issue project renders an explicit empty state; no invented completion status anywhere.
+- [ ] **2 Issue page** — click a row → design/IMPL phase cards (absent phase hidden, not zero-filled) with the 5 token components + total, active model time, secondary line «календарно: 3 дня» / «календарно: 9 ч»; by-model and by-agent horizontal CSS bars (issue-level and per phase).
+- [ ] **3 Design drill-down** — expand design → root → gate nodes (scout, each panelist, plan-reviewer), each with agent, tokens, time.
+- [ ] **4 IMPL drill-down** — expand IMPL → marathon root → `T1…Tn` folded nodes aggregating their sub-sessions (nested levels included) + standalone unlabeled children; expand/collapse at any depth; container-time nodes carry the «≈» mark with the single «≈ сумма по параллельным дочерним сессиям» note; session nodes have a «Привязать» button (rebind path), T-fold nodes don't.
+- [ ] **5 Bind a session** — «Несопоставленные» tab: table + «Привязать» per row → dialog (project prefilled when attributable, issue №, phase) → POST → the row moves into the issue and leaves the tab; a wrongly auto-matched session is rebound the same way from its issue page; without the server running the dialog shows a plain failure message.
+- [ ] **6 Board write-back** — after a collect, the issue's card on its project board (web UI) shows the 6 numeric fields (tokens in millions, hours — 1 dp, e.g. «48.2»); only changed values are written; WIP and closed cards alike.
+
+## Live acceptance runbook (one-time per project)
+
+Real calls against the real board — run from `token-analytics/`, `gh` must be authenticated with the `project` scope. Memo board #3 stays disabled until its config flip (see `fields` above).
+
+1. **Create the fields** (idempotent; validate + record created vs pre-existing):
+
+        python3 collect.py fields
+        gh project field-list 4 --owner mkosinov --format json     # 6 canonical fields present
+
+2. **Real collect** — full rebuild of both sources + the write-back hook:
+
+        python3 collect.py collect
+
+   Expect `data/index.json`, `data/issues/<project>-<N>.json`, `data/unmatched.json` refreshed with plausible numbers. A source that can't be read (DB missing, `docker exec` unavailable) warns and is skipped — the run still exits 0 (fail-open by design); record the exact warning.
+
+3. **Real write-back / diff-gate proof** — a rerun writes nothing (all values cached unchanged):
+
+        python3 collect.py writeback
+
+   Read back what landed on cards (fields per item):
+
+        gh project item-list 4 --owner mkosinov --format json
+
+4. **Browser pass** — `python3 collect.py serve`, walk the checklist above; open the board in the GitHub web UI and confirm the 6 values on a card. Record: created fields, collect warnings, cards written, 2–3 sample values, deviations.
