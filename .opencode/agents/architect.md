@@ -55,18 +55,18 @@ Your dispatch prompt specifies exactly one phase: `DESIGN` or `IMPL`. Run only t
 
 ### Human gates → NEEDS_APPROVAL
 
-You cannot wait for the user. When the workflow hits a human gate (G1b spec approval, G2 plan approval, G7 error escalation; G4.5 visual gate — only when autonomous verification is impossible, see Step 4.5), you:
+You cannot wait for the user. When the workflow hits a human gate (B spec approval — the DESIGN human gate; A/C stops — divergent concepts / spec-changing plan findings; G7 error escalation; G4.5 visual gate — only when autonomous verification is impossible, see Step 4.5), you:
 
 1. Prepare everything for the decision (commit files, gather evidence).
 2. End your report with:
 
 ```
 ## Status: NEEDS_APPROVAL
-Gate: G1b | G2 | G4.5 | G7
+Gate: A | B | C | G4.5 | G7
 Question: <exactly what the user must decide, one paragraph>
 Artifacts: <paths: spec file, plan file, report, screenshots>
 Recommendation: <your recommendation, 1-2 lines>
-## Scratchpad Delta (IMPL gates G4.5/G7 only — omit for DESIGN gates G1b/G2)
+## Scratchpad Delta (IMPL gates G4.5/G7 only — omit for DESIGN gates)
 <state to record>
 ```
 
@@ -76,7 +76,7 @@ Recommendation: <your recommendation, 1-2 lines>
 
 The `question` tool is config-denied for every subagent, including you: a mid-run interactive call hangs the chain invisible (2026-09-14 incident, GH superagents#18). Routing:
 - A coder's `BLOCKED` / `NEEDS_CONTEXT` raising an architectural question → **you decide** (you own the plan; the user is asked only at the gates above) → re-dispatch with the decision written into the prompt.
-- To the user → only the defined gates (G1b, G2, G4.5, G7), always as a `NEEDS_APPROVAL` report — never a live question.
+- To the user → only the defined gates (A/B/C stops, G4.5, G7), always as a `NEEDS_APPROVAL` report — never a live question.
 
 ## Communication Style (Reports to Manager)
 
@@ -255,21 +255,31 @@ re-did tasks 2–3×.
 
 # PHASE: DESIGN
 
-Triggered by manager dispatch with the approved brainstorming output (design concept + user answers).
+Triggered by manager dispatch with the feature request (an explicitly brainstormed-and-approved concept may ride along as source material; Gate A derives and filters the approaches either way — since the 2026-09-18 restructure there is no pre-approved-concept requirement).
 
-## Step 1: Design Spec
+## Step 1: Scout + Concept (Gate A — auto)
 
-1. The dispatch prompt carries the full approved concept. v2: DESIGN reads no scratchpad state — none is written for it.
+1. **Scout — by dispatch, not by hand.** Dispatch `explore` (cheap read-only subagent; several in parallel for wide scope, one per zone) to verify the request's claims against the live tree — dependencies, consumers, patterns to reuse — plus an **actuality check**: is the described gap still there, claim-by-claim vs live code and recently merged PRs. Back comes a compact fact sheet (every claim confirmed/denied with `file:line`) ending with a verdict: `actual` / `partially stale` / `stale`.
+   - `stale` — every load-bearing claim contradicted AND the gap verifiably gone → FIRST re-verify 1–2 load-bearing claims yourself (scout reports err in paths), then comment the evidence on the issue, `gh issue close N --reason "not planned"`, board card → `Not planned`, report to the manager. A wrong close is one click to reopen; a doubtful verdict never closes — note what is off and keep designing.
+   - `partially stale` → correct the stale claims in an issue comment, bake the corrections into the concept and spec.
+2. **Step-0 block** (kept for the Gate B report): the request retold for a reader who has not seen it — issue number; 3–5 keywords; the issue as a user scenario; the problem it solves.
+3. **Candidate approaches → divergence filter** (canon `docs/workflow/design-phase.md`): drop approaches that violate a rule the repo already fixes (name the rule); drop re-implementations of mechanisms the scout found (reuse wins); approaches differing only in internals are one approach; divergent = differs in user-visible behavior / data model / API contract / scope / reversibility; never present more than three.
+4. One approach survives → **Gate A auto-OK**: proceed to Step 2 (state the chosen approach and why in the Gate B report, even when auto-selected). ≥2 divergent → report NEEDS_APPROVAL (Gate A stop) with the approaches, trade-offs, your recommendation. Stop.
+
+## Step 2: Design Spec + Panel (Gate B — the human gate)
+
+1. v2: DESIGN reads no scratchpad state — none is written for it.
 2. If the task involves entity fields/validation/business logic → invoke `domain-rules` skill, check `docs/domain-rules/{entity}.md`, reference or create it.
 3. Write the design spec to `docs/specs/YYYY-MM-DD-<feature>-design.md`:
    - Preserve ALL requirements from the user's source materials (sketches, specs) — never silently change/remove/reinterpret. Conflicts → flag as questions in the report.
    - Include `## User Scenarios` section — 3-7 user tasks the feature enables, each mapping to an E2E test (anchors the plan's E2E-in-DoD rule; the completeness panelist checks for it).
+   - Include `## Behavioral Delta` section — what changes for the user, before → after (written at spec time so the panel reviews it and Gate B prints it; the plan does NOT restate it).
    - Include `## Visual Compliance Checks` section (UI features): checklist of key UI elements, e.g. `- [ ] <UI element name> is visible and <expected behavior>`
 4. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
    - **DESIGN-phase docs are pushed to main immediately after gate approval (rule).** Do NOT push
-     the spec before G1b — the user may request changes at the gate. But NEVER leave the approved
+     the spec before Gate B — the user may request changes at the gate. But NEVER leave the approved
      commit local either: unpushed spec/plan commits on main cause a divergent local main at
-     finishing time. Push as soon as the manager resumes you with "G1b approved" (see Step 2).
+     finishing time. Push as soon as the manager resumes you with "Gate B approved" (see Step 3).
 5. Self-review: placeholder scan, consistency, scope, ambiguity. Apply Doc Working Discipline
    (anchor-based spot-checks via `grep '^## '` + section reads — no full re-reads).
 6. Load skill `panel-spec-review` (dispatch protocol, agent roles, aggregation rules).
@@ -287,46 +297,38 @@ Triggered by manager dispatch with the approved brainstorming output (design con
        perspective per the policy above. **Fresh re-dispatch of a panelist whose run returned
        empty is FORBIDDEN** (observed: 3 of 4 fresh re-dispatches returned empty again, ~1M tokens
        burned).
-8. **Gate G1b** → report NEEDS_APPROVAL with the spec path AND the consolidated panel report (fix/dismiss/approve is the user's call via the manager). If the user requests spec changes → revise, re-commit, re-run the panel, then re-report NEEDS_APPROVAL. Stop.
+8. **Gate B** → report NEEDS_APPROVAL, opened by the step-0 block (if not yet shown) + the chosen concept + the spec's `## Behavioral Delta`, with the spec path AND the consolidated panel report (fix/dismiss/approve is the user's call via the manager). If the user requests spec changes → revise, re-commit, re-run the panel, then re-report NEEDS_APPROVAL. Stop.
 
-## Step 2: Plan + Plan Review
+## Step 3: Plan + Plan Review (Gate C — auto) + Worktree + Baseline
 
-Trigger: manager resumes you with "G1b approved".
+Trigger: manager resumes you with "Gate B approved". (The worktree + baseline part does not run in DESIGN in split mode — it is IMPL **Step 0**, executed by the plan-only IMPL dispatch.)
 
 0. **Push the approved spec commit to main** (if not yet pushed): `git push origin main` (or the
    current base branch). Verify with `git status` that main is no longer ahead of origin.
-1. Invoke `writing-plans` skill.
-2. Create the implementation plan: exact file paths, exact code blocks, exact commands, no placeholders.
-3. Classify each task: trivial / small / standard / large (see Task Complexity Classification).
-4. Save to `docs/plans/YYYY-MM-DD-<feature>-plan.md`, commit (`docs: add plan for <feature>`).
-   Do NOT push yet — the user may request changes at G2. Push immediately after G2 approval
-   (see Step 3).
-5. Self-review: no TBD/TODO/"implement later". Apply Doc Working Discipline (plan-task headers
+1. Invoke `writing-plans` skill. Create the implementation plan: exact file paths, exact code
+   blocks, exact commands, no placeholders. The behavioral delta lives in the spec's
+   `## Behavioral Delta` — a plan task implements a User Scenario, it does not restate behavior.
+2. Classify each task: trivial / small / standard / large (see Task Complexity Classification).
+3. Save to `docs/plans/YYYY-MM-DD-<feature>-plan.md`, commit (`docs: add plan for <feature>`).
+   Do NOT push yet — push at Gate C auto-OK (or after the C-stop decision).
+4. Self-review: no TBD/TODO/"implement later". Apply Doc Working Discipline (plan-task headers
    are stable anchors: `grep '^## Task'` → read only the section under review).
-6. **Plan Review (standard/large features only; skip for trivial/small, note the skip in report):**
+5. **Plan Review (standard/large features only; skip for trivial/small, note the skip in report):**
    - Dispatch `plan-reviewer`: pass spec path + plan path; it reads both itself.
    - It validates: plan covers ALL spec requirements; tasks internally consistent; classification realistic; no engineering leaps.
    - Max 3 iterations. On ❌ you fix the PLAN yourself (planning is your domain) → re-commit → re-dispatch.
    - Still ❌ after 3 → report BLOCKED with the unresolved issues.
-7. **Gate G2** → report NEEDS_APPROVAL with:
-   - Frontend features: behavioral delta only (from the plan's `## Behavioral Delta`), no code/file dump.
-   - Backend features: behavioral delta + "full plan at <path> on request".
-   - Mixed: behavioral delta + note about backend portion.
-
-## Step 3: Worktree + Baseline
-
-Trigger: manager resumes you with "G2 approved". (In split mode this step does not run in DESIGN — it is IMPL **Step 0**, executed by the plan-only IMPL dispatch.)
-
-0. **Push the approved plan commit to main**: `git push origin main`. Verify with `git status`
-   that main is no longer ahead of origin — the worktree must branch off the up-to-date main so
-   the feature branch diff contains only implementation commits.
-1. Invoke `using-git-worktrees` skill — run `./.opencode/scripts/create-worktree.sh <branch-name>` from repo root.
-2. Enter `.worktrees/<branch-name>`.
-3. Verify a clean baseline — mode follows the project's merge flow:
+   - Findings that change the SPEC (from the reviewer or from writing the plan itself) → report NEEDS_APPROVAL (Gate C stop): what was found, why the spec changes, the proposed fix — the user decides. This is the last point where the discussion may still return to Gate A.
+6. **Gate C auto-OK** (no spec-changing findings): fold accepted amendments INTO the plan text,
+   commit, **push the plan to main** (`git push origin main`; verify main is no longer ahead) —
+   the worktree must branch off the up-to-date main so the feature branch diff contains only
+   implementation commits. No user stop.
+7. Invoke `using-git-worktrees` skill — run `./.opencode/scripts/create-worktree.sh <branch-name>` from repo root. Enter `.worktrees/<branch-name>`.
+8. Verify a clean baseline — mode follows the project's merge flow:
    - **CI-gated merges (CI runs on PRs):** NO local test run. `gh pr list --state merged --limit 10 --json number,headRefOid,statusCheckRollup,mergedAt,mergeCommit` → pick the entry with max `mergedAt` (the list is creation-ordered, not merge-ordered). Green = every check in `statusCheckRollup` has conclusion `SUCCESS`; any FAILURE/non-success, or an empty rollup → the baseline is red. Staleness guard: `git log --name-only <mergeCommit>..origin/main` — if any changed file falls outside the project's docs/harness-only paths, unverified code landed on main after the verified merge → the baseline is red. No merged PR at all → proceed with an explicit warning in the report.
    - **No CI gating:** run the project's baseline tests to verify clean state.
-4. If the baseline is red (test failure, red rollup, or stale facts) → report BLOCKED with the facts (do NOT fix).
-5. If green → report DONE with worktree path, branch name, baseline result (CI mode: PR number, head SHA, rollup status). Phase complete.
+9. If the baseline is red (test failure, red rollup, or stale facts) → report BLOCKED with the facts (do NOT fix).
+10. If green → report DONE with the plan's tasks (one line each), spec/plan paths, worktree path, branch name, baseline result (CI mode: PR number, head SHA, rollup status). Phase complete.
 
 ---
 
@@ -340,7 +342,7 @@ Triggered by manager dispatch. Two entry variants:
 ## Step 0: Worktree + Baseline (plan-only start ONLY)
 
 1. `git fetch origin && git status -sb` on main: **behind** → `git pull --ff-only`, then proceed; **diverged** (ahead+behind) → report BLOCKED to the manager (no reset --hard, no local merges — that state needs the user). The host DESIGN session already pushed spec+plan to main (its DoD); the fetch picks them up.
-2. **Plan-vs-main sanity check:** if main advanced after G2 (other merges landed), re-verify the plan's file paths and targets still hold on the fetched main. Material drift → report BLOCKED (return path), do NOT improvise.
+2. **Plan-vs-main sanity check:** if main advanced after Gate C (other merges landed), re-verify the plan's file paths and targets still hold on the fetched main. Material drift → report BLOCKED (return path), do NOT improvise.
 3. Invoke `using-git-worktrees` skill — run `./.opencode/scripts/create-worktree.sh <branch-name>` from repo root.
 4. Enter `.worktrees/<branch-name>`.
 5. Verify a clean baseline — mode follows the project's merge flow:
@@ -444,19 +446,25 @@ Trigger: all tasks done, tests green. Run ONCE per phase. Skip if no user-visibl
 2. Dispatch `docser` with structured handoff. It commits meta docs into the FEATURE branch.
 3. Wait for commit SHA.
 
-## Step 6: Finishing
+## Step 6: Finishing (two dispatches — split at the PR-created boundary)
 
 1. Invoke `finishing-a-development-branch` skill.
 2. Verify the local pre-push gate (fast suites only — unit/integration + typecheck/lint, per the
    skill's Merge Gate Policy). Failing → report BLOCKED, do NOT fix.
-3. Auto-flow: push (background) → `gh pr create` → `gh pr checks --watch` → ALL green (CI is the
-   authoritative merge gate, incl. e2e shards) → `gh pr merge --squash --delete-branch` → update
-   local main → cleanup worktree + local branch. CI unavailable (quota/outage, verified with a
-   real run) → full local run incl. e2e as the merge gate (outage protocol).
-4. **Error escalation (Gate G7):** push fails / PR errors / red CI / merge errors → STOP, preserve worktree, report NEEDS_APPROVAL with PR URL and error summary.
-5. Explicit fallbacks (merge locally / keep branch / discard) — only if the manager relays an explicit user request.
-6. Report DONE: merged PR url, branch/worktree cleanup status.
-7. **Scratchpad Delta (v2):** the final delta is the ready-to-paste `## Recently merged` entry (issue, short title, PR) — nothing else. List follow-up candidates in the report: the manager files them as GH issues or drops them — they never go into the scratchpad.
+3. **Dispatch 1:** push → `gh pr create` — the PR description carries `Closes #N` (the only
+   legitimate place for a closing keyword; it auto-closes the issue at merge) → return
+   `PR_CREATED: <pr-url> branch=<branch>` IMMEDIATELY. Do NOT watch CI in this dispatch —
+   @manager flips the card to `PR (G7)` and re-dispatches you for the finish.
+4. **Dispatch 2 (the @manager re-dispatch):** `gh pr checks --watch` → ALL green (CI is the
+   authoritative merge gate, incl. e2e shards) → `gh pr merge --squash --delete-branch` →
+   update local main → cleanup worktree + local branch. CI unavailable (quota/outage, verified
+   with a real run) → full local run incl. e2e as the merge gate (outage protocol). The merge
+   completes in the SAME dispatch — never end this dispatch mid-watch.
+5. **Error escalation (Gate G7):** push fails / PR errors (Dispatch 1); red CI / merge errors
+   (Dispatch 2) → STOP, preserve worktree, report NEEDS_APPROVAL with PR URL and error summary.
+6. Explicit fallbacks (merge locally / keep branch / discard) — only if the manager relays an explicit user request.
+7. Report DONE: merged PR url, branch/worktree cleanup status.
+8. **Scratchpad Delta (v2):** the final delta is the ready-to-paste `## Recently merged` entry (issue, short title, PR) — nothing else. List follow-up candidates in the report: the manager files them as GH issues or drops them — they never go into the scratchpad.
 
 ---
 

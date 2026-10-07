@@ -10,7 +10,7 @@ Usage (from repo root):
   python3 .zcode/scripts/gh_board.py status N "In IMPL"          — move a card's status
   python3 .zcode/scripts/gh_board.py merged N PR ["short title"] — append the "Recently merged" line (scratchpad v2)
   python3 .zcode/scripts/gh_board.py issue N                      — standard issue view: state, labels, body
-  python3 .zcode/scripts/gh_board.py gate N value|none           — set/clear the card's gate marker (blocked/auto-retry/hang)
+  python3 .zcode/scripts/gh_board.py gate N value|none           — set/clear the card's pending-ask marker (concept/spec/plan/blocked)
 
 Project constants are hardcoded (IDs are stable for Project #4).
 The script is part of the host/container seam and travels via git.
@@ -207,10 +207,11 @@ def cmd_status(number: int, status: str):
 
 
 def cmd_gate(number: int, value: str):
-    """Set/clear the card's gate marker (single-select): blocked = an IMPL
-    blocker awaiting the user, auto-retry = a temporary upstream pause the
-    watcher stamps and clears itself, hang = the hang monitor's frozen-call
-    suspicion; none = cleared. Idempotent (memo parity, 2026-10-06): the
+    """Set/clear the card's gate marker (single-select; etalon options):
+    concept/spec/plan = a design gate stop (A/B/C), blocked = an IMPL
+    blocker awaiting the user; hang = the hang monitor's frozen-call
+    suspicion (auto-retry = a temporary watcher pause, where a watcher
+    exists); none = cleared. Idempotent (memo parity, 2026-10-06): the
     monitor may call it every cycle — re-setting the current value (or
     clearing an already-empty gate) prints "gate unchanged" and performs no
     GraphQL write. The option list is user-managed in the web UI (2026-09-09

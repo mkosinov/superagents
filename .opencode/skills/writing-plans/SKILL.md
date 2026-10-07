@@ -60,24 +60,11 @@ This structure informs the task decomposition. Each task should produce self-con
 ---
 ```
 
-## Behavioral Delta (REQUIRED section in every plan)
+## Behavioral Delta (lives in the SPEC, not the plan)
 
-Every plan MUST include a `## Behavioral Delta` subsection, placed right after the header (before the task list). This is a **plain-language** description of how the feature will behave for the end user — no code, no file names — mapped to the spec's acceptance criteria.
+Since 2026-09-18 the `## Behavioral Delta` section — a **plain-language** description of how the feature behaves for the end user (no code, no file names), one line per acceptance criterion, understandable by someone who has NOT read the implementation — is written **at spec time** into the spec's `## Behavioral Delta`, so the spec panel reviews it and Gate B prints it to the user.
 
-This section is what the architect presents at the **asymmetric G2 gate**: for frontend features the user approves the feature by BEHAVIOR (relying on plan-reviewer's review for engineering correctness), not by reading plan code.
-
-**Format:**
-
-```markdown
-## Behavioral Delta
-
-How this feature behaves for the user, mapped to spec acceptance criteria:
-
-- **[Acceptance criterion from spec]** → [what the user will see/do, in plain language]
-- **[Acceptance criterion from spec]** → [observable behavior]
-```
-
-Keep it concise: one line per acceptance criterion. It must be understandable by someone who has NOT read the implementation.
+The plan does **not** restate it. The plan header is Goal / Architecture / Tech Stack, then the task list; a plan task implements a User Scenario from the spec's `## User Scenarios`. Gate C (plan review) verifies the plan expands the spec — including its Behavioral Delta coverage through the User Scenarios — without duplicating it.
 
 ## Task Structure
 

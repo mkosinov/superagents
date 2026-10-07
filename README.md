@@ -2,7 +2,7 @@
 
 > A reusable agentic workflow framework for AI-driven software development.
 >
-> **Version:** 3.12
+> **Version:** 3.13
 >
 > **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
