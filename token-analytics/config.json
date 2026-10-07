@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "sources": {
+    "zcode_host": {"db": "~/.zcode/cli/db/db.sqlite"},
+    "opencode_container": {"container": "opencode", "db": "/root/.local/share/opencode/opencode.db"}
+  },
+  "projects": {
+    "superagents": {
+      "repo": "mkosinov/superagents", "phase_mode": "title",
+      "directories": ["/Users/mkosinov/dev/opencode/workspace/superagents", "/Users/mkosinov/dev/superagents"],
+      "board": {"owner": "mkosinov", "project_number": 4, "project_id": "PVT_kwHOA-0Z984BkOSk"},
+      "write_back": {"enabled": true, "fields": {
+        "Tokens total":  "tokens.total_m",
+        "Tokens design": "phases.design.tokens.total_m",
+        "Tokens IMPL":   "phases.impl.tokens.total_m",
+        "Hours total":   "active.hours",
+        "Hours design":  "phases.design.active.hours",
+        "Hours impl":    "phases.impl.active.hours"
+      }}
+    },
+    "memo": {
+      "repo": "mkosinov/memo", "phase_mode": "split",
+      "directories": ["/root/workspace/memo", "/Users/mkosinov/dev/memo"],
+      "board": {"owner": "mkosinov", "project_number": 3, "project_id": "<PVT_…>"},
+      "write_back": {"enabled": false, "fields": {
+        "Tokens total":  "tokens.total_m",
+        "Tokens design": "phases.design.tokens.total_m",
+        "Tokens IMPL":   "phases.impl.tokens.total_m",
+        "Hours total":   "active.hours",
+        "Hours design":  "phases.design.active.hours",
+        "Hours impl":    "phases.impl.active.hours"
+      }}
+    }
+  },
+  "serve": {"host": "127.0.0.1", "port": 8765}
+}
