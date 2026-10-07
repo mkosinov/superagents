@@ -20,6 +20,7 @@
     issueDataUrl: issueDataUrl,
     phaseRows: phaseRows,
     barsWidths: barsWidths,
+    needsScrollHint: needsScrollHint,
     visibleNodes: visibleNodes,
     toggleKey: toggleKey,
     nodeTitle: nodeTitle,
@@ -57,6 +58,14 @@
 
   function hide(id) { byId(id).hidden = true; }
   function show(id) { byId(id).hidden = false; }
+
+  // Фейд-подсказка у правого края широкой таблицы — только когда контейнер
+  // действительно прокручивается (ширина известна лишь у видимого узла,
+  // поэтому вызывается после снятия hidden).
+  function updateScrollHint(wrap) {
+    wrap.classList.toggle("scrolls",
+      L.needsScrollHint(wrap.scrollWidth, wrap.clientWidth));
+  }
 
   // --- данные --------------------------------------------------------------
 
@@ -205,6 +214,7 @@
     wrap.appendChild(table);
     empty.hidden = true;
     wrap.hidden = false;
+    updateScrollHint(wrap);
   }
 
   // --- вид «несопоставленные» --------------------------------------------------
@@ -267,6 +277,7 @@
     wrap.appendChild(table);
     empty.hidden = true;
     wrap.hidden = false;
+    updateScrollHint(wrap);
   }
 
   // --- вид «задача» ----------------------------------------------------------

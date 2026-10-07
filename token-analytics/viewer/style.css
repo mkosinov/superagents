@@ -124,7 +124,22 @@ b, strong { color: #fff; font-weight: 650; }
 
 /* ============ tables ============ */
 
-.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 12px; }
+.table-wrap {
+  overflow-x: auto;               /* широкая таблица скроллится внутри,
+                                     страница — нет */
+  overscroll-behavior-x: contain; /* свайп таблицы не цепляет страницу */
+  border: 1px solid var(--border); border-radius: 12px;
+  position: relative;
+}
+/* аффорданс: правый фейд, только пока контент реально шире контейнера
+   (класс «scrolls» вешает app.js по lib.needsScrollHint). Затемнение к
+   цвету фона страницы, а не surface — иначе фейд сливается с таблицей */
+.table-wrap.scrolls::after {
+  content: ""; position: absolute; top: 0; right: 0; bottom: 0;
+  width: 40px; pointer-events: none;
+  background: linear-gradient(to right, rgba(10, 14, 19, 0), rgba(10, 14, 19, 0.92));
+  border-radius: 0 12px 12px 0;
+}
 
 .table {
   width: 100%;
@@ -215,15 +230,19 @@ th.cell-num, .table th:last-of-type { text-align: right; }
 .bars-title { font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
 .bar-row {
-  display: grid; grid-template-columns: minmax(90px, 180px) 1fr 64px;
-  align-items: center; gap: 10px;
+  display: flex; align-items: center; gap: 10px;
   margin-bottom: 6px;
 }
 .bar-label {
+  flex: 0 1 180px; min-width: 40px;
   font-size: 12.5px; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .bar-track {
+  /* единственный растущий элемент строки: полоса забирает всё свободное
+     место и не может быть ужата шириной подписи (grid-вариант с
+     minmax(90px, 180px) оставлял треку ~2px на мобильной ширине) */
+  flex: 1 1 40px; min-width: 48px;
   height: 10px; border-radius: 5px;
   background: var(--bg);
   border: 1px solid var(--border);
@@ -232,8 +251,11 @@ th.cell-num, .table th:last-of-type { text-align: right; }
 .bar-fill { height: 100%; border-radius: 5px 0 0 5px; min-width: 2px; }
 .bar-model { background: linear-gradient(90deg, #2c4f7c, var(--link)); }
 .bar-agent { background: linear-gradient(90deg, #1f6e51, var(--auto)); }
-.bar-value { font-size: 12.5px; color: var(--muted); text-align: right;
-  font-variant-numeric: tabular-nums; }
+.bar-value {
+  flex: 0 0 64px; text-align: right;
+  font-size: 12.5px; color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 
 /* фазы */
 .phase-card {
@@ -325,6 +347,9 @@ th.cell-num, .table th:last-of-type { text-align: right; }
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 8px 10px;
+  /* без этого input тянет свою натуральную ширину (size=20 ≈ 200px)
+     и раздувает grid-колонку за край диалога на мобильной ширине */
+  width: 100%; min-width: 0;
 }
 .dialog-field select:focus, .dialog-field input:focus {
   outline: none; border-color: var(--link);
@@ -358,6 +383,7 @@ th.cell-num, .table th:last-of-type { text-align: right; }
   .dialog-row { grid-template-columns: 1fr 1fr; }
   .dialog-field-narrow { grid-column: span 1; }
   .cell-title { max-width: 220px; }
+  .bar-label { flex-basis: 96px; }   /* больше места самой полосе */
   .tree-row { flex-wrap: wrap; row-gap: 4px; }
   .tree-name { max-width: 150px; flex-shrink: 1; }
   .sources { display: none; }

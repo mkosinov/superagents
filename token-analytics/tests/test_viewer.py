@@ -319,6 +319,27 @@ class BarsTest(unittest.TestCase):
 
 
 @unittest.skipUnless(NODE, "node not available")
+class ScrollHintTest(unittest.TestCase):
+    """Table scroll affordance: the fade hint appears only when the
+    .table-wrap actually scrolls (wide table inside a narrow viewport)."""
+
+    def test_wider_content_needs_hint(self):
+        self.assertTrue(_js("lib.needsScrollHint(864, 340)"))
+
+    def test_fitting_content_has_no_hint(self):
+        self.assertFalse(_js("lib.needsScrollHint(340, 340)"))
+        self.assertFalse(_js("lib.needsScrollHint(300, 340)"))
+
+    def test_subpixel_tolerance(self):
+        self.assertFalse(_js("lib.needsScrollHint(341, 340)"))
+        self.assertTrue(_js("lib.needsScrollHint(342.5, 340)"))
+
+    def test_guards(self):
+        self.assertFalse(_js("lib.needsScrollHint(null, 340)"))
+        self.assertFalse(_js("lib.needsScrollHint(864, null)"))
+
+
+@unittest.skipUnless(NODE, "node not available")
 class DialogHelpersTest(unittest.TestCase):
     def test_parse_issue_number(self):
         cases = [("16", 16), (" 327 ", 327), ("0", None), ("-5", None),

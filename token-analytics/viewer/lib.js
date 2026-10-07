@@ -145,6 +145,15 @@ function barsWidths(rows, keyField) {
   });
 }
 
+// Подсказка «таблицу можно прокрутить»: правый фейд показываем, только
+// когда контент шире контейнера (допуск 1px на субпиксельные округления).
+function needsScrollHint(scrollWidth, clientWidth) {
+  if (typeof scrollWidth !== "number" || typeof clientWidth !== "number") {
+    return false;
+  }
+  return scrollWidth > clientWidth + 1;
+}
+
 // --- Дерево сверл-дауна --------------------------------------------------------
 
 // Плоский список видимых узлов: дети рисуются только при раскрытом
@@ -218,6 +227,7 @@ if (typeof module !== "undefined" && module.exports !== undefined) {
     issueDataUrl: issueDataUrl,
     phaseRows: phaseRows,
     barsWidths: barsWidths,
+    needsScrollHint: needsScrollHint,
     visibleNodes: visibleNodes,
     toggleKey: toggleKey,
     nodeTitle: nodeTitle,
