@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "project_id": "PVT_kwHOA-0Z984BkOSk",
+  "project_number": 4,
+  "owner": "mkosinov",
+  "repo": "superagents",
+  "fields": {
+    "Status": "PVTSSF_lAHOA-0Z984BkOSkzhi_o7I",
+    "Priority": "PVTSSF_lAHOA-0Z984BkOSkzhi_o8I",
+    "host": "PVTSSF_lAHOA-0Z984BkOSkzhi_o8c",
+    "gate": "PVTSSF_lAHOA-0Z984BkOSkzhi_o8k"
+  },
+  "host_budgets": {
+    "imac": 2,
+    "macbook": 1,
+    "hk": 1,
+    "gcp": 1
+  }
+}
