@@ -1,0 +1,17 @@
+name: gh-board
+on:
+  push:
+    paths: [".zcode/scripts/gh_board.py", ".opencode/scripts/gh_board.py", ".zcode/skills/github-board/SKILL.md", ".opencode/skills/github-board/SKILL.md", ".opencode/scripts/auto_impl_watch.sh", "tests/test_gh_board.py", ".github/workflows/gh-board.yml"]
+  pull_request:
+    paths: [".zcode/scripts/gh_board.py", ".opencode/scripts/gh_board.py", ".zcode/skills/github-board/SKILL.md", ".opencode/skills/github-board/SKILL.md", ".opencode/scripts/auto_impl_watch.sh", "tests/test_gh_board.py", ".github/workflows/gh-board.yml"]
+permissions:
+  contents: read
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python3 -m unittest discover -s tests -v
