@@ -11,7 +11,12 @@ Zero-network harness: EVERY gh CLI call the script can make goes through
 subprocess.run — the single transport seam. These tests install a
 fixture-backed fake as subprocess.run; any call the fake cannot route
 raises AssertionError, so a real network call fails the test instead of
-happening (Task 3 adds the session-wide guard fixture on top).
+happening. On top of the per-test fake, a session-wide guard (setUpModule)
+replaces subprocess.run/Popen for the whole test-module session: a call
+escaping every mock fails with the guard's AssertionError instead of
+reaching the network — the zero-network claim is asserted, not accidental.
+The guard is module-scoped, so it never touches the board-bootstrap tests,
+which spawn real local subprocesses by design.
 """
 import contextlib
 import hashlib
@@ -20,6 +25,7 @@ import json
 import re
 import runpy
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import types
@@ -37,6 +43,43 @@ import gh_board as gb  # noqa: E402
 # The unpatched canon path, captured before any test patches BOARD_CONFIG_PATH:
 # the repo root must be parents[2] of the script itself (the twins convention).
 ORIGINAL_CONFIG_PATH = gb.BOARD_CONFIG_PATH
+
+
+# ---------------------------------------------------------------------------
+# Session-wide zero-network guard (spec §CI: asserted, not accidental)
+
+
+_REAL_SUBPROCESS_RUN = subprocess.run
+_REAL_SUBPROCESS_POPEN = subprocess.Popen
+"""The real primitives, captured at import (before the guard is installed).
+subprocess.Popen is guarded alongside run because run shells out through it
+and subprocess.call/check_call use Popen directly — every subprocess entry
+point funnels through these two."""
+
+
+def _zero_network_guard(*args, **kwargs):
+    """Fails any code path that reaches a REAL subprocess call: on CI a `gh`
+    invocation here would be a network call (and would fail token-less).
+    Installed for the whole test-module session (setUpModule); each fixture
+    test patches subprocess.run ON TOP of it, so mocked behavior is unchanged
+    and only a call escaping every mock hits this guard."""
+    raise AssertionError(
+        "zero-network guard: subprocess escaped the fixture-backed mock "
+        f"(args={args!r}, kwargs={kwargs!r}) — a real gh/date call would hit "
+        "the network. Route the call through FakeGhBoard (GhBoardCase.setUp "
+        "patches subprocess.run), or, for a deliberate LOCAL check like the "
+        "bash -n test, restore _REAL_SUBPROCESS_RUN/_REAL_SUBPROCESS_POPEN "
+        "explicitly for that one call.")
+
+
+def setUpModule():
+    subprocess.run = _zero_network_guard
+    subprocess.Popen = _zero_network_guard
+
+
+def tearDownModule():
+    subprocess.run = _REAL_SUBPROCESS_RUN
+    subprocess.Popen = _REAL_SUBPROCESS_POPEN
 
 
 # ---------------------------------------------------------------------------
@@ -1236,11 +1279,77 @@ class TestShowBookkeeping(GhBoardCase):
 
 
 class TestTwinsByteIdentical(unittest.TestCase):
+    """Spec Goal 2: byte-identical twins within the repo, mechanically
+    guarded by sha256 comparison."""
+
     def test_script_twins_are_byte_identical(self):
         a = (REPO / ".zcode" / "scripts" / "gh_board.py").read_bytes()
         b = (REPO / ".opencode" / "scripts" / "gh_board.py").read_bytes()
         self.assertEqual(
             hashlib.sha256(a).hexdigest(), hashlib.sha256(b).hexdigest())
+
+    def test_github_board_skill_twins_are_byte_identical(self):
+        a = (REPO / ".zcode" / "skills" / "github-board" / "SKILL.md").read_bytes()
+        b = (REPO / ".opencode" / "skills" / "github-board" / "SKILL.md").read_bytes()
+        self.assertTrue(a and b, "both skill twins must exist and be non-empty")
+        self.assertEqual(
+            hashlib.sha256(a).hexdigest(), hashlib.sha256(b).hexdigest())
+
+
+# ---------------------------------------------------------------------------
+# Watcher syntax — bash -n over the container template (spec CI: the loop
+# logic itself stays live-observation-only)
+
+
+class TestWatcherScriptSyntax(unittest.TestCase):
+    def test_auto_impl_watch_sh_parses(self):
+        script = REPO / ".opencode" / "scripts" / "auto_impl_watch.sh"
+        self.assertTrue(script.is_file(), f"watcher template missing: {script}")
+        # The session-wide zero-network guard blocks every subprocess for the
+        # whole module; lift it for this one deliberately LOCAL, non-network
+        # syntax check. Both primitives are restored because subprocess.run
+        # shells out through Popen.
+        with mock.patch.object(subprocess, "run", _REAL_SUBPROCESS_RUN), \
+                mock.patch.object(subprocess, "Popen", _REAL_SUBPROCESS_POPEN):
+            r = subprocess.run(["bash", "-n", str(script)],
+                               capture_output=True, text=True, timeout=30)
+        self.assertEqual(r.returncode, 0, f"bash -n rejected {script.name}:\n{r.stderr}")
+        self.assertEqual(r.stdout, "")
+
+
+# ---------------------------------------------------------------------------
+# Live-options read — loud-overflow-exit variant of the #24 pagination rule
+
+
+class TestLiveOptionsLoudOverflow(GhBoardCase):
+    """load_status_field (one query serves the Status/host/gate option lists)
+    reads a single UNPAGINATED fields(first: 30) page and exits loudly on
+    hasNextPage — a truncated list must never be silently trusted, and the
+    failure must precede any field write."""
+
+    def fields_queries(self) -> list[str]:
+        return [argv[4][len("query="):] for argv in self.board.calls
+                if argv[:3] == ["gh", "api", "graphql"]
+                and "fields(first: 30)" in argv[4]]
+
+    def test_single_non_paginated_fields_query(self):
+        gb.load_status_field()
+        self.assertEqual(len(self.board.calls), 1,
+                         "the live-options read is exactly one gql call")
+        queries = self.fields_queries()
+        self.assertEqual(len(queries), 1)
+        self.assertNotIn("after:", queries[0],
+                         "no cursor pagination — the loud exit replaces it")
+        self.assertIn("pageInfo { hasNextPage }", queries[0])
+        self.assertEqual(self.board.mutations, [])
+
+    def test_overflow_exits_loudly_refusing_to_guess(self):
+        self.board.fields_overflow = True
+        self.assert_exit(gb.load_status_field, needles=(
+            f"project {gb.PROJECT_NUM} has more than 30 fields",
+            "refusing to guess option ids"))
+        self.assertEqual(self.board.mutations, [],
+                         "a truncated read must precede no field write")
 
 
 if __name__ == "__main__":
