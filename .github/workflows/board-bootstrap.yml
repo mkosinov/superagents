@@ -1,9 +1,12 @@
 name: board-bootstrap
 on:
-  push:
-    paths: [".zcode/scripts/board_bootstrap.py", ".opencode/scripts/board_bootstrap.py", "docs/board/board-etalon.md", "tests/**"]
   pull_request:
-    paths: [".zcode/scripts/board_bootstrap.py", ".opencode/scripts/board_bootstrap.py", "docs/board/board-etalon.md", "tests/**"]
+    branches: [main]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.run_id }}
+  cancel-in-progress: true
 jobs:
   smoke:
     runs-on: ubuntu-latest
