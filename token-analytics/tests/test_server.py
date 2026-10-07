@@ -20,15 +20,19 @@ DoD coverage:
 - `collect.py serve` wiring (--config, serve block host/port).
 """
 
+import contextlib
 import fcntl
+import io
 import json
 import os
+import socket
 import sys
 import tempfile
 import threading
 import unittest
 import urllib.error
 import urllib.request
+from http.client import HTTPConnection
 from pathlib import Path
 from unittest import mock
 
@@ -561,6 +565,56 @@ class GuardUnitTests(ServeTestCase):
         self.assertFalse((self.data_dir / "overrides.json").exists())
 
 
+class HandlerHygieneTests(unittest.TestCase):
+    """Handler robustness minors from the quality review (no world needed)."""
+
+    def test_handler_socket_timeout_30s(self):
+        # A stalled client (no request line ever, or a stall mid-body in
+        # rfile.read) must not park a worker thread forever: socketserver
+        # honors the handler's `timeout`, after which the handle() loop
+        # exits and the thread is freed.
+        self.assertEqual(server.AnalyticsHandler.timeout, 30)
+
+
+class RobustnessTests(ServeTestCase):
+    """Quality-review minors: generic 500s + a server-side warning, and a
+    413 that closes the connection instead of keeping it desynced."""
+
+    def test_500_generic_message_and_server_side_warning(self):
+        boom = RuntimeError("boom at " + str(self.tmpdir) + "/secret.json")
+        with mock.patch.object(server.ServeApp, "bind", side_effect=boom), \
+                mock.patch.object(server, "_warn") as warn:
+            status, payload = self.post_json("/api/bind", {
+                "session_id": "h-loose", "project": "memo",
+                "issue": 327, "phase": "impl"})
+        self.assertEqual(status, 500)
+        # the client gets a GENERIC message: no exception text, no paths
+        self.assertEqual(payload["error"], "внутренняя ошибка сервера")
+        self.assertNotIn(str(self.tmpdir),
+                         json.dumps(payload, ensure_ascii=False))
+        # the operator still gets the details — server-side, via _warn
+        warn.assert_called_once()
+        self.assertIn(repr(boom), warn.call_args.args[0])
+
+    def test_413_closes_connection(self):
+        # Content-Length over the limit → 413 without reading the body;
+        # the connection must then close (an unread body would desync
+        # keep-alive). The body is deliberately never sent — that is the
+        # situation the close protects against.
+        conn = HTTPConnection("127.0.0.1", self.port, timeout=60)
+        conn.putrequest("POST", "/api/bind")
+        conn.putheader("Content-Type", "application/json")
+        conn.putheader("Content-Length", str(server.MAX_BODY_BYTES + 1))
+        conn.endheaders()
+        response = conn.getresponse()
+        try:
+            self.assertEqual(response.status, 413)
+            self.assertEqual(response.getheader("Connection"), "close")
+            self.assertTrue(response.will_close)
+        finally:
+            conn.close()
+
+
 class CliWiringTests(unittest.TestCase):
     """`collect.py serve`: --config plumbing + the config serve block."""
 
@@ -584,6 +638,33 @@ class CliWiringTests(unittest.TestCase):
                 rc = collect.main(["serve", "--config", str(config_path)])
             self.assertEqual(rc, 0)
             run_serve.assert_called_once_with(config, str(tmpdir / "data"))
+
+    def test_serve_port_busy_clean_one_line_error_exit_1(self):
+        # a second `collect serve` on the same port: a clean one-line
+        # error + exit 1, never a raw bind traceback
+        blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.addCleanup(blocker.close)
+        blocker.bind(("127.0.0.1", 0))
+        blocker.listen(1)
+        port = blocker.getsockname()[1]
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            host_db = tmpdir / "host.sqlite"
+            fixtures.write_host_db(host_db, fixtures.host_scenario())
+            config = {"version": 1,
+                      "sources": {"zcode_host": {"db": str(host_db)}},
+                      "projects": {}, "serve": {"host": "127.0.0.1",
+                                                "port": port}}
+            config_path = tmpdir / "config.json"
+            config_path.write_text(json.dumps(config), encoding="utf-8")
+            stderr = io.StringIO()
+            with contextlib.redirect_stderr(stderr):
+                rc = collect.main(["serve", "--config", str(config_path)])
+        self.assertEqual(rc, 1)
+        self.assertIn("порт", stderr.getvalue())
+        self.assertIn(str(port), stderr.getvalue())
+        self.assertIn("занят", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
     def test_run_serve_uses_serve_block_and_overrides(self):
         config = {"projects": {},

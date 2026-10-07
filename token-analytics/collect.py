@@ -16,6 +16,7 @@ viewer + /data/*.json + POST /api/bind on 127.0.0.1:8765 via server.py;
 `writeback` remains a stub until its task of #26.
 """
 import argparse
+import errno
 import os
 import sys
 
@@ -41,7 +42,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
     """Serve the static viewer + JSON API + POST /api/bind (server.py).
 
     Host/port come from the config `serve` block (default 127.0.0.1:8765);
-    Ctrl-C is the normal way down.
+    Ctrl-C is the normal way down. A bind failure (port already taken by
+    a second serve) is a clean one-line error, not a raw traceback.
     """
     try:
         config = collector.load_config(args.config)
@@ -50,7 +52,16 @@ def cmd_serve(args: argparse.Namespace) -> int:
               + str(exc), file=sys.stderr)
         return 1
     import server
-    server.run_serve(config, collector.data_dir_for(args.config))
+    try:
+        server.run_serve(config, collector.data_dir_for(args.config))
+    except OSError as exc:
+        _, port = server.serve_address(config)
+        if exc.errno == errno.EADDRINUSE:
+            print("serve: порт " + str(port)
+                  + " занят — сервер уже запущен?", file=sys.stderr)
+        else:
+            print("serve: " + str(exc), file=sys.stderr)
+        return 1
     return 0
 
 

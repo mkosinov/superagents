@@ -251,6 +251,7 @@ class AnalyticsHandler(BaseHTTPRequestHandler):
 
     server_version = "token-analytics-serve"
     protocol_version = "HTTP/1.1"   # keep-alive; every reply carries Length
+    timeout = 30                    # a stalled client frees its worker thread
     _replied = False                # one response per request, even on errors
 
     @property
@@ -266,6 +267,9 @@ class AnalyticsHandler(BaseHTTPRequestHandler):
         self._replied = True  # one response per request, even on errors
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
+        if self.close_connection:
+            # e.g. the 413 path: say the close out loud, not just do it
+            self.send_header("Connection", "close")
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -330,10 +334,13 @@ class AnalyticsHandler(BaseHTTPRequestHandler):
         except (BrokenPipeError, ConnectionResetError):
             pass  # the browser closed the socket — nothing to report
         except Exception as exc:  # a bug must not kill the server thread
+            # the client gets a generic message (no exception text, no
+            # paths); the operator gets the details server-side
+            _warn("unhandled error on " + str(self.command) + " "
+                  + str(self.path) + ": " + repr(exc))
             try:
                 if not self._replied:  # never send a second response
-                    self._send_json(500, {"error": "внутренняя ошибка: "
-                                          + str(exc)})
+                    self._send_json(500, {"error": "внутренняя ошибка сервера"})
             except OSError:
                 pass
 
@@ -405,6 +412,10 @@ class AnalyticsHandler(BaseHTTPRequestHandler):
         except ValueError:
             length = 0
         if length > MAX_BODY_BYTES:
+            # The body stays unread, so keep-alive would desync on the
+            # next request — and draining an arbitrary-size body is not
+            # worth it. Close instead; _send_json adds Connection: close.
+            self.close_connection = True
             self._send_json(413, {"error": "тело запроса слишком большое"})
             return
         body = self.rfile.read(length) if length > 0 else b""
@@ -437,17 +448,26 @@ def make_server(config: dict, data_dir, host: str = "127.0.0.1",
     return AnalyticsServer((host, port), app)
 
 
-def run_serve(config: dict, data_dir, host: str = None,
-              port: int = None) -> None:
-    """`collect serve`: serve until Ctrl-C. Host/port from the config
-    `serve` block (defaults 127.0.0.1:8765), overridable by args — the
-    tests' ephemeral-port injection path."""
+def serve_address(config: dict, host: str = None,
+                  port: int = None) -> tuple[str, int]:
+    """Resolve the bind address: args win, else the config `serve` block,
+    else 127.0.0.1:8765. `run_serve` binds these numbers, and collect's
+    port-busy error message quotes the same ones."""
     block = (config.get("serve") or {}) if isinstance(config, dict) else {}
     bound_host = host or block.get("host") or "127.0.0.1"
     if port is not None:
         bound_port = int(port)
     else:
         bound_port = int(block.get("port") or 8765)
+    return bound_host, bound_port
+
+
+def run_serve(config: dict, data_dir, host: str = None,
+              port: int = None) -> None:
+    """`collect serve`: serve until Ctrl-C. Host/port from the config
+    `serve` block (defaults 127.0.0.1:8765), overridable by args — the
+    tests' ephemeral-port injection path."""
+    bound_host, bound_port = serve_address(config, host, port)
     httpd = make_server(config, data_dir, host=bound_host, port=bound_port)
     shown = httpd.server_address if isinstance(httpd.server_address, tuple) \
         else (bound_host, bound_port)
