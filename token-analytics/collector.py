@@ -29,6 +29,29 @@ Mapping layer (spec §Session → issue mapping, §Phase attribution):
 * `build_unmatched(host, container, config, overrides)` — rows for roots
   matching no issue (any directory), sorted by tokens desc.
 
+Aggregation + snapshot writing (spec §Token accounting, §Active model time
+and calendar span, §Drill-down tree, §By-model and by-agent aggregates,
+§Snapshots and state):
+
+* `aggregate(host, container, config, overrides, titles)` — the rebuild
+  core: per-issue snapshot dicts (tokens 5 components + raw-sum total,
+  active model time, calendar span per phase, recursive drill-down tree
+  with T-folding on IMPL-root children and agent-labeled design children,
+  by_model/by_agent bars, board-ready rounded values);
+* `rebuild(host, container, config, data_dir)` — one full pass: refresh
+  the gh title cache, aggregate, write `issues/*.json` + `index.json` +
+  `unmatched.json` atomically, drop stale issue files, ensure
+  `state.json` exists (write-back caches only);
+* `fetch_issue_titles(repo)` / `refresh_titles(...)` — one bulk
+  `gh issue list` argv call per repo per run; `data/titles.json` is the
+  offline fallback cache (closed issues keep the last known title).
+
+Determinism: every JSON write goes through `_atomic_write_json`
+(tmp + `os.replace`, `sort_keys=True`, `ensure_ascii=False`) and no
+wall-clock timestamp ever enters a snapshot — `collected_at` and
+last-activity dates are derived from DB times — so identical input yields
+byte-identical output.
+
 Safety invariants (grep-checked by tests/test_readers.py):
 * subprocess calls are argv lists only — never through a shell;
 * all SQL is static constants with parameter placeholders where values
@@ -328,20 +351,33 @@ def load_overrides(data_dir):
     return overrides
 
 
-def save_overrides(data_dir, overrides) -> None:
-    """Write overrides.json atomically (tmp file + os.replace, spec §Snapshots).
+def _atomic_write_json(path, payload) -> None:
+    """Write JSON atomically: tmp file + os.replace (spec §Snapshots).
 
-    Sorted keys, UTF-8, indented — hand-editable; all snapshot writers are
-    serialized by data/.lock so a fixed tmp name is safe.
+    Sorted keys, UTF-8, indented — hand-editable and byte-deterministic.
+    All snapshot writers are serialized by data/.lock so a fixed tmp name
+    is safe. A failure anywhere between tmp creation and replace removes
+    the tmp file and re-raises — the previous file stays intact.
     """
+    tmp = os.fspath(path) + ".tmp"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(payload, fh, ensure_ascii=False, indent=2, sort_keys=True)
+            fh.write("\n")
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def save_overrides(data_dir, overrides) -> None:
+    """Write overrides.json atomically (tmp file + os.replace, spec §Snapshots)."""
     directory = os.fspath(data_dir)
     os.makedirs(directory, exist_ok=True)
-    path = os.path.join(directory, OVERRIDES_FILENAME)
-    tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as fh:
-        json.dump(overrides, fh, ensure_ascii=False, indent=2, sort_keys=True)
-        fh.write("\n")
-    os.replace(tmp, path)
+    _atomic_write_json(os.path.join(directory, OVERRIDES_FILENAME), overrides)
 
 
 # --- Phase attribution (spec §Phase attribution) -----------------------------
@@ -438,6 +474,566 @@ def build_unmatched(host, container, config, overrides=None):
             })
     rows.sort(key=lambda row: -row["tokens"])
     return rows
+
+
+def _utc_iso(epoch_ms) -> str:
+    """Epoch milliseconds → UTC ISO-8601 second timestamp (deterministic)."""
+    moment = datetime.datetime.fromtimestamp(int(epoch_ms) // 1000,
+                                             tz=datetime.timezone.utc)
+    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+# --- Aggregation: the rebuild core (spec §Token accounting, §Active model
+# --- time and calendar span, §Drill-down tree, §By-model/by-agent) ---------
+
+# The 5 canonical components and their column names in both source DBs.
+TOKEN_KINDS = ("input", "output", "reasoning", "cache_read", "cache_write")
+TOKEN_KIND_COLUMNS = (
+    ("input", "tokens_input"),
+    ("output", "tokens_output"),
+    ("reasoning", "tokens_reasoning"),
+    ("cache_read", "tokens_cache_read"),
+    ("cache_write", "tokens_cache_write"),
+)
+
+MS_PER_HOUR = 3_600_000
+MS_PER_DAY = 86_400_000
+
+# IMPL-phase marathon children folding: `T1: …` / `T1. …` / `T1 …` all fold
+# into one `T1` node aggregating their subtrees (spec §Drill-down tree).
+T_LABEL_RE = re.compile(r"^T(\d+)[:. ]")
+
+
+def board_total_m(total: int) -> float:
+    """Raw token total → board value in millions, 1 decimal («48.2»)."""
+    return round(total / 1_000_000, 1)
+
+
+def board_hours(active_ms: int) -> float:
+    """Active milliseconds → board value in hours, 1 decimal («25.3»)."""
+    return round(active_ms / MS_PER_HOUR, 1)
+
+
+def _zero_tokens() -> dict:
+    return {kind: 0 for kind in TOKEN_KINDS}
+
+
+def _add_tokens(acc, row) -> None:
+    """Add a source row's 5 token columns into a kind-keyed accumulator."""
+    for kind, column in TOKEN_KIND_COLUMNS:
+        acc[kind] += row.get(column) or 0
+
+
+def _tokens_block(acc) -> dict:
+    """Kind accumulator → snapshot block: 5 components + total + total_m."""
+    block = dict(acc)
+    block["total"] = sum(acc[kind] for kind in TOKEN_KINDS)
+    block["total_m"] = board_total_m(block["total"])
+    return block
+
+
+def _calendar_block(span_ms: int) -> dict:
+    """Calendar span: whole days at/above a day, hours (1 dp) below it."""
+    if span_ms >= MS_PER_DAY:
+        return {"ms": span_ms, "days": int(round(span_ms / MS_PER_DAY)), "hours": None}
+    return {"ms": span_ms, "days": None, "hours": board_hours(span_ms)}
+
+
+def _bars(counts: dict, key: str) -> list:
+    """{name: tokens} → sorted bar-chart rows, tokens desc then name asc."""
+    return [{key: name, "tokens": total}
+            for name, total in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))]
+
+
+def _children_map(sessions) -> dict:
+    """{parent_id: [direct child sessions]} in session-list order."""
+    children = {}
+    for session in sessions:
+        children.setdefault(session.get("parent_id"), []).append(session)
+    return children
+
+
+def _container_model_id(session):
+    """Container session.model (JSON `{"id": …}`) → the model id string."""
+    raw = session.get("model")
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, TypeError):
+        return raw
+    if isinstance(data, dict) and data.get("id"):
+        return data["id"]
+    return raw
+
+
+def _host_session_metrics(payload: dict) -> dict:
+    """Per host session: tokens (5 kinds, ALL turn_usage rows — errored and
+    cancelled turns are real spend attempts), active_ms (per-turn durations
+    summed — roots AND children count), and agent attribution from
+    model_usage for tree labels."""
+    metrics = {}
+
+    def _rec(session_id):
+        return metrics.setdefault(session_id, {
+            "tokens": _zero_tokens(), "active_ms": 0, "agent": None,
+            "agent_tokens": {},
+        })
+
+    for turn in payload.get("turns") or []:
+        rec = _rec(turn["session_id"])
+        _add_tokens(rec["tokens"], turn)
+        rec["active_ms"] += turn.get("duration_ms") or 0
+    for row in payload.get("models") or []:
+        rec = _rec(row["session_id"])
+        agent = row.get("agent")
+        rec["agent_tokens"][agent] = rec["agent_tokens"].get(agent, 0) + _token_total(row)
+    for rec in metrics.values():
+        # label = the session's highest-token agent (ties → name asc);
+        # unrecognized agents keep their raw string — no translation
+        rec["agent"] = _dominant_agent(rec["agent_tokens"])
+    return metrics
+
+
+def _dominant_agent(agent_tokens: dict):
+    if not agent_tokens:
+        return None
+    ranked = sorted(agent_tokens.items(), key=lambda kv: (-kv[1], kv[0] or ""))
+    return ranked[0][0]
+
+
+def _container_session_metrics(sessions: list) -> dict:
+    """Per container session: tokens from the session row (root wrappers'
+    tokens COUNT — real orchestration spend) and the active-time
+    approximation `time_updated − time_created`, with marathon root
+    wrappers excluded (their span ≈ the whole marathon calendar) while
+    childless roots count their own span (single-step IMPL session)."""
+    children = _children_map(sessions)
+    metrics = {}
+    for session in sessions:
+        tokens = {kind: (session.get(column) or 0) for kind, column in TOKEN_KIND_COLUMNS}
+        span = max(0, (session.get("time_updated") or 0) - (session.get("time_created") or 0))
+        is_wrapper = session.get("parent_id") is None and bool(children.get(session["id"]))
+        metrics[session["id"]] = {
+            "tokens": tokens,
+            "active_ms": 0 if is_wrapper else span,
+            "agent": session.get("agent"),
+            "model": _container_model_id(session),
+        }
+    return metrics
+
+
+def _model_rows_by_session(models: list) -> dict:
+    rows = {}
+    for row in models or []:
+        rows.setdefault(row["session_id"], []).append(row)
+    return rows
+
+
+def _fold_t_children(nodes: list) -> list:
+    """Fold `T<N>`-titled root children into one aggregating node each.
+
+    One task = several sub-sessions (implement/compliance/quality) — they
+    aggregate under a single `T<N>` node, each keeping its own subtree as
+    a child; unlabeled children («Fix …») stay standalone (spec
+    §Drill-down tree). Fold nodes appear at their first member's position.
+    """
+    folded = []
+    t_nodes = {}
+    for node in nodes:
+        match = T_LABEL_RE.match(node["title"] or "")
+        if not match:
+            folded.append(node)
+            continue
+        number = match.group(1)
+        t_node = t_nodes.get(number)
+        if t_node is None:
+            t_node = {"session_id": None, "title": "T" + number, "agent": None,
+                      "tokens": _zero_tokens(), "active_ms": 0, "children": []}
+            t_nodes[number] = t_node
+            folded.append(t_node)
+        for kind in TOKEN_KINDS:
+            t_node["tokens"][kind] += node["tokens"][kind]
+        t_node["active_ms"] += node["active_ms"]
+        t_node["children"].append(node)
+    for t_node in t_nodes.values():
+        t_node["tokens"] = _tokens_block(t_node["tokens"])
+    return folded
+
+
+def _build_node(session, children_map, metrics, fold_t=False) -> dict:
+    """Session → tree node whose tokens/active are its WHOLE subtree's
+    aggregate (own session + descendants, any nesting depth)."""
+    rec = metrics.get(session["id"]) or {}
+    tokens = dict(rec.get("tokens") or _zero_tokens())
+    active_ms = rec.get("active_ms") or 0
+    children = [_build_node(child, children_map, metrics)
+                for child in children_map.get(session["id"], [])]
+    if fold_t:  # T-folding applies to IMPL-root children only, not deeper
+        children = _fold_t_children(children)
+    for child in children:
+        for kind in TOKEN_KINDS:
+            tokens[kind] += child["tokens"][kind]
+        active_ms += child["active_ms"]
+    return {
+        "session_id": session["id"],
+        "title": session.get("title"),
+        "agent": rec.get("agent"),
+        "tokens": _tokens_block(tokens),
+        "active_ms": active_ms,
+        "children": children,
+    }
+
+
+def _new_issue_acc() -> dict:
+    return {"phases": {}, "max_updated": None}
+
+
+def _new_phase_acc() -> dict:
+    return {"tokens": _zero_tokens(), "active_ms": 0,
+            "min_created": None, "max_updated": None,
+            "by_model": {}, "by_agent": {}, "roots": []}
+
+
+def aggregate(host, container, config, overrides=None, titles=None) -> dict:
+    """Both source payloads → per-issue snapshot dicts (the rebuild core).
+
+    `host`/`container` are reader payloads (None = source unavailable,
+    skipped fail-open). Roots are mapped to (project, issue) by the
+    mapping layer (overrides beat every heuristic) and phased per the
+    project's mode; each root's whole subtree folds into its issue.
+    Returns {"issues": {(project, issue): snapshot}, "unmatched": rows}.
+
+    Snapshot shape (spec §Snapshots and state): title + source, project,
+    last activity, issue-level raw totals (5 components + total +
+    active_ms) AND board-ready values (`tokens.total_m`, `active.hours`,
+    mirrored per phase), `phases.{design,impl}` each with tokens,
+    active_ms/hours, calendar span, the recursive drill-down tree, and
+    by_model/by_agent bars; `by_model`/`by_agent`/`collected_at` at the
+    top. Every date is data-derived — no wall clock (byte determinism).
+    """
+    overrides = overrides or {}
+    titles = titles or {}
+    projects_cfg = config.get("projects", {})
+    issues = {}
+
+    for source, payload in ((SOURCES[0], host), (SOURCES[1], container)):
+        if not payload:
+            continue
+        sessions = payload["sessions"]
+        by_id = {s["id"]: s for s in sessions}
+        children_map = _children_map(sessions)
+        groups = group_by_root(sessions)
+        if source == "host":
+            metrics = _host_session_metrics(payload)
+            model_rows = _model_rows_by_session(payload.get("models"))
+        else:
+            metrics = _container_session_metrics(sessions)
+            model_rows = {}
+
+        for root_id in sorted(groups):
+            root = by_id[root_id]
+            override = overrides.get(root_id) or {}
+            project = override.get("project") or attribute_project(
+                root.get("directory"), config)
+            issue = _coerce_issue(override.get("issue"))
+            if issue is None:
+                issue = extract_issue(root.get("title"))
+            if project is None or issue is None:
+                continue  # unmapped — flows into the unmatched table
+            spec = projects_cfg.get(project)
+            if spec is None:
+                _warn("aggregate: project " + repr(project)
+                      + " not in config (override typo?); title phase mode assumed")
+                mode = "title"
+            else:
+                mode = spec.get("phase_mode", "title")
+            phase = phase_for_root(root, mode, source, override.get("phase"))
+
+            issue_acc = issues.setdefault((project, issue), _new_issue_acc())
+            phase_acc = issue_acc["phases"].setdefault(phase, _new_phase_acc())
+            for member in groups[root_id]:
+                rec = metrics.get(member["id"])
+                if rec is not None:
+                    _add_into(phase_acc["tokens"], rec["tokens"])
+                    phase_acc["active_ms"] += rec["active_ms"]
+                    if source == "container":
+                        total = sum(rec["tokens"].values())
+                        phase_acc["by_model"][rec["model"]] = (
+                            phase_acc["by_model"].get(rec["model"], 0) + total)
+                        agent = rec["agent"] or UNATTRIBUTED
+                        phase_acc["by_agent"][agent] = (
+                            phase_acc["by_agent"].get(agent, 0) + total)
+                created = member.get("time_created")
+                updated = member.get("time_updated")
+                phase_acc["min_created"] = _min_nullable(phase_acc["min_created"], created)
+                phase_acc["max_updated"] = _max_nullable(phase_acc["max_updated"], updated)
+                issue_acc["max_updated"] = _max_nullable(issue_acc["max_updated"], updated)
+                if source == "host":
+                    for row in model_rows.get(member["id"], []):
+                        total = _token_total(row)
+                        model_id = row.get("model_id") or UNATTRIBUTED
+                        phase_acc["by_model"][model_id] = (
+                            phase_acc["by_model"].get(model_id, 0) + total)
+                        agent = row.get("agent") or UNATTRIBUTED
+                        phase_acc["by_agent"][agent] = (
+                            phase_acc["by_agent"].get(agent, 0) + total)
+            phase_acc["roots"].append(_build_node(root, children_map, metrics,
+                                                  fold_t=(phase == "impl")))
+
+    snapshots = {key: _make_snapshot(key, acc, config, titles)
+                 for key, acc in issues.items()}
+    return {
+        "issues": snapshots,
+        "unmatched": build_unmatched(host, container, config, overrides),
+    }
+
+
+def _add_into(acc, tokens) -> None:
+    for kind in TOKEN_KINDS:
+        acc[kind] += tokens.get(kind) or 0
+
+
+def _min_nullable(current, candidate):
+    if candidate is None:
+        return current
+    return candidate if current is None else min(current, candidate)
+
+
+def _max_nullable(current, candidate):
+    if candidate is None:
+        return current
+    return candidate if current is None else max(current, candidate)
+
+
+def _make_snapshot(key, issue_acc, config, titles) -> dict:
+    """Issue accumulator → the final snapshot dict (shapes pinned by spec)."""
+    project, issue = key
+    repo = (config.get("projects", {}).get(project) or {}).get("repo")
+    repo_titles = titles.get(repo) if repo else None
+    number = str(issue)
+    if repo_titles and number in repo_titles:
+        title, title_source = repo_titles[number], "gh"
+    else:
+        title, title_source = "issue #" + number, "fallback"
+
+    issue_tokens = _zero_tokens()
+    issue_active_ms = 0
+    issue_by_model, issue_by_agent = {}, {}
+    phases = {}
+    for phase in sorted(issue_acc["phases"]):
+        acc = issue_acc["phases"][phase]
+        _add_into(issue_tokens, acc["tokens"])
+        issue_active_ms += acc["active_ms"]
+        for name, total in acc["by_model"].items():
+            issue_by_model[name] = issue_by_model.get(name, 0) + total
+        for name, total in acc["by_agent"].items():
+            issue_by_agent[name] = issue_by_agent.get(name, 0) + total
+        span_ms = (acc["max_updated"] or 0) - (acc["min_created"] or 0)
+        phases[phase] = {
+            "tokens": _tokens_block(acc["tokens"]),
+            "active_ms": acc["active_ms"],
+            "active": {"hours": board_hours(acc["active_ms"])},
+            "calendar": _calendar_block(span_ms),
+            "tree": sorted(acc["roots"],
+                           key=lambda node: (-node["tokens"]["total"],
+                                             node["session_id"])),
+            "by_model": _bars(acc["by_model"], "model"),
+            "by_agent": _bars(acc["by_agent"], "agent"),
+        }
+    max_updated = issue_acc["max_updated"]
+    return {
+        "project": project,
+        "issue": issue,
+        "title": title,
+        "title_source": title_source,
+        "last_activity": _utc_date(max_updated) if max_updated is not None else None,
+        # data-derived (DB times) — never a wall clock, for byte determinism
+        "collected_at": _utc_iso(max_updated) if max_updated is not None else None,
+        "tokens": _tokens_block(issue_tokens),
+        "active_ms": issue_active_ms,
+        "active": {"hours": board_hours(issue_active_ms)},
+        "phases": phases,
+        "by_model": _bars(issue_by_model, "model"),
+        "by_agent": _bars(issue_by_agent, "agent"),
+    }
+
+
+# --- Issue titles: one bulk gh call per repo per run (spec §Snapshots) -------
+
+GH_TIMEOUT_S = 30               # a wedged gh must not hang a collect run
+GH_LIST_LIMIT = "1000"          # no 30-row defaults — loop/exhaust equivalents
+TITLES_FILENAME = "titles.json"
+STATE_FILENAME = "state.json"
+INDEX_FILENAME = "index.json"
+UNMATCHED_FILENAME = "unmatched.json"
+ISSUES_DIRNAME = "issues"
+
+
+def fetch_issue_titles(repo: str) -> dict | None:
+    """One bulk `gh issue list` per repo → {issue_number: title}, or None.
+
+    `--state all` so closed issues refresh too; the titles.json cache is
+    the offline fallback either way (closed issues keep the last known
+    title). Any invocation/parse failure → warning + None (fail-open).
+    """
+    argv = ["gh", "issue", "list",
+            "--repo", repo,
+            "--state", "all",
+            "--limit", GH_LIST_LIMIT,
+            "--json", "number,title"]
+    try:
+        proc = subprocess.run(argv, capture_output=True, timeout=GH_TIMEOUT_S)
+    except (OSError, subprocess.SubprocessError) as exc:
+        _warn("fetch_issue_titles " + repo + ": " + str(exc))
+        return None
+    if proc.returncode != 0:
+        stderr_lines = proc.stderr.decode("utf-8", errors="replace").strip().splitlines()
+        detail = stderr_lines[0] if stderr_lines else "no stderr"
+        _warn("fetch_issue_titles " + repo + ": exit " + str(proc.returncode)
+              + ": " + detail)
+        return None
+    try:
+        data = json.loads(proc.stdout.decode("utf-8", errors="replace"))
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        _warn("fetch_issue_titles " + repo + ": cannot parse gh output")
+        return None
+    titles = {}
+    if isinstance(data, list):
+        for row in data:
+            if isinstance(row, dict) and isinstance(row.get("number"), int) \
+                    and isinstance(row.get("title"), str):
+                titles[row["number"]] = row["title"]
+    return titles
+
+
+def load_titles(data_dir) -> dict:
+    """Read data/titles.json → {repo: {issue-number-string: title}}.
+
+    Missing file → {}. Corrupt/non-dict content → warning + {} (the cache
+    must not kill a collect run).
+    """
+    path = os.path.join(os.fspath(data_dir), TITLES_FILENAME)
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            text = fh.read()
+    except FileNotFoundError:
+        return {}
+    except OSError as exc:
+        _warn("load_titles " + path + ": " + str(exc))
+        return {}
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        _warn("load_titles " + path + ": cannot parse, ignoring cache")
+        return {}
+    if not isinstance(data, dict):
+        _warn("load_titles " + path + ": expected an object, ignoring cache")
+        return {}
+    titles = {}
+    for repo, entries in data.items():
+        if isinstance(entries, dict):
+            titles[repo] = {str(number): title for number, title in entries.items()
+                            if isinstance(title, str)}
+    return titles
+
+
+def refresh_titles(data_dir, config, fetch=None) -> dict:
+    """Refresh the gh title cache: one bulk call per configured repo, merged
+    over the existing cache (fresh wins per issue; cached issues gh no
+    longer returns — e.g. filtered-out closed ones — keep their last known
+    title). Saves and returns the merged mapping.
+    """
+    fetch = fetch or fetch_issue_titles
+    cache = load_titles(data_dir)
+    merged = {repo: dict(entries) for repo, entries in cache.items()}
+    repos = set()
+    for spec in config.get("projects", {}).values():
+        repo = (spec or {}).get("repo")
+        if repo:
+            repos.add(repo)
+    for repo in sorted(repos):
+        fresh = fetch(repo)
+        if fresh is None:
+            _warn("titles " + repo + ": gh failed, keeping cached titles")
+            continue
+        entries = merged.setdefault(repo, {})
+        for number, title in fresh.items():
+            entries[str(number)] = title
+    directory = os.fspath(data_dir)
+    os.makedirs(directory, exist_ok=True)
+    _atomic_write_json(os.path.join(directory, TITLES_FILENAME), merged)
+    return merged
+
+
+def write_snapshots(data_dir, aggregated, sources=None) -> None:
+    """Persist an aggregate() result under data/ — all writes atomic.
+
+    Writes `issues/<project>-<N>.json`, `index.json` (issue rows with
+    totals/phase split/last activity, sorted by spend desc, plus
+    per-source availability), `unmatched.json`; removes snapshot files of
+    issues that no longer have mapped sessions (their index entries are
+    gone with the rewrite); creates `state.json` when missing (write-back
+    caches only — nothing else ever goes in it here).
+    """
+    directory = os.fspath(data_dir)
+    issues_dir = os.path.join(directory, ISSUES_DIRNAME)
+    os.makedirs(issues_dir, exist_ok=True)
+    current = set()
+    index_rows = []
+    for (project, issue), snapshot in sorted(aggregated.get("issues", {}).items()):
+        name = str(project) + "-" + str(issue) + ".json"
+        _atomic_write_json(os.path.join(issues_dir, name), snapshot)
+        current.add(name)
+        index_rows.append({
+            "project": snapshot["project"],
+            "issue": snapshot["issue"],
+            "title": snapshot["title"],
+            "title_source": snapshot["title_source"],
+            "tokens": {"total": snapshot["tokens"]["total"],
+                       "total_m": snapshot["tokens"]["total_m"]},
+            "active_ms": snapshot["active_ms"],
+            "phases": {phase: {"tokens": {"total": block["tokens"]["total"],
+                                          "total_m": block["tokens"]["total_m"]},
+                               "active_ms": block["active_ms"]}
+                       for phase, block in snapshot["phases"].items()},
+            "last_activity": snapshot["last_activity"],
+        })
+    index_rows.sort(key=lambda row: (-row["tokens"]["total"], row["project"],
+                                     row["issue"]))
+    _atomic_write_json(os.path.join(directory, INDEX_FILENAME),
+                       {"issues": index_rows, "sources": dict(sources or {})})
+    _atomic_write_json(os.path.join(directory, UNMATCHED_FILENAME),
+                       aggregated.get("unmatched", []))
+    with os.scandir(issues_dir) as entries:
+        for entry in entries:
+            if entry.is_file() and entry.name.endswith(".json") \
+                    and entry.name not in current:
+                os.unlink(entry.path)
+    state_path = os.path.join(directory, STATE_FILENAME)
+    if not os.path.exists(state_path):
+        _atomic_write_json(state_path, {})
+
+
+def rebuild(host, container, config, data_dir, overrides=None, fetch_titles=None) -> dict:
+    """One full rebuild over both sources into data/ (spec §Collection runs).
+
+    Loads overrides from data_dir unless given, refreshes the gh title
+    cache (injectable fetcher), aggregates, writes every snapshot file
+    atomically and returns the aggregate() result. First run and every
+    later run are the same code path.
+    """
+    directory = os.fspath(data_dir)
+    os.makedirs(directory, exist_ok=True)
+    if overrides is None:
+        overrides = load_overrides(directory)
+    titles = refresh_titles(directory, config, fetch_titles)
+    aggregated = aggregate(host, container, config, overrides=overrides,
+                           titles=titles)
+    write_snapshots(directory, aggregated,
+                    sources={"host": host is not None,
+                             "container": container is not None})
+    return aggregated
 
 
 def run_collect(config: dict) -> None:
