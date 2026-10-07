@@ -22,7 +22,6 @@ flipping write_back.enabled on.
 """
 import argparse
 import errno
-import fcntl
 import os
 import sys
 
@@ -32,14 +31,24 @@ DEFAULT_CONFIG = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "config.json")
 
 
+def _load_config_or_exit(command: str, config_path):
+    """The subcommand's config.json, or None after a loud one-line error —
+    a broken config is NOT fail-open, unlike source failures (each
+    cmd_* turns None into exit 1; collector.load_config raises).
+    """
+    try:
+        return collector.load_config(config_path)
+    except (OSError, ValueError) as exc:
+        print(command + ": cannot load config " + str(config_path) + ": "
+              + str(exc), file=sys.stderr)
+        return None
+
+
 def cmd_collect(args: argparse.Namespace) -> int:
     """One collection pass: locked readers -> rebuild -> write-back hook."""
-    try:
-        config = collector.load_config(args.config)
-    except (OSError, ValueError) as exc:
-        print("collect: cannot load config " + str(args.config) + ": "
-              + str(exc), file=sys.stderr)
-        return 1  # a broken config is not fail-open, unlike source failures
+    config = _load_config_or_exit("collect", args.config)
+    if config is None:
+        return 1
     collector.run_collect(config, collector.data_dir_for(args.config))
     return 0  # lock-skip and fail-open source losses both stay 0
 
@@ -51,11 +60,8 @@ def cmd_serve(args: argparse.Namespace) -> int:
     Ctrl-C is the normal way down. A bind failure (port already taken by
     a second serve) is a clean one-line error, not a raw traceback.
     """
-    try:
-        config = collector.load_config(args.config)
-    except (OSError, ValueError) as exc:
-        print("serve: cannot load config " + str(args.config) + ": "
-              + str(exc), file=sys.stderr)
+    config = _load_config_or_exit("serve", args.config)
+    if config is None:
         return 1
     import server
     try:
@@ -77,30 +83,17 @@ def cmd_writeback(args: argparse.Namespace) -> int:
     The same pipeline `collect` runs post-rebuild (writeback.py), over
     the issue files already in data/ — a manual re-push after a gh
     outage or a board fix. Serialized against a running collect by the
-    same exclusive flock (a busy lock skips fail-open, exit 0); gh
-    failures warn and the run still exits 0.
+    same exclusive flock via collector.run_locked (a busy lock skips
+    fail-open, exit 0); gh failures warn and the run still exits 0.
     """
-    try:
-        config = collector.load_config(args.config)
-    except (OSError, ValueError) as exc:
-        print("writeback: cannot load config " + str(args.config) + ": "
-              + str(exc), file=sys.stderr)
+    config = _load_config_or_exit("writeback", args.config)
+    if config is None:
         return 1
     import writeback
     directory = collector.data_dir_for(args.config)
-    os.makedirs(directory, exist_ok=True)
-    lock_fd = os.open(os.path.join(directory, collector.LOCK_FILENAME),
-                      os.O_CREAT | os.O_RDWR, 0o644)
-    try:
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            print(collector.SKIP_MESSAGE, file=sys.stderr)
-            return 0
-        writeback.run_writeback(config, directory)
-        return 0
-    finally:
-        os.close(lock_fd)  # releases the flock (never held on "skipped")
+    collector.run_locked(
+        directory, lambda: writeback.run_writeback(config, directory))
+    return 0  # both "ok" and "skipped" — fail-open either way
 
 
 def cmd_fields(args: argparse.Namespace) -> int:
@@ -111,11 +104,8 @@ def cmd_fields(args: argparse.Namespace) -> int:
     configured binding stops loudly (exit 1, zero mutations). gh
     failures stay fail-open (warning, exit 0).
     """
-    try:
-        config = collector.load_config(args.config)
-    except (OSError, ValueError) as exc:
-        print("fields: cannot load config " + str(args.config) + ": "
-              + str(exc), file=sys.stderr)
+    config = _load_config_or_exit("fields", args.config)
+    if config is None:
         return 1
     import writeback
     return writeback.run_fields(config)

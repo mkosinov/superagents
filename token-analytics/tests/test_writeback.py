@@ -33,6 +33,7 @@ import io
 import json
 import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -72,7 +73,14 @@ elif argv[0] == "project" and argv[1] in ("item-list", "field-list"):
     is_items = argv[1] == "item-list"
     rows = json.load(open(os.environ["GH_ITEMS" if is_items else "GH_FIELDS"]))
     key = "items" if is_items else "fields"
-    out({key: rows[: int(flag("--limit"))], "totalCount": len(rows)})
+    page = rows[: int(flag("--limit"))]
+    mode = os.environ.get("GH_TOTAL_MODE", "")
+    if mode == "omit":       # pathological: no totalCount at all
+        out({key: page})
+    elif mode == "lie-low":  # pathological: totalCount understates rows
+        out({key: page, "totalCount": 3})
+    else:
+        out({key: page, "totalCount": len(rows)})
 elif argv[:2] == ["project", "item-edit"]:
     item = flag("--id")
     if item in json.load(open(os.environ["GH_EDIT_FAIL"])):
@@ -262,6 +270,30 @@ class ResolvePathTests(unittest.TestCase):
             self.assertIsNotNone(resolved, msg=bad)  # no silent None
 
 
+# --- unit: state cache normalization (fail-open against corrupt state) -------
+
+class ProjectCacheTests(unittest.TestCase):
+    def test_corrupt_written_entry_reset_to_empty_dict(self):
+        # regression: "written": {"5": 48.2} (number, not {field: value})
+        # used to AttributeError through run_collect and kill the cron
+        # collect — it must normalize one level deeper, fail-open
+        state = {"writeback": {"memo": {
+            "items": {"5": "I5"},
+            "written": {"5": 48.2, "7": {"Hours total": 1.0}}}}}
+        cache = writeback._project_cache(state, "memo")
+        self.assertEqual(cache["written"]["5"], {})  # reset, not crash
+        self.assertEqual(cache["written"]["7"], {"Hours total": 1.0})
+        self.assertEqual(cache["items"], {"5": "I5"})  # sibling intact
+
+    def test_non_dict_levels_replaced_in_place(self):
+        state = {"writeback": "junk"}
+        cache = writeback._project_cache(state, "memo")
+        self.assertEqual(cache, {"items": {}, "written": {}})
+        root = state["writeback"]
+        self.assertIsInstance(root, dict)
+        self.assertIs(root["memo"], cache)  # saved back
+
+
 # --- unit: pagination drain (#24 canon) ----------------------------------------
 
 class PaginationTests(unittest.TestCase):
@@ -300,6 +332,55 @@ class PaginationTests(unittest.TestCase):
             self.assertEqual(len(fields), 126)
             names = {field["name"] for field in fields}
             self.assertIn("Hours impl", names)  # canonical names live past 100
+
+    def test_totalcount_missing_returns_page_without_looping(self):
+        # pathological shape: gh omits totalCount — nothing to drain
+        # against, so the loop stops at the explicit page (bounded,
+        # never infinite) instead of crashing or guessing
+        with tempfile.TemporaryDirectory() as tmp:
+            gh = self._fake(Path(tmp))
+            gh.set_items([_board_item(n) for n in range(1, 131)])
+            with mock.patch.dict(os.environ, gh.env(GH_TOTAL_MODE="omit")):
+                resolved = writeback.gh_item_list("t", 3)
+            self.assertIsInstance(resolved, list)
+            assert resolved is not None
+            self.assertEqual(len(resolved), 100)  # first explicit page only
+            self.assertEqual(len(gh.calls("project", "item-list")), 1)
+
+    def test_totalcount_lying_low_stops_immediately(self):
+        # pathological shape: totalCount (3) understates the rows the
+        # call actually returned — «covered», stop, no grow-loop
+        with tempfile.TemporaryDirectory() as tmp:
+            gh = self._fake(Path(tmp))
+            gh.set_items([_board_item(n) for n in range(1, 131)])
+            with mock.patch.dict(os.environ, gh.env(GH_TOTAL_MODE="lie-low")):
+                resolved = writeback.gh_item_list("t", 3)
+            self.assertIsInstance(resolved, list)
+            assert resolved is not None
+            self.assertEqual(len(resolved), 100)  # the full returned page
+            self.assertEqual(len(gh.calls("project", "item-list")), 1)
+
+    def test_board_over_limit_cap_warns_and_drains_partially(self):
+        # pathological shape: totalCount beyond LIMIT_CAP — the drain
+        # warns and returns the capped prefix, limit never exceeds the cap
+        with tempfile.TemporaryDirectory() as tmp:
+            gh = self._fake(Path(tmp))
+            gh.set_items([_board_item(n)
+                          for n in range(1, writeback.LIMIT_CAP + 2)])
+            stderr = io.StringIO()
+            with mock.patch.dict(os.environ, gh.env()), \
+                    contextlib.redirect_stderr(stderr):
+                resolved = writeback.gh_item_list("t", 3)
+            self.assertIsInstance(resolved, list)
+            assert resolved is not None
+            self.assertEqual(len(resolved), writeback.LIMIT_CAP)
+            self.assertIn("drained partially", stderr.getvalue())
+            calls = gh.calls("project", "item-list")
+            limits = [int(_flag(argv, "--limit")) for argv in calls]
+            self.assertEqual(limits, [writeback.PAGE_SIZE,
+                                      writeback.LIMIT_CAP])
+            for limit in limits:
+                self.assertLessEqual(limit, writeback.LIMIT_CAP)
 
 
 # --- unit: `fields` subcommand --------------------------------------------------
@@ -450,6 +531,7 @@ class WritebackStandaloneTests(unittest.TestCase):
             rc, stderr = self._run(gh, config)
             self.assertEqual(rc, 0)
             self.assertIn("Hours impl", stderr)      # warning names the field
+            self.assertIn("memo", stderr)            # …and the project
             self.assertIn("fields", stderr)          # «run `fields`» hint
             self.assertEqual(len(self._edits(gh)), 5)  # the other 5 written
             written = _state(tmpdir / "data")["writeback"]["memo"]["written"]["5"]
@@ -494,6 +576,7 @@ class WritebackStandaloneTests(unittest.TestCase):
             rc, stderr = self._run(gh, config)
             self.assertEqual(rc, 0)
             self.assertIn("warning", stderr)
+            self.assertIn("memo#5", stderr)  # failure names project + issue
             state = _state(tmpdir / "data")["writeback"]["memo"]
             self.assertNotIn("5", state["items"])          # id dropped
             self.assertEqual(state["written"]["5"]["Tokens total"], 48.2)
@@ -510,6 +593,44 @@ class WritebackStandaloneTests(unittest.TestCase):
             state = _state(tmpdir / "data")["writeback"]["memo"]
             self.assertEqual(state["items"]["5"], "I5NEW")
             self.assertEqual(state["written"]["5"]["Tokens total"], 60.0)
+
+    def test_mixed_type_issue_values_sort_without_typeerror(self):
+        # one snapshot file carries a STRING issue (hand-edit, older
+        # writer): sorting int vs str must not TypeError; the string
+        # issue is skipped like every other non-int issue, the int one
+        # is written normally
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            snap9 = _snapshot(issue=9)
+            snap9["issue"] = "9"  # hand-corrupted to a string
+            gh, config = self._setup(
+                tmpdir, [_snapshot(issue=5), snap9],
+                items=[_board_item(5), _board_item(9)])
+            rc, stderr = self._run(gh, config)
+            self.assertEqual(rc, 0)
+            edits = self._edits(gh)
+            self.assertEqual({_flag(argv, "--id") for argv in edits}, {"I5"})
+
+    def test_written_cache_pruned_for_dropped_issue_snapshots(self):
+        # entries for issues whose snapshot files no longer exist (the
+        # rebuild stale-swept them) must not accumulate forever
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            gh, config = self._setup(
+                tmpdir, [_snapshot(issue=5), _snapshot(issue=9)],
+                items=[_board_item(5), _board_item(9)])
+            self._run(gh, config)
+            written = _state(tmpdir / "data")["writeback"]["memo"]["written"]
+            self.assertEqual(set(written), {"5", "9"})
+            # issue 9's snapshot disappears; its board card stays
+            (tmpdir / "data" / "issues" / "memo-9.json").unlink()
+            rc, stderr = self._run(gh, config)
+            self.assertEqual(rc, 0)
+            written = _state(tmpdir / "data")["writeback"]["memo"]["written"]
+            self.assertEqual(set(written), {"5"})  # pruned — no growth
+            self.assertIn("pruned", stderr)        # note lands in collect.log
+            # the survivor's cache is untouched: no re-write for issue 5
+            self.assertEqual(len(self._edits(gh)), 12)
 
     def test_empty_fields_noop_disabled_project_no_calls(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -544,6 +665,60 @@ class WritebackStandaloneTests(unittest.TestCase):
             self.assertGreaterEqual(len(list_calls), 2)
             for argv in list_calls:
                 self.assertIn("--limit", argv)
+
+
+# --- CLI plumbing: config errors + the shared lock ------------------------------
+
+class WritebackCliPlumbingTests(unittest.TestCase):
+    def _run(self, argv):
+        stderr = io.StringIO()
+        with contextlib.redirect_stderr(stderr):
+            rc = collect.main(argv)
+        return rc, stderr.getvalue()
+
+    def test_writeback_bad_config_exits_one_with_clean_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "config.json"
+            bad.write_text("{not json", encoding="utf-8")
+            rc, stderr = self._run(["writeback", "--config", str(bad)])
+            self.assertEqual(rc, 1)  # a broken config is not fail-open
+            self.assertIn("writeback: cannot load config", stderr)
+            self.assertNotIn("Traceback", stderr)
+
+    def test_fields_bad_config_exits_one_with_clean_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            bad = Path(tmp) / "config.json"
+            bad.write_text("{not json", encoding="utf-8")
+            rc, stderr = self._run(["fields", "--config", str(bad)])
+            self.assertEqual(rc, 1)
+            self.assertIn("fields: cannot load config", stderr)
+            self.assertNotIn("Traceback", stderr)
+
+    def test_writeback_lock_held_skips_exit_zero(self):
+        # the SAME flock collect takes (shared helper): a busy lock
+        # skips fail-open, exit 0, no gh calls at all
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            config = _write_config(tmpdir, {"memo": _project_spec()})
+            _write_snapshots(tmpdir / "data", [_snapshot()])
+            lock_path = tmpdir / "data" / ".lock"
+            holder = subprocess.Popen(
+                [sys.executable, "-c",
+                 "import fcntl, os, time\n"
+                 "fd = os.open({!r}, os.O_CREAT | os.O_RDWR)\n"
+                 "fcntl.flock(fd, fcntl.LOCK_EX)\n"
+                 "print('held', flush=True)\n"
+                 "time.sleep(60)".format(str(lock_path))],
+                stdout=subprocess.PIPE, text=True)
+            try:
+                assert holder.stdout is not None
+                self.assertEqual(holder.stdout.readline().strip(), "held")
+                rc, stderr = self._run(["writeback", "--config", str(config)])
+                self.assertEqual(rc, 0)
+                self.assertIn("skipped: previous run still active", stderr)
+            finally:
+                holder.kill()
+                holder.wait()
 
 
 # --- E2E: scenario 6 — collect drives the write-back ------------------------------
@@ -658,6 +833,7 @@ class WritebackE2ETests(unittest.TestCase):
             rc, stderr = run()
             self.assertEqual(rc, 0)                       # fail-open
             self.assertIn("warning", stderr)
+            self.assertIn("memo#327", stderr)  # failure names project + issue
             failed_edits = gh.calls("project", "item-edit")[len(edits):]
             snap327b = json.loads((tmpdir / "data" / "issues" / "memo-327.json")
                                   .read_text(encoding="utf-8"))
@@ -684,6 +860,53 @@ class WritebackE2ETests(unittest.TestCase):
             self.assertEqual(_flag(re_edits[0], "--number"), "2.1")
             state = _state(tmpdir / "data")["writeback"]["memo"]
             self.assertEqual(state["items"]["327"], "I327B")
+
+    def test_corrupt_written_state_collect_still_exits_zero(self):
+        # BLOCKER regression: a shape-valid but corrupt state.json
+        # («written": {"327": 48.2} — number, not {field: value}) used
+        # to AttributeError through run_after_rebuild and kill the
+        # scheduled cron collect. It must warn, reset the entry and
+        # still exit 0 (fail-open contract), re-writing the values.
+        with tempfile.TemporaryDirectory() as tmp:
+            tmpdir = Path(tmp)
+            host_db = tmpdir / "host.sqlite"
+            fixtures.write_host_db(host_db, fixtures.host_scenario())
+            ctr_db = tmpdir / "opencode.db"
+            fixtures.write_container_db(ctr_db, fixtures.container_scenario())
+            docker_bin = tmpdir / "dbin"
+            docker_bin.mkdir()
+            fake_docker = docker_bin / "docker"
+            fake_docker.write_text(FAKE_DOCKER, encoding="utf-8")
+            os.chmod(fake_docker, 0o755)
+            gh = FakeGh(tmpdir)
+            gh.set_items([_board_item(327), _board_item(331)])
+            gh.set_fields(_canonical_board_fields())
+            config = _write_config(
+                tmpdir, {"memo": _project_spec(number=3)},
+                sources={"zcode_host": {"db": str(host_db)},
+                         "opencode_container": {"container": "memo-box",
+                                                "db": str(ctr_db)}})
+            data = tmpdir / "data"
+            data.mkdir()
+            (data / "state.json").write_text(
+                json.dumps({"writeback": {"memo": {
+                    "items": {}, "written": {"327": 48.2}}}}, indent=2),
+                encoding="utf-8")
+            env = gh.env()
+            env["PATH"] = str(docker_bin) + os.pathsep + env["PATH"]
+            stderr = io.StringIO()
+            with mock.patch.dict(os.environ, env), \
+                    contextlib.redirect_stderr(stderr):
+                rc = collect.main(["collect", "--config", str(config)])
+            self.assertEqual(rc, 0)                # the cron collect survives
+            self.assertIn("warning", stderr.getvalue())
+            self.assertIn("327", stderr.getvalue())  # names the corrupt entry
+            # the reset entry re-writes from the fresh snapshot
+            # (327: 6 fields, 331: 4 — both caches start empty/reset)
+            self.assertEqual(len(gh.calls("project", "item-edit")), 10)
+            written = _state(data)["writeback"]["memo"]["written"]["327"]
+            self.assertIsInstance(written, dict)
+            self.assertIn("Tokens total", written)
 
 
 if __name__ == "__main__":

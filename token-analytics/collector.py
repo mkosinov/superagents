@@ -48,6 +48,9 @@ and calendar span, §Drill-down tree, §By-model and by-agent aggregates,
 * `fetch_issue_titles(repo)` / `refresh_titles(...)` — one bulk
   `gh issue list` argv call per repo per run; `data/titles.json` is the
   offline fallback cache (closed issues keep the last known title);
+* `run_locked(data_dir, action)` — the exclusive data/.lock flock both
+  `run_collect` and the standalone `collect.py writeback` serialize
+  their write phase under (busy → «skipped» result, fail-open);
 * `run_collect(config, data_dir)` — the CLI's one pass: exclusive
   flock on `data/.lock` for the whole write phase (a concurrent run
   logs «skipped: previous run still active» and returns "skipped" —
@@ -1102,6 +1105,29 @@ LOCK_FILENAME = ".lock"
 SKIP_MESSAGE = "skipped: previous run still active"
 
 
+def run_locked(data_dir, action):
+    """Run `action()` under the exclusive data/.lock flock — the write-phase
+    serialization `collect` and the standalone `collect.py writeback` share
+    (spec §Collection runs). A busy lock logs «skipped: previous run still
+    active» on stderr and returns ("skipped", None) — callers exit 0;
+    otherwise ("ok", action()'s result), the flock released on the way out
+    (it is never held on the "skipped" path).
+    """
+    directory = os.fspath(data_dir)
+    os.makedirs(directory, exist_ok=True)
+    lock_fd = os.open(os.path.join(directory, LOCK_FILENAME),
+                      os.O_CREAT | os.O_RDWR, 0o644)
+    try:
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            print(SKIP_MESSAGE, file=sys.stderr)
+            return "skipped", None
+        return "ok", action()
+    finally:
+        os.close(lock_fd)  # releases the flock (never held on "skipped")
+
+
 def load_config(path) -> dict:
     """Read config.json (committed, no secrets — spec §Config file).
 
@@ -1149,34 +1175,27 @@ def _read_container_source(config):
 def run_collect(config: dict, data_dir) -> str:
     """One full collection pass under data/.lock (spec §Collection runs).
 
-    Acquires an exclusive flock on `data/.lock` for the whole write
-    phase; a second run finding the lock held logs «skipped: previous
-    run still active» on stderr (cron redirects it into
-    data/collect.log) and returns "skipped" — the caller exits 0 either
-    way. With the lock: readers → rebuild (mapping + aggregation +
-    snapshots, per-source availability into index.json) → the write-back
-    hook `writeback.run_after_rebuild` (a no-op stub until Task 8).
-    Source failures stay fail-open: readers warn + return None, the
-    other source still rebuilds, the run returns "ok".
+    `run_locked` holds the exclusive flock for the whole write phase (a
+    second run finding the lock held logs «skipped: previous run still
+    active» on stderr — cron redirects it into data/collect.log — and
+    returns "skipped", the caller exiting 0 either way). With the lock:
+    readers → rebuild (mapping + aggregation + snapshots, per-source
+    availability into index.json) → the write-back hook
+    `writeback.run_after_rebuild`. Source failures stay fail-open:
+    readers warn + return None, the other source still rebuilds, the
+    run returns "ok".
     """
     # Imported here rather than at module top: keeps collector importable
     # standalone whatever writeback grows to import (Task 8).
     import writeback
 
     directory = os.fspath(data_dir)
-    os.makedirs(directory, exist_ok=True)
-    lock_fd = os.open(os.path.join(directory, LOCK_FILENAME),
-                      os.O_CREAT | os.O_RDWR, 0o644)
-    try:
-        try:
-            fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except OSError:
-            print(SKIP_MESSAGE, file=sys.stderr)
-            return "skipped"
+
+    def _locked_pass() -> None:
         host = _read_host_source(config)
         container = _read_container_source(config)
         rebuild(host, container, config, directory)
         writeback.run_after_rebuild(config, directory)
-        return "ok"
-    finally:
-        os.close(lock_fd)  # releases the flock (never held on "skipped")
+
+    status, _ = run_locked(directory, _locked_pass)
+    return status

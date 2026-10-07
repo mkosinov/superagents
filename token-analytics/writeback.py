@@ -31,7 +31,11 @@ field skipped with a «run `collect.py fields`» hint. Values are
 diff-gated against the last WRITTEN value cached in `data/state.json`
 (so rounding noise never writes); the cache updates only after a
 successful write, and a write failure drops the item's cached id (a
-re-added card gets a new one — re-resolved next run). Everything is
+re-added card gets a new one — re-resolved next run). The cache is
+defensive about its own shape: a corrupt `written` entry (a bare
+number — state.json is hand-editable) resets to empty with a warning
+instead of crashing the run, and entries whose issue snapshots no
+longer exist are pruned after each completed pass. Everything is
 fail-open: a gh/network failure warns on stderr, the run continues,
 the exit code stays 0. No status filtering — WIP and closed issues
 are written alike; an issue not on the board is skipped with a note.
@@ -179,11 +183,12 @@ def resolve_board_items(owner: str, number):
     return {issue: pair[0] for issue, pair in items.items()}
 
 
-def resolve_field_ids(owner: str, number, names) -> dict | None:
+def resolve_field_ids(owner: str, number, names, project: str) -> dict | None:
     """Configured field names → {name: field id} via field-list.
 
-    Unknown names warn (with the `fields` hint) and stay absent from
-    the result — only that field is skipped. None on gh failure.
+    Unknown names warn (naming the project, with the `fields` hint) and
+    stay absent from the result — only that field is skipped. None on
+    gh failure.
     """
     rows = gh_field_list(owner, number)
     if rows is None:
@@ -198,8 +203,9 @@ def resolve_field_ids(owner: str, number, names) -> dict | None:
         if name in by_name:
             resolved[name] = by_name[name]
         else:
-            _warn("writeback: field " + repr(name) + " not on board "
-                  + str(number) + " — skipped (" + FIELDS_HINT + ")")
+            _warn("writeback: " + project + ": field " + repr(name)
+                  + " not on board " + str(number) + " — skipped ("
+                  + FIELDS_HINT + ")")
     return resolved
 
 
@@ -239,7 +245,14 @@ def save_state(data_dir, state: dict) -> None:
 
 
 def _project_cache(state: dict, project: str) -> dict:
-    """The project's {"items": {…}, "written": {…}} cache, normalized."""
+    """The project's {"items": {…}, "written": {…}} cache, normalized.
+
+    Normalization runs one level DEEPER than «is it a dict»: a corrupt
+    `written` ENTRY (a bare number, a list — state.json is hand-editable
+    and shape-checked nowhere else) must not AttributeError up through
+    run_collect and kill the scheduled pass; it is reset to {} with a
+    warning and the values re-written from the snapshot.
+    """
     root = state.get(STATE_KEY)
     if not isinstance(root, dict):
         root = {}
@@ -251,29 +264,54 @@ def _project_cache(state: dict, project: str) -> dict:
     for key in ("items", "written"):
         if not isinstance(cache.get(key), dict):
             cache[key] = {}
+    written = cache["written"]
+    for issue, entry in written.items():
+        if not isinstance(entry, dict):
+            _warn("writeback: " + project + ": cached written["
+                  + repr(issue) + "] is not an object — reset, "
+                  + "will re-write")
+            written[issue] = {}
     return cache
 
 
 # --- the write-back stage -------------------------------------------------------
 
-def _item_edit(project_id: str, item_id: str, field_id: str, value) -> bool:
-    """One `gh project item-edit` call (one item+field); True on success."""
+def _item_edit(project_id: str, item_id: str, field_id: str, value,
+               what: str) -> bool:
+    """One `gh project item-edit` call (one item+field); True on success.
+
+    `what` names the project#issue + field for failure warnings — a
+    bare item/field id pair is useless in a log.
+    """
     argv = ["gh", "project", "item-edit",
             "--id", item_id, "--field-id", field_id,
             "--project-id", project_id, "--number", str(value)]
     try:
         proc = subprocess.run(argv, capture_output=True, timeout=GH_TIMEOUT_S)
     except (OSError, subprocess.SubprocessError) as exc:
-        _warn("writeback item-edit: " + str(exc))
+        _warn("writeback item-edit " + what + ": " + str(exc))
         return False
     if proc.returncode != 0:
         stderr_lines = proc.stderr.decode("utf-8", errors="replace") \
             .strip().splitlines()
         detail = stderr_lines[0] if stderr_lines else "no stderr"
-        _warn("writeback item-edit " + item_id + " " + field_id
-              + ": exit " + str(proc.returncode) + ": " + detail)
+        _warn("writeback item-edit " + what + " (" + item_id + "/"
+              + field_id + "): exit " + str(proc.returncode) + ": " + detail)
         return False
     return True
+
+
+def _issue_sort_key(snap) -> int:
+    """Snapshot → int sort key for the write order.
+
+    A missing or non-int issue (a hand-edited snapshot file can carry a
+    string) sorts first instead of raising — mixed types across files
+    must never TypeError the run.
+    """
+    try:
+        return int(snap.get("issue"))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _writeback_project(project, spec, snapshots, state) -> None:
@@ -299,7 +337,7 @@ def _writeback_project(project, spec, snapshots, state) -> None:
     if not own:
         return  # nothing mapped to this project — no gh calls at all
 
-    field_ids = resolve_field_ids(owner, number, fields.keys())
+    field_ids = resolve_field_ids(owner, number, fields.keys(), project)
     if field_ids is None:
         _warn("writeback: " + project
               + ": field-list failed — board write skipped this run")
@@ -313,7 +351,7 @@ def _writeback_project(project, spec, snapshots, state) -> None:
         cache["items"] = {str(issue): item_id
                           for issue, item_id in fresh.items()}
 
-    for snap in sorted(own, key=lambda s: s.get("issue") or 0):
+    for snap in sorted(own, key=_issue_sort_key):
         issue = snap.get("issue")
         if not isinstance(issue, int) or isinstance(issue, bool):
             continue
@@ -337,12 +375,27 @@ def _writeback_project(project, spec, snapshots, state) -> None:
                 continue
             if written.get(name) == value:
                 continue  # diff-gate: the written (rounded) value is unchanged
-            if _item_edit(project_id, item_id, field_ids[name], value):
+            if _item_edit(project_id, item_id, field_ids[name], value,
+                          what=project + "#" + str(issue) + " " + name):
                 written[name] = value  # cache updates only after success
             else:
                 # A failed write invalidates the cached item id — a
                 # re-added card gets a new one, re-resolved next run.
                 cache["items"].pop(str(issue), None)
+
+    # Pass completed — prune `written` entries whose issue snapshot no
+    # longer exists (the rebuild stale-swept it): without this the
+    # cache grows forever, one entry per dropped issue.
+    live = {str(snap["issue"]) for snap in own
+            if isinstance(snap.get("issue"), int)
+            and not isinstance(snap.get("issue"), bool)}
+    stale = [issue for issue in cache["written"] if issue not in live]
+    for issue in stale:
+        del cache["written"][issue]
+    if stale:
+        _note("writeback: " + project + ": pruned " + str(len(stale))
+              + " stale written-cache "
+              + ("entry" if len(stale) == 1 else "entries"))
 
 
 def load_snapshots(data_dir) -> list:
@@ -386,13 +439,15 @@ def run_writeback(config: dict, data_dir, snapshots=None) -> None:
     save_state(data_dir, state)
 
 
-def run_after_rebuild(config: dict, data_dir, snapshots=None) -> None:
+def run_after_rebuild(config: dict, data_dir) -> None:
     """Post-rebuild write-back hook (spec §Collection runs, §Board write-back).
 
     Called by collector.run_collect and the serve bind rebuild, both
-    under data/.lock — the same pipeline as the standalone re-push.
+    under data/.lock — the same pipeline as the standalone re-push;
+    neither caller passes snapshots, both re-read from data/ inside
+    run_writeback.
     """
-    run_writeback(config, data_dir, snapshots)
+    run_writeback(config, data_dir)
 
 
 # --- `collect.py fields`: one-time board field creation -------------------------
