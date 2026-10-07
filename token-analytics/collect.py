@@ -11,8 +11,9 @@ readers -> mapping -> aggregation -> snapshots -> write-back hook, the
 whole write phase under an exclusive flock on data/.lock — a second
 run finding the lock held logs «skipped: previous run still active»
 and exits 0. Warnings always go to stderr; under cron they land in
-data/collect.log via the README's redirect. serve/writeback remain
-stubs until their tasks of #26.
+data/collect.log via the README's redirect. `serve` (Task 7) runs the
+viewer + /data/*.json + POST /api/bind on 127.0.0.1:8765 via server.py;
+`writeback` remains a stub until its task of #26.
 """
 import argparse
 import os
@@ -37,9 +38,20 @@ def cmd_collect(args: argparse.Namespace) -> int:
 
 
 def cmd_serve(args: argparse.Namespace) -> int:
-    """Stub: serve the static viewer + JSON API (later tasks of #26)."""
-    print("serve: not implemented", file=sys.stderr)
-    return 1
+    """Serve the static viewer + JSON API + POST /api/bind (server.py).
+
+    Host/port come from the config `serve` block (default 127.0.0.1:8765);
+    Ctrl-C is the normal way down.
+    """
+    try:
+        config = collector.load_config(args.config)
+    except (OSError, ValueError) as exc:
+        print("serve: cannot load config " + str(args.config) + ": "
+              + str(exc), file=sys.stderr)
+        return 1
+    import server
+    server.run_serve(config, collector.data_dir_for(args.config))
+    return 0
 
 
 def cmd_writeback(args: argparse.Namespace) -> int:
@@ -66,6 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_serve = sub.add_parser(
         "serve", help="serve the static viewer + JSON API"
+    )
+    p_serve.add_argument(
+        "--config", default=DEFAULT_CONFIG,
+        help="path to config.json (default: the config.json next to this script)",
     )
     p_serve.set_defaults(func=cmd_serve)
 
