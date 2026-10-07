@@ -18,3 +18,16 @@ The data dir is the `data/` sibling of the config file. The whole write phase ru
 Tests (stdlib `unittest`, offline — fixture DBs are generated into tmp dirs at test time):
 
     python3 -m unittest discover token-analytics/tests -v
+
+## Viewer
+
+Static dashboard in `viewer/` (`index.html` + `lib.js` + `app.js` + `style.css`; vanilla, no build step, no external references), served at the root by `collect serve` (Task 7) — it fetches `/data/index.json`, `/data/unmatched.json`, `/data/issues/<project>-<N>.json` and posts binds to `/api/bind`. Pure formatting/navigation helpers live in `lib.js` (DOM-free, CommonJS export guard) and are unit-tested under `node` in `tests/test_viewer.py`.
+
+Manual browser checklist (draft; final acceptance polish at Task 9):
+
+- [ ] Open `127.0.0.1:8765` — project tabs (one per project, «Несопоставленные» last) + a source-availability line; the strongest project's tab opens first.
+- [ ] Issue table sorted by token total desc; columns: title (with issue №), tokens human («12.4M» / «830K», raw total in the tooltip), active time human («1ч 24м»), last activity date, design/IMPL mini-split chips; a WIP row shows accrued totals and its real date — no invented completion status anywhere.
+- [ ] A project with zero issues (tab exists via `index.json` `projects`) renders an explicit empty state.
+- [ ] Click a row → issue page: phase cards (absent phase hidden, not zero-filled), 5 token components + total, active time, secondary line «календарно: 3 дня» / «календарно: 9 ч»; by-model and by-agent horizontal CSS bars (issue-level and per phase).
+- [ ] Drill-down tree: expand/collapse at any depth; container-time nodes carry the «≈» mark and the tree shows «≈ сумма по параллельным дочерним сессиям» once; session nodes have a «Привязать» button (rebind path), T-fold nodes don't.
+- [ ] «Несопоставленные» tab: table + «Привязать» per row → dialog (project prefilled when attributable, issue №, phase) → POST → the row moves into the issue; without the server running the dialog shows a plain failure message.

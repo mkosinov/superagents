@@ -661,12 +661,15 @@ def _fold_t_children(nodes: list) -> list:
         t_node = t_nodes.get(number)
         if t_node is None:
             t_node = {"session_id": None, "title": "T" + number, "agent": None,
-                      "tokens": _zero_tokens(), "active_ms": 0, "children": []}
+                      "tokens": _zero_tokens(), "active_ms": 0, "children": [],
+                      "approx": False}
             t_nodes[number] = t_node
             folded.append(t_node)
         for kind in TOKEN_KINDS:
             t_node["tokens"][kind] += node["tokens"][kind]
         t_node["active_ms"] += node["active_ms"]
+        # fold nodes inherit the container-time approximation flag
+        t_node["approx"] = t_node["approx"] or bool(node.get("approx"))
         t_node["children"].append(node)
     for t_node in t_nodes.values():
         t_node["tokens"] = _tokens_block(t_node["tokens"])
@@ -674,7 +677,7 @@ def _fold_t_children(nodes: list) -> list:
 
 
 def _build_node(session, children_map, metrics, fold_t=False, visited=None,
-                allowed=None) -> dict:
+                allowed=None, approx=False) -> dict:
     """Session → tree node whose tokens/active are its WHOLE subtree's
     aggregate (own session + descendants, any nesting depth).
 
@@ -686,6 +689,11 @@ def _build_node(session, children_map, metrics, fold_t=False, visited=None,
     cyclic sibling that group_by_root made its own root is drilled
     into only under itself. Ids are unique per source, so on
     well-formed trees both guards prune nothing.
+
+    `approx` marks container-built time (the `time_updated −
+    time_created` span approximation; spec §Active model time) — the
+    viewer renders it with the «≈ сумма по параллельным дочерним
+    сессиям» label. Host nodes are exact per-turn sums: approx=False.
     """
     visited = visited if visited is not None else set()
     visited.add(session["id"])
@@ -693,7 +701,7 @@ def _build_node(session, children_map, metrics, fold_t=False, visited=None,
     tokens = dict(rec.get("tokens") or _zero_tokens())
     active_ms = rec.get("active_ms") or 0
     children = [_build_node(child, children_map, metrics, visited=visited,
-                            allowed=allowed)
+                            allowed=allowed, approx=approx)
                 for child in children_map.get(session["id"], [])
                 if child["id"] not in visited
                 and (allowed is None or child["id"] in allowed)]
@@ -710,6 +718,7 @@ def _build_node(session, children_map, metrics, fold_t=False, visited=None,
         "tokens": _tokens_block(tokens),
         "active_ms": active_ms,
         "children": children,
+        "approx": approx,
     }
 
 
@@ -812,7 +821,8 @@ def aggregate(host, container, config, overrides=None, titles=None) -> dict:
                             phase_acc["by_agent"].get(agent, 0) + total)
             phase_acc["roots"].append(_build_node(
                 root, children_map, metrics, fold_t=(phase == "impl"),
-                allowed={member["id"] for member in groups[root_id]}))
+                allowed={member["id"] for member in groups[root_id]},
+                approx=(source == "container")))
 
     snapshots = {key: _make_snapshot(key, acc, config, titles)
                  for key, acc in issues.items()}
@@ -999,19 +1009,22 @@ def refresh_titles(data_dir, config, fetch=None) -> dict:
     return merged
 
 
-def write_snapshots(data_dir, aggregated, sources=None) -> None:
+def write_snapshots(data_dir, aggregated, sources=None, projects=None) -> None:
     """Persist an aggregate() result under data/ — all writes atomic.
 
     Writes `issues/<project>-<N>.json`, `index.json` (issue rows with
     totals/phase split/last activity, sorted by spend desc, plus
-    per-source availability), `unmatched.json`; removes snapshot files of
-    issues that no longer have mapped sessions (their index entries are
-    gone with the rewrite) and sweeps stale `*.tmp` leftovers a killed
-    run may have left in issues/ (the sweep runs after every current
-    write — `_atomic_write_json` renames or deletes each tmp — so any
-    `*.tmp` still present is by definition orphaned); creates
-    `state.json` when missing (write-back caches only — nothing else
-    ever goes in it here).
+    per-source availability and — when `projects` (the configured
+    project keys) is given — the `projects` list the viewer builds its
+    tabs from, so a project with zero mapped issues still gets a tab
+    with an explicit empty state), `unmatched.json`; removes snapshot
+    files of issues that no longer have mapped sessions (their index
+    entries are gone with the rewrite) and sweeps stale `*.tmp`
+    leftovers a killed run may have left in issues/ (the sweep runs
+    after every current write — `_atomic_write_json` renames or
+    deletes each tmp — so any `*.tmp` still present is by definition
+    orphaned); creates `state.json` when missing (write-back caches
+    only — nothing else ever goes in it here).
     """
     directory = os.fspath(data_dir)
     issues_dir = os.path.join(directory, ISSUES_DIRNAME)
@@ -1032,14 +1045,16 @@ def write_snapshots(data_dir, aggregated, sources=None) -> None:
             "active_ms": snapshot["active_ms"],
             "phases": {phase: {"tokens": {"total": block["tokens"]["total"],
                                           "total_m": block["tokens"]["total_m"]},
-                               "active_ms": block["active_ms"]}
-                       for phase, block in snapshot["phases"].items()},
+                                "active_ms": block["active_ms"]}
+                        for phase, block in snapshot["phases"].items()},
             "last_activity": snapshot["last_activity"],
         })
     index_rows.sort(key=lambda row: (-row["tokens"]["total"], row["project"],
                                      row["issue"]))
-    _atomic_write_json(os.path.join(directory, INDEX_FILENAME),
-                       {"issues": index_rows, "sources": dict(sources or {})})
+    index_payload = {"issues": index_rows, "sources": dict(sources or {})}
+    if projects is not None:
+        index_payload["projects"] = sorted(projects)
+    _atomic_write_json(os.path.join(directory, INDEX_FILENAME), index_payload)
     _atomic_write_json(os.path.join(directory, UNMATCHED_FILENAME),
                        aggregated.get("unmatched", []))
     # Stale sweep, post-write: vanished issues lose their .json; any
@@ -1075,7 +1090,8 @@ def rebuild(host, container, config, data_dir, overrides=None, fetch_titles=None
                            titles=titles)
     write_snapshots(directory, aggregated,
                     sources={"host": host is not None,
-                             "container": container is not None})
+                             "container": container is not None},
+                    projects=config.get("projects", {}).keys())
     return aggregated
 
 

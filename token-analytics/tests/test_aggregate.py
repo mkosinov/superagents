@@ -282,6 +282,34 @@ class TFoldTests(unittest.TestCase):
                          ["zcode-implement", "zcode-compliance", "zcode-quality"])
 
 
+class ApproxFlagTests(unittest.TestCase):
+    """Container-built tree nodes carry approx=True — the viewer marks
+    container time «≈ сумма по параллельным дочерним сессиям» (spec
+    §Viewer / §Active model time); host nodes are exact per-turn sums
+    and carry approx=False. Same flag flows into T-fold nodes."""
+
+    @staticmethod
+    def _all_nodes(nodes):
+        for node in nodes:
+            yield node
+            yield from ApproxFlagTests._all_nodes(node["children"])
+
+    def test_container_nodes_flagged_host_not(self):
+        snap = _snap(host=fixtures.host_scenario(),
+                     container=fixtures.container_scenario())
+        impl = list(self._all_nodes(snap["phases"]["impl"]["tree"]))
+        self.assertTrue(impl)
+        for node in impl:
+            self.assertIs(node["approx"], True, node.get("title"))
+        # the T1 fold node (no session id) inherits the flag too
+        t1 = [n for n in impl if n["session_id"] is None]
+        self.assertEqual(len(t1), 1)
+        design = list(self._all_nodes(snap["phases"]["design"]["tree"]))
+        self.assertTrue(design)
+        for node in design:
+            self.assertIs(node["approx"], False, node.get("title"))
+
+
 class RootWrapperAsymmetryTests(unittest.TestCase):
     def test_wrapper_tokens_count_time_does_not(self):
         snap = _snap(host=fixtures.host_scenario(), container=fixtures.container_scenario())
@@ -532,7 +560,7 @@ class SnapshotShapeTests(unittest.TestCase):
         node = snap["phases"]["design"]["tree"][0]
         self.assertEqual(set(node),
                          {"session_id", "title", "agent", "tokens", "active_ms",
-                          "children"})
+                          "children", "approx"})
         # board-ready dot-paths + raw alongside (write-back config keys)
         self.assertEqual(snap["tokens"]["total"], 157_200)
         self.assertEqual(snap["tokens"]["total_m"], 0.2)
@@ -600,7 +628,7 @@ class RebuildAndFilesTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self._rebuild(tmp, fixtures.host_scenario(), fixtures.container_scenario())
             index = json.loads((Path(tmp) / "index.json").read_text(encoding="utf-8"))
-        self.assertEqual(set(index), {"issues", "sources"})
+        self.assertEqual(set(index), {"issues", "sources", "projects"})
         self.assertEqual(index["sources"], {"host": True, "container": True})
         self.assertEqual([r["issue"] for r in index["issues"]], [327, 331, 335])
         row = index["issues"][0]
@@ -609,6 +637,15 @@ class RebuildAndFilesTests(unittest.TestCase):
         self.assertEqual(row["tokens"], {"total": 157_200, "total_m": 0.2})
         self.assertEqual(set(row["phases"]), {"design", "impl"})
         self.assertEqual(row["phases"]["design"]["tokens"]["total"], 91_700)
+
+    def test_index_lists_configured_projects(self):
+        # viewer tabs: a configured project with zero mapped issues still
+        # gets a tab rendering an explicit empty state (spec §Viewer)
+        with tempfile.TemporaryDirectory() as tmp:
+            self._rebuild(tmp, fixtures.host_scenario(),
+                          fixtures.container_scenario())
+            index = json.loads((Path(tmp) / "index.json").read_text(encoding="utf-8"))
+        self.assertEqual(index["projects"], ["memo", "superagents"])
 
     def test_index_marks_failed_source(self):
         with tempfile.TemporaryDirectory() as tmp:

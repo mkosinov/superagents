@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>token·analytics — токены и время по задачам</title>
+  <meta name="description" content="Локальный просмотрщик аналитики токенов и активного времени моделей по задачам проектов: дизайн и IMPL, дерево сессий, несопоставленные сессии.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container topbar-inner">
+    <span class="logo">token<span class="logo-dot">·</span>analytics</span>
+    <span id="sources" class="sources mono"></span>
+  </div>
+</header>
+
+<nav class="tabs-wrap" aria-label="Проекты">
+  <div class="container">
+    <div id="tabs" class="tabs" role="tablist"></div>
+  </div>
+</nav>
+
+<main class="container main">
+
+  <!-- Данные не загрузились (сервер не запущен / data/ пуст) -->
+  <div id="load-error" class="empty" hidden></div>
+
+  <!-- ============ Проект: таблица задач ============ -->
+  <section id="view-project" class="view" hidden>
+    <h2 id="project-title" class="view-title"></h2>
+    <p class="view-sub mono">токены — сумма 5 компонент; время — активная работа модели</p>
+    <div id="project-empty" class="empty" hidden></div>
+    <div id="project-table" class="table-wrap" hidden></div>
+  </section>
+
+  <!-- ============ Задача: фазы, полосы, дерево ============ -->
+  <section id="view-issue" class="view" hidden>
+    <button id="issue-back" class="btn btn-small" type="button">← все задачи</button>
+    <div id="issue-body"></div>
+  </section>
+
+  <!-- ============ Несопоставленные ============ -->
+  <section id="view-unmatched" class="view" hidden>
+    <h2 id="unmatched-title" class="view-title"></h2>
+    <p class="view-sub">корневые сессии, не привязанные ни к одной задаче — «Привязать» переносит сессию в задачу</p>
+    <div id="unmatched-empty" class="empty" hidden></div>
+    <div id="unmatched-table" class="table-wrap" hidden></div>
+  </section>
+
+</main>
+
+<!-- ============ Диалог «Привязать» ============ -->
+<dialog id="bind-dialog" class="dialog" aria-labelledby="bind-caption">
+  <form id="bind-form">
+    <h3 id="bind-caption" class="dialog-title">Привязать сессию</h3>
+    <p id="bind-hint" class="dialog-sub mono"></p>
+    <div class="dialog-row">
+      <label class="dialog-field">Проект
+        <select id="bind-project" required></select>
+      </label>
+      <label class="dialog-field dialog-field-narrow">Задача №
+        <input id="bind-issue" inputmode="numeric" autocomplete="off" placeholder="327" required>
+      </label>
+      <label class="dialog-field dialog-field-narrow">Фаза
+        <select id="bind-phase">
+          <option value="design">design</option>
+          <option value="impl">IMPL</option>
+        </select>
+      </label>
+    </div>
+    <p id="bind-message" class="dialog-message" hidden></p>
+    <div class="dialog-actions">
+      <button type="button" id="bind-cancel" class="btn btn-small">Отмена</button>
+      <button type="submit" id="bind-submit" class="btn btn-small btn-primary">Привязать</button>
+    </div>
+  </form>
+</dialog>
+
+<footer class="footer">
+  <div class="container footer-inner">
+    <span>token-analytics</span>
+    <span class="mono">данные: /data/*.json · обновление — collect</span>
+  </div>
+</footer>
+
+<script src="lib.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
