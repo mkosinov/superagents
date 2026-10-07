@@ -8,7 +8,7 @@ Option order in the block is the option order on the created field. Field/option
 
 ## Status
 
-Lifecycle stage; merged names (no gate suffixes): `Hold` (paused) → `Backlog` (not in trajectory) → `In Design` (design underway, gates G1a–G2 pass inside it) → `Ready to IMPL` (plan approved, waiting for dispatch) → `In IMPL` (implementation running) → `PR (G7)` (pull request on CI) → `In-main` (merged) → `deployed`; `Not planned` = closed without plans. Gate stops are tracked in the `gate` field, not in status names. Note: a single-select's first option is what a freshly added item may get — the workflow rule «created an issue → set its status explicitly» (github-board skill) covers this; `init` sets every seeded card explicitly.
+Lifecycle stage; merged names (no gate suffixes): `Hold` (paused) → `Backlog` (not in trajectory) → `In Design` (design underway, gates A–C pass inside it) → `Ready to IMPL` (plan approved, waiting for dispatch) → `In IMPL` (implementation running) → `PR (G7)` (pull request on CI) → `In-main` (merged) → `deployed`; `Not planned` = closed without plans. Gate stops are tracked in the `gate` field, not in status names. Note: a single-select's first option is what a freshly added item may get — the workflow rule «created an issue → set its status explicitly» (github-board skill) covers this; `init` sets every seeded card explicitly.
 
 ## Priority
 
@@ -20,7 +20,7 @@ Which machine owns the card (`imac` / `macbook` / `hk` / `gcp`). Single ownershi
 
 ## gate
 
-The pending-ask marker (`concept` / `spec` / `plan` / `blocked`): a design gate stop (concept = G1a, spec = G1b, plan = G2) or an IMPL blocker awaiting the user (`blocked`). Stamped when the question is asked, cleared at the user's answer and automatically when the card leaves `In Design` / `In IMPL`. Empty = nothing awaits the user.
+The pending-ask marker (`concept` / `spec` / `plan` / `blocked`): a design gate stop (concept = Gate A, spec = Gate B, plan = Gate C) or an IMPL blocker awaiting the user (`blocked`). Stamped when the question is asked, cleared at the user's answer and automatically when the card leaves `In Design` / `In IMPL`. Empty = nothing awaits the user.
 
 ## Machine block
 

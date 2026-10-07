@@ -110,7 +110,7 @@ cd /root/docker && docker compose down opencode && docker compose up -d opencode
 ## Step 7: Start Workflow
 
 - **DESIGN phase** — on the host: open the project in ZCode and say `design` / `design #NNN` (the `design-phase` skill runs gates G1a–G2; see docs/workflow/design-phase.md).
-- **IMPL phase** — in the container: when the card is at `Ready to IMPL (G2)`, tell @manager «продолжаем траекторию #NNN» (plan-only entry; see docs/workflow/impl-phase.md).
+- **IMPL phase** — in the container: when the card is at `Ready to IMPL (G2)`, tell @manager «start impl #NNN» (plan-only entry; see docs/workflow/impl-phase.md).
 
 The in-container DESIGN flow (brainstorming via @manager → @architect) remains available as a fallback for non-split deployments.
 

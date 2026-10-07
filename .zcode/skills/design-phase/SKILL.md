@@ -1,6 +1,6 @@
 ---
 name: design-phase
-description: DESIGN phase on the host (zcode) in the host/container split topology — brainstorm G1a → spec + 6-reviewer panel G1b → plan + review G2, DoD = push to origin, board = the scripts/gh_board.py script living in memo itself, handoff to the container is «продолжаем траекторию #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
+description: DESIGN phase on the host (zcode) in the host/container split topology — brainstorm G1a → spec + 6-reviewer panel G1b → plan + review G2, DoD = push to origin, board = the scripts/gh_board.py script living in memo itself, handoff to IMPL is «start impl #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
 ---
 
 # DESIGN phase on the host (split host/container)
@@ -9,7 +9,7 @@ description: DESIGN phase on the host (zcode) in the host/container split topolo
 
 DESIGN (gates G1a/G1b/G2) is this interactive zcode host session. IMPL (G3–G7) is the opencode container (@manager/@architect) — we do not go there. The session merges the manager+architect roles for DESIGN: talks to the user at the gates and dispatches subagents **one level deep** (panel, plan reviewer) — nested dispatch is unnecessary and unavailable (depth limit).
 
-Only what is pushed/flipped crosses the seam (git + board). Workflow canon: `~/dev/superagents/docs/workflow/design-phase.md` (this phase) + `impl-phase.md`; migration plan: `~/dev/superagents/docs/plans/2026-09-05-host-design-container-impl-split-plan.md`.
+Only what is pushed crosses the seam (git; the issue's comments carry the return path). The board visualizes state — it carries nothing. Workflow canon: `~/dev/superagents/docs/workflow/design-phase.md` (this phase) + `impl-phase.md`; migration plan: `~/dev/superagents/docs/plans/2026-09-05-host-design-container-impl-split-plan.md`.
 
 ## 1. Session start (ritual)
 
@@ -67,9 +67,9 @@ Dispatch `plan-reviewer` (verifies the plan faithfully and completely expands th
 
 ## 6. DESIGN session DoD (the seam contract)
 
-- Only **git and the board** cross the seam. The session does NOT end holding local commits: every passed gate = commit + push to origin/main.
-- **All decisions are folded into the artifact texts**: review amendments, constraints like "#NNN strictly after #NNN — shared file" go into the spec/plan, not the chat. Git and the board carry no session context across the seam. This is the DESIGN DoD under Scratchpad Discipline v2: DESIGN writes zero scratchpad state, so the pushed spec/plan are the ONLY carrier — fold every decision and dependency in **before the phase closes**.
-- After G2 tell the user: «скажи менеджеру в opencode: продолжаем траекторию #NNN». The container needs nothing else.
+- Only **git** crosses the seam (plus the issue's comments on the return path); the board is a state visualizer, not a carrier. The session does NOT end holding local commits: every passed gate = commit + push to origin/main.
+- **All decisions are folded into the artifact texts**: review amendments, constraints like "#NNN strictly after #NNN — shared file" go into the spec/plan, not the chat. The board carries no session context across the seam — it is a visualizer. This is the DESIGN DoD under Scratchpad Discipline v2: DESIGN writes zero scratchpad state, so the pushed spec/plan are the ONLY carrier — fold every decision and dependency in **before the phase closes**.
+- After G2 tell the user: «скажи менеджеру в opencode: start impl #NNN». The container needs nothing else.
 - Does NOT cross the seam: `.opencode/scratchpad.md` (the container seeds its section at IMPL start — DESIGN itself writes nothing, v2), worktrees, env. The host **never writes or reads** the scratchpad — there are no container operations during the DESIGN phase at all.
 
 ## 7. Board (the script lives in memo, run locally)

@@ -2,275 +2,76 @@
 
 > A reusable agentic workflow framework for AI-driven software development.
 >
-> **Version:** 3.5
+> **Version:** 3.12
 >
 > **New project?** [New Project Setup](docs/setup/new-project-setup.md)
 
-## What is SuperAgents? (read this first)
+## What is SuperAgents?
 
-Every feature goes through **two phases**, and by design each phase runs in its own tool:
+SuperAgents is a **pipeline for AI-driven software development**, built on the **spec-driven** and **TDD** approaches. The unit of work is a **GitHub issue**.
 
-| Phase | What happens | Where it runs | Full reference |
-|-------|--------------|---------------|----------------|
-| **DESIGN** | brainstorm concept → spec + 6-perspective review panel → plan + plan review. Human gates G1a/G1b/G2. Output: approved spec + plan **pushed to main**. | **ZCode on the host** — an interactive session with you; review agents dispatched in parallel | [docs/workflow/design-phase.md](docs/workflow/design-phase.md) |
-| **IMPL** | worktree + baseline → sequential task loop with two-stage reviews → visual gate → docs → merge/PR. Human gate G7. Input: the approved plan from DESIGN. | **OpenCode in the container** — @manager + @architect run it autonomously | [docs/workflow/impl-phase.md](docs/workflow/impl-phase.md) |
+Every issue goes through **two independent phases**, coupled only by the seam below. Each phase may run in its own environment — the recommended setup separates them: an interactive session for DESIGN, an autonomous **Docker container** for IMPL. **DESIGN** is an interactive session: a human approves the reviewed spec (the phase's single mandatory gate). **IMPL** is an autonomous pipeline: the human decides only at the finish. The only thing that crosses between them is **git** — the pushed spec and plan (on the way back, the issue's comments record why a spec or plan was rejected). Work on the project is visualized on the **GitHub Project board**: each card's status mirrors the last gate its trajectory passed, and a card waiting for the user shows the pending ask; the board carries no context.
 
-Why two tools: DESIGN is a conversation with a human at gates — it needs an interactive session and only one level of subagent dispatch, which the host (ZCode) provides. IMPL is a long autonomous pipeline with nested dispatch (manager → architect → coders/reviewers), which the container (OpenCode) provides. The only things that cross between them are **git** (pushed spec/plan) and the **GitHub Project board** (the card's status shows which gate was passed last). The handoff is one sentence: the user tells the container manager «продолжаем траекторию #NNN».
+![GitHub Project board — the project's state at a glance](docs/img/board.png)
 
-If IMPL discovers the spec or plan itself is wrong, the card bounces back to a DESIGN gate with an issue comment — see the return path in [impl-phase.md](docs/workflow/impl-phase.md).
+The workflow is defined once as **theory** and implemented per harness as an **adapter**:
 
-Each project repo gets its own copies of the harness: `.zcode/` (DESIGN executors) and `.opencode/` (the full pipeline, container side), seeded from this repo's [`.zcode/`](.zcode/) and [`.opencode/`](.opencode/).
+- **Theory** — `docs/workflow/` + `docs/architecture/`: phases, gates, roles, artifact formats, the git seam. Harness-neutral; names roles (session manager, controller, implementers, reviewers), never tools.
+- **Adapters** — `.zcode/` (zcode) and `.opencode/` (opencode): the mechanics — dispatch tools, agent/skill formats, scripts, paths, model assignments. They reference the canon and never re-tell it.
+- **Boundary criterion:** a rule is theory if you can verify it from artifacts alone (spec, plan, PR, board); if verifying it requires a specific tool or path, it belongs to an adapter.
 
-Capabilities:
+## The pipeline
 
-- **7+ quality gates** (G1a/b, G2, G3, G4–G6, G4.5 visual, G7)
-- **Test-Driven Development** (RED-GREEN-REFACTOR) for implementation work
-- **Two-stage review** after non-trivial tasks (code compliance, then code quality + tests)
-- **Git worktree isolation** per feature via `.opencode/scripts/create-worktree.sh`
-- **Documentation on the feature branch** before finish
-- **Resumable sessions** via `.opencode/scratchpad.md`
-- **Fast Track Protocol** for post-merge polish without full G1–G2
-- **Spec review panel** — 6 parallel free-model perspectives review every spec before user approval
-- **Reflection mode** for workflow self-analysis (`/reflect`, `.opencode/skills/reflect/`)
+```mermaid
+flowchart TD
+    subgraph DESIGN["DESIGN · interactive session"]
+        PICK["Pick an issue from the board"] --> SCOUT["Scout: recon + issue actuality"]
+        SCOUT -->|"concept"| A["Gate A · concept — auto<br/>user only if approaches diverge"]
+        A --> SPEC["Spec draft"]
+        SPEC -->|"panel report ×6"| B(["Gate B · spec — HUMAN<br/>the phase's main OK"])
+        B --> PLAN["Plan draft"]
+        PLAN -->|"plan review"| C["Gate C · plan — auto<br/>user only if the plan changes the spec"]
+    end
 
-## Workflow guides (detailed)
+    C -->|"git: spec + plan on origin/main<br/>handoff: «start impl #NNN»"| ENTRY["IMPL entry<br/>board: Ready to IMPL"]
 
-- **[DESIGN phase — host, ZCode](docs/workflow/design-phase.md)** — brainstorm G1a, spec + panel G1b, plan G2, board flips, the push-to-main seam contract
-- **[IMPL phase — container, OpenCode](docs/workflow/impl-phase.md)** — plan-only entry, worktree G3, dev loop G4–G6, visual gate, finish G7, FasTP, agent architecture
+    subgraph IMPL["IMPL · autonomous pipeline"]
+        ENTRY --> G3["Gate G3 · worktree + baseline — auto"]
+        G3 --> LOOP["Gates G4–G6 · task loop<br/>TDD + two-stage review — auto"]
+        LOOP --> G45["Gate G4.5 · visual check — auto, UI only"]
+        G45 --> DOCS["Docs on branch"]
+        DOCS --> G7(["Gate G7 · finish — HUMAN<br/>merge / PR / keep / discard"])
+    end
 
-One-line map:
-
+    G7 -->|"PR merged · Closes #N"| INMAIN["In-main"]
+    LOOP -.->|"spec/plan wrong:<br/>issue comment + card back"| A
 ```
-DESIGN (host, ZCode):  Brainstorm (G1a) → Spec + panel (G1b) → Plan (G2) → push to main
-                                                              ↓  «продолжаем траекторию #NNN»
-IMPL (container, opencode):  Worktree + baseline (G3) → Dev loop (G4–G6) → Visual (G4.5) → Docs → Finish (G7)
-```
 
-## Quick Start
+**Stadium / amber = human gate** — the user decides. **Rectangle / green = auto gate** — passes itself, stops the user only on a defined condition. Board statuses along the way: `In Design` (all of DESIGN) → `Ready to IMPL` → `In IMPL` → `PR (G7)` → `In-main`.
 
-### New Project Setup
+Small post-merge polish skips the pipeline — the fast-track protocol (FasTP), see [impl-phase.md](docs/workflow/impl-phase.md).
 
-[New Project Setup](docs/setup/new-project-setup.md) — copy the `.zcode/` and `.opencode/` folders into your repo and adjust project-specific paths and test commands.
+## Where the details live
 
-### Run Workflow (two phases, two tools)
+- [DESIGN phase reference](docs/workflow/design-phase.md) — gates A/B/C, scout, spec panel, plan review, the seam contract, fast-track
+- [IMPL phase reference](docs/workflow/impl-phase.md) — plan-only entry, G3–G7, role architecture, review tiers, FasTP
+- Architecture notes: [token economy](docs/architecture/token-economy.md) · [context management](docs/architecture/context-management.md) · [decision log](docs/architecture/decision-log.md)
+- [Setting up a new project](docs/setup/new-project-setup.md)
+- [Maintaining the framework](docs/maintaining-the-framework.md) — golden source rule, change/sync protocol, language convention
 
-| Phase | Step | Gate | Executor | Skill |
-|-------|------|------|----------|-------|
-| **DESIGN** (host, ZCode) | 0. Brainstorming | G1a (concept) | host session + user | `design-phase` |
-| | 1. Spec + panel review | G1b (spec) | host session + `spec-panel-*` ×6 | `design-phase` (panel protocol ported from `panel-spec-review`) |
-| | 2. Plan + review | G2 (plan) | host session + `plan-reviewer` | `design-phase` (conventions from `writing-plans`) |
-| **IMPL** (container, OpenCode) | 0. Worktree + baseline | G3 | @architect (first IMPL action) | `using-git-worktrees` |
-| | 4. Dev loop + reviews | G4–G6 | @architect → coders → reviewers | `subagent-driven-development` |
-| | 4.5 Visual check (UI) | G4.5 | @architect | `visual-compliance-check.sh` |
-| | 5. Docs | — | @docser | dispatch |
-| | 6. Finish | G7 (merge) | @manager + user | `finishing-a-development-branch` |
-
-Details, review tiers, and diagrams: [design-phase.md](docs/workflow/design-phase.md) · [impl-phase.md](docs/workflow/impl-phase.md).
-
-## Repository Structure
+## Repository layout
 
 ```
 superagents/
-├── .opencode/               # IMPL pipeline (full container workflow) — seed for project .opencode/
-│   ├── agents/              # Agent definitions (frontmatter + prompts)
-│   │   ├── manager.md       # Primary entry point — gates, brainstorming, phase dispatch
-│   │   ├── architect.md     # Phase executor — DESIGN or IMPL (never talks to user)
-│   │   ├── frontend-coder.md# Next.js implementer
-│   │   ├── backend-coder.md # FastAPI implementer
-│   │   ├── plan-reviewer.md # Plan reviewer — plan vs spec (G2, DESIGN)
-│   │   ├── code-compliance-reviewer.md  # Code compliance reviewer — code vs task (G5)
-│   │   ├── code-quality-reviewer.md     # Quality + tests reviewer
-│   │   ├── tester.md        # Test env prep + test suite runs (cheap model)
-│   │   ├── debugger.md      # Root cause investigator
-│   │   ├── docser.md        # Meta documentation
-│   │   ├── deployer.md      # DevOps / deploy
-│   │   └── spec-panel-*.md  # Spec review panel (6 perspectives, G1b)
-│   ├── scripts/             # Shared automation (worktree, visual gate, subagent + scratchpad audit)
-│   │   ├── create-worktree.sh
-│   │   ├── remove-worktree.sh
-│   │   ├── visual-compliance-check.sh
-│   │   ├── subagent-audit.py
-│   │   └── scratchpad_audit.py
-│   ├── skills/              # Reusable skills (invoked via skill tool)
-│   │   ├── brainstorming/
-│   │   ├── writing-plans/
-│   │   ├── using-git-worktrees/
-│   │   ├── find-specialist/ # Pick agent when dispatch is unclear (architect)
-│   │   ├── test-driven-development/
-│   │   ├── subagent-driven-development/
-│   │   ├── finishing-a-development-branch/
-│   │   ├── systematic-debugging/
-│   │   ├── fast-track-protocol/
-│   │   ├── github-board/    # Board doc (script ships in both harness folders)
-│   │   ├── panel-spec-review/     # Panel protocol (canon body for the host design-phase skill)
-│   │   ├── pytest-patterns/       # Backend test patterns (generic, Memo examples)
-│   │   ├── vitest-playwright-patterns/  # Frontend test patterns (generic, Memo examples)
-│   │   └── reflect/
-├── .zcode/                  # DESIGN pipeline (host) — seed for project .zcode/
-│   ├── agents/              # spec-panel-* ×6, plan-reviewer (+ smoke spikes)
-│   ├── skills/design-phase/ # DESIGN phase skill (gates G1a/G1b/G2)
-│   ├── skills/brainstorming/ # G1a dialogue skill (explicit-only trigger; dispatched by design-phase)
-│   └── scripts/gh_board.py  # GitHub Project board script
-└── docs/
-    ├── workflow/            # design-phase.md + impl-phase.md (human reference)
-    ├── architecture/        # token-economy, context-management, decision-log, reflection-mode
-    ├── specs/ + plans/      # dated design artifacts (historical)
-    └── setup/               # new-project-setup.md
+├── docs/         # theory: workflow/, architecture/, setup/ (+ dated specs/plans as history)
+├── .zcode/       # zcode adapter — DESIGN on the host
+├── .opencode/    # opencode adapter — IMPL in the container
+└── site/
 ```
-
-## Agents
-
-| Agent | Role | Mode | When to Dispatch |
-|-------|------|------|-----------------|
-| **@manager** | Entry point, brainstorming, gates, scratchpad, phase dispatch | Primary | Auto — starts on user request |
-| **@architect** | Phase executor — runs DESIGN or IMPL, never talks to user | All | Dispatched by @manager |
-| **@frontend-coder** | Next.js + TypeScript + Tailwind implementation | Subagent | UI/frontend tasks |
-| **@backend-coder** | FastAPI + SQLite implementation | Subagent | API/backend tasks |
-| **@plan-reviewer** | Verify "plan faithfully expands spec" (G2, DESIGN) | Subagent | Plan review before G2 approval |
-| **@code-compliance-reviewer** | Verify "code matches plan" | Subagent | After small/standard/large tasks |
-| **@code-quality-reviewer** | Verify "code is well-built AND tests pass" | Subagent | After compliance review passes |
-| **@tester** | Test env prep + test suite runs, compact reports | Subagent | Env-dependent test runs (e2e/full-suite), env pre-flight |
-| **@debugger** | Root cause analysis | Subagent | On BLOCKED/bugs |
-| **@docser** | Meta documentation (PLAN.md, CHANGELOG) | Subagent | After all tasks complete |
-| **@deployer** | Production deployment | Subagent | On user request |
-
-## Key Principles
-
-1. **Manager Owns Conversation** — @manager is the single entry point; @architect never talks to the user
-2. **Controller Never Implements** — @architect plans and delegates, never edits code
-3. **Two-Stage Review** — spec compliance → code quality, never one without the other
-4. **Sequential Tasks** — one implementer at a time, no parallel dispatch
-5. **Human Gates** — G1a (design concept), G1b (written spec), G2 (plan), G7 (finish) require user approval
-6. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
-7. **Diff for reviewers (hybrid)** — architect reads `git diff --stat` only; full diff goes to a file; reviewers read the file (saves architect tokens). Not "paste entire diff into architect chat."
-8. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
-9. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model); coders keep their contexts clean of env forensics
-10. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
-
-Full gate list and behavior: [design-phase.md](docs/workflow/design-phase.md) · [impl-phase.md](docs/workflow/impl-phase.md).
-
-## Reflection Mode
-
-Self-analysis tool for the SuperAgents workflow. Reads `opencode.db` (read-only), runs 17 compliance checks (5 critical / 8 warning / 4 info, mapped to the Key Principles), and produces human-approved improvement proposals as markdown files.
-
-### How to run
-
-**Slash command (easiest)** — type in opencode:
-```
-/reflect
-/reflect websearch was failing all day
-```
-Optional text after `/reflect` = "what user noticed as wrong/strange", passed to the analysis as context.
-
-**CLI** — `.opencode/skills/reflect/scripts/reflect.sh`:
-
-| Mode | Command | Use when |
-|------|---------|----------|
-| `post-mortem` | `reflect.sh post-mortem --target=path/to/file` | Before fixing a bug — investigate the workflow that produced it |
-| `wave` | `reflect.sh wave --name="Wave 4.5"` | After a wave — compliance + quality report |
-| `in_session` | `reflect.sh in_session --session=ses_xxx` | Analyze current session + all subagents |
-| `nightly` | `reflect.sh nightly --days=7` | Last N days digest (run from cron) |
-| `status` | `reflect.sh status` | Health summary (proposal counts, adoption rate) |
-
-**Auto-triggers:**
-- **Nightly cron** (host): `0 3 * * *` → `reflect.sh nightly --days=7` → telegram on critical. Install with `bash ~/.config/opencode/scripts/install-host-cron.sh`.
-- **Post-wave** (in `finishing-a-development-branch` skill): suggests running `reflect.sh wave` after merge or PR.
-
-### Where the output lives
-
-```
-~/.config/opencode/reflection/
-├── reports/      # Human-readable analysis (markdown)
-├── proposals/    # Pending improvement proposals
-├── decisions/    # Applied/rejected history (audit trail)
-└── state.json    # Last-run cursors
-```
-
-**Apply a proposal** → read the `.md` in `proposals/`, decide. On decision (apply/reject), the file moves to `decisions/`.
-
-### LLM
-
-Uses `opencode-go/deepseek-v4-flash` (1M context, MIT license, $0.09/M input). No additional config needed.
-
-### More info
-
-- Spec: [`docs/specs/2026-06-19-reflection-mode-design.md`](docs/specs/2026-06-19-reflection-mode-design.md)
-- Architecture: [`docs/architecture/reflection-mode.md`](docs/architecture/reflection-mode.md)
-
-## Token Economy
-
-See [`docs/architecture/token-economy.md`](docs/architecture/token-economy.md) for cost model and optimization rationale.
-
-## Decision Log
-
-See [`docs/architecture/decision-log.md`](docs/architecture/decision-log.md) for architecture decisions.
-
-## Maintaining the Framework
-
-### Golden Source Rule
-
-This repo is the **single source of truth** for the SuperAgents workflow framework.
-
-**Project repos** contain **local copies** of agents and skills with project-specific context (test commands, paths, models).
-
-### Change Protocol
-
-1. **Generic workflow changes** → edit in `superagents/` FIRST → commit → sync to project repos
-2. **Project-specific changes** → edit in project `.opencode/`/`.zcode/` only → no sync needed
-3. Update **[docs/workflow/design-phase.md](docs/workflow/design-phase.md)** / **[docs/workflow/impl-phase.md](docs/workflow/impl-phase.md)** and this README when gates or steps change — using the workflow change checklist below
-4. **@infra** verifies sync status when workflow files change in either repo
-
-**Language convention:** skill and agent bodies (`.opencode/`, `.zcode/`) are written in English. Literal user-side strings stay in the user's language: trigger phrases («design #NNN», «продолжаем траекторию #NNN», «коммитим»), sample user-facing messages, UI literals and domain data in examples (Алиса, «Картина маслом») — translating those would break real triggers and make examples diverge from the actual product.
-
-### Workflow change checklist
-
-When behavior of a step or gate changes, update in order:
-
-1. **`.opencode/agents/manager.md`** — routing, gate handling, phase dispatch (if change affects manager behavior)
-2. **`.opencode/agents/architect.md`** — steps, triggers, gate rules
-3. **Affected `.opencode/skills/*/SKILL.md`** — procedure invoked at that step
-4. **`.opencode/scripts/`** — if automation changes
-5. **`docs/workflow/design-phase.md` / `docs/workflow/impl-phase.md`** — human diagrams and gates
-6. **This README** — if gates, skills list, or onboarding summary changes
-7. **Project repos** — sync generic changes into `.opencode/`/`.zcode/`; restart agent runtime if required
-
-### Documentation map (keep in sync)
-
-| What | Human-readable | Runtime (agents execute) |
-|------|----------------|---------------------------|
-| DESIGN phase flow & gates | [docs/workflow/design-phase.md](docs/workflow/design-phase.md) | project `.zcode/skills/design-phase/SKILL.md` |
-| IMPL phase flow & gates | [docs/workflow/impl-phase.md](docs/workflow/impl-phase.md) | — |
-| Overview & onboarding | this README | — |
-| Entry point + routing (IMPL) | — | [.opencode/agents/manager.md](.opencode/agents/manager.md) |
-| Scratchpad discipline (v2) | — | [.opencode/agents/manager.md](.opencode/agents/manager.md), [.opencode/scripts/scratchpad_audit.py](.opencode/scripts/scratchpad_audit.py), [.opencode/command/sanitize-scratchpad.md](.opencode/command/sanitize-scratchpad.md) |
-| Orchestration steps (IMPL) | — | [.opencode/agents/architect.md](.opencode/agents/architect.md) |
-| Worktree create/remove | — | [.opencode/skills/using-git-worktrees/SKILL.md](.opencode/skills/using-git-worktrees/SKILL.md), [.opencode/scripts/create-worktree.sh](.opencode/scripts/create-worktree.sh), [.opencode/scripts/remove-worktree.sh](.opencode/scripts/remove-worktree.sh) |
-| Dev loop & reviews | — | [.opencode/skills/subagent-driven-development/SKILL.md](.opencode/skills/subagent-driven-development/SKILL.md) |
-| Visual gate | impl-phase.md, Step 4.5 | [.opencode/scripts/visual-compliance-check.sh](.opencode/scripts/visual-compliance-check.sh) |
-| Reviewer behavior | impl-phase.md, agent architecture | [.opencode/agents/plan-reviewer.md](.opencode/agents/plan-reviewer.md), [.opencode/agents/code-compliance-reviewer.md](.opencode/agents/code-compliance-reviewer.md), [.opencode/agents/code-quality-reviewer.md](.opencode/agents/code-quality-reviewer.md) |
-
-Test commands and app paths in diagrams may show *example (Memo)*; each project configures its own commands in its `.opencode/`/`.zcode/` copies.
-
-### Generic vs Project-Specific
-
-| Generic (edit superagents/) | Project-specific (edit project .opencode/ or .zcode/) |
-|----------------------------|-------------------------------------------|
-| Workflow steps, gates, rules | Project name, design system paths |
-| Agent roles and responsibilities | Model assignments, temperature settings |
-| Task classification, circuit breaker | Tech stack versions, mock data refs |
-| Skill definitions | Permission lists in frontmatter |
-| Review pipeline structure | Project-specific bash allow lists, test commands |
 
 ## Changelog
 
-- **3.9** — Scratchpad Discipline v2 (user-approved): DESIGN — host and container — writes zero scratchpad state (crash recovery is manual from the DB/board/spec); IMPL/FasTP sections live while their worktree exists and collapse on finish into a new shared `## Recently merged` block (≤5, newest first: `- YYYY-MM-DD #<issue> <short title> → PR #<n>`) written via `gh_board.py merged` (the `Idle. Last:` stub convention is retired); follow-up candidates are filed as GH issues or dropped — never parked in the scratchpad; new `scratchpad_audit.py` + `/sanitize-scratchpad` command (AUTO_SAFE with `.bak` backup / NEEDS_USER; auto-run in the manager's Session Start Ritual when the file exceeds 150 lines); host-DESIGN DoD — all decisions/dependencies folded into the pushed spec/plan before phase close.
-- **3.8** — container `brainstorming` trimmed to the G1a dialogue core (mirror of the host port): its tail had duplicated @architect DESIGN Steps 1-2 in a weaker form (no subagent-audit ladder, no push discipline, user-facing gates the architect cannot perform). The `## User Scenarios` spec requirement the tail carried moved to its consumers: @architect Step 1 (spec authoring) and both brainstorming ports' presentation step; host `design-phase` §3 now demands the section in the spec. Skill language convention fixed (README): bodies English, user-side literals stay; `design-phase` + both `brainstorming` ports translated to English.
-- **3.7** — `brainstorming` ported to the host as a standalone `.zcode` skill: explicit-only trigger (`/brainstorming`, «побрейнштормим X», or dispatch from `design-phase` at G1a — never auto-fires on task descriptions), body trimmed to the G1a dialogue core (terminal state = user-approved concept). The opencode original keeps its full pipeline tail (manager fallback); on the host `design-phase` owns the orchestration.
-- **3.6** — shared AGENTS.md dissolved: conversational rules moved into `manager.md` (container) and the `design-phase` skill (host); the opencode session-id rule rides inside dispatch prompts. No seeds, no root-level harness file in projects (both tools provably load instructions only from the repo root — kept empty of harness files by design).
-- **3.5** — workflow docs split by phase: `docs/workflow/README.md` → `design-phase.md` (host, ZCode, gates G1a–G2) + `impl-phase.md` (container, OpenCode, G3–G7); root README re-written as the two-phase entry point for newcomers. Canon restructured: flat `agents/`+`skills/`+`scripts/` moved into `.opencode/` (full pipeline) and `.zcode/` (DESIGN-only host seed); project seeding = copy the two folders + AGENTS.md to the project root.
-- **3.4** — agent registry rename (names state the reviewed document): `spec-review-*` panel → `spec-panel-*`; `spec-reviewer` split into `plan-reviewer` (G2: plan vs spec, DESIGN) + `code-compliance-reviewer` (G5: code vs task, symmetry with code-quality-reviewer at G6); gate G5 label "Spec Compliance" → "Code Compliance". Container `.opencode` copies re-sync manually after in-flight IMPL waves.
-- **3.3** — host/container phase split: DESIGN (G1a–G2) can run in a host session, IMPL stays in-container; plan-only IMPL entry (architect creates worktree + baseline as its first IMPL action, IMPL Step 0); git+board seam contract with diverged-main STOP and a one-time return path (BLOCKED → issue comment → card back).
-- **3.2** — asymmetric G2: spec-reviewer validates plans before implementation; user approves by behavior, not code. Manager/Architect split: @manager owns conversation + gates, @architect is phase executor. Spec review panel (5 free-model perspectives). Reflection mode. Context HANDOFF protocol.
+See [docs/changelog.md](docs/changelog.md).
 
 ## License
 

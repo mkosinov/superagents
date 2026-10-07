@@ -1,48 +1,69 @@
-# IMPL Phase — runs in the opencode container
+# IMPL Phase — plan → merged PR (autonomous)
 
 > **Audience:** humans — this is the human-readable reference for the IMPL phase.
 >
-> **Where it runs:** autonomously in the **opencode container**: @manager (entry point, gates, scratchpad, board) dispatches @architect (phase executor); @architect dispatches implementers and reviewers. Nothing in IMPL talks to the user except through @manager.
+> **Where it runs:** autonomously — the phase is environment-independent; an isolated container is the recommended environment for the long autonomous run. A **session manager** (entry point, gates, scratchpad, board) dispatches a **controller** (phase executor); the controller dispatches implementers and reviewers. Nothing in IMPL talks to the user except through the session manager. Current adapter: the OpenCode Docker container (see [Executors](#executors-adapters-1)).
 >
-> **Input:** an approved plan already on origin/main, card at `Ready to IMPL (G2)` (produced by the [DESIGN phase](design-phase.md) on the host). **Output:** merged PR / In-main.
+> **Input:** an approved plan already on origin/main, card at `Ready to IMPL` (produced by the [DESIGN phase](design-phase.md)). **Output:** merged PR / In-main.
 >
-> **Version:** 3.6 · **Last aligned:** 2026-09-10
+> **Version:** 3.11 · **Last aligned:** 2026-10-07
 
-Executors: the project's `.opencode/` — agents `manager`, `architect`, `frontend-coder`/`backend-coder`, reviewers, `tester`, `docser`; skills `using-git-worktrees`, `subagent-driven-development`, `finishing-a-development-branch`; scripts under `.opencode/scripts/`. Seed source: this repo's [`.opencode/`](../../.opencode/).
+## Executors (adapters)
+
+The theory below names roles and artifacts, never tools. The current opencode adapter implements the roles like this (other harnesses implement the same roles with their own mechanics — dispatch tools, agent/skill formats, scripts, paths, model assignments — and reference this canon without re-telling it):
+
+| Theory role | opencode adapter (container) |
+|---|---|
+| Session manager | agent `manager` (@manager) |
+| Controller (phase executor) | agent `architect` (@architect) |
+| Implementers | agents `frontend-coder`, `backend-coder` |
+| Compliance reviewer | agent `code-compliance-reviewer` |
+| Quality reviewer | agent `code-quality-reviewer` |
+| Investigator (root cause) | agent `debugger` |
+| Test runner (cheap model) | agent `tester` |
+| Scribe (docs) | agent `docser` |
+| Deployer | agent `deployer` |
+| Dispatch tool | `task()` |
+| Board script | `gh_board.py` (shipped with each adapter) |
+| Worktree / visual / audit scripts | `.opencode/scripts/*` |
+| Dev-loop / worktree / finishing skills | `subagent-driven-development`, `using-git-worktrees`, `finishing-a-development-branch`, `fast-track-protocol` |
+
+Seed source: this repo's [`.opencode/`](../../.opencode/).
 
 ## At a glance
 
 | Step | Gate | Who decides | Executors |
 |------|------|-------------|-----------|
-| Entry: plan-only start | — | user says «продолжаем траекторию #NNN» | @manager |
-| 0. Worktree + baseline | G3 | Auto (BLOCKED on red baseline) | @architect |
-| 4. Dev loop + reviews | G4–G6 | Auto | @architect → coders → reviewers |
-| 4.5 Visual check (UI) | G4.5 | Auto, soft block | `visual-compliance-check.sh` |
-| 5. Docs on branch | — | Auto | @docser |
-| 6. Finish | G7 | **Human** | `finishing-a-development-branch` |
+| Entry: plan-only start | — | user says «start impl #NNN» | session manager |
+| 0. Worktree + baseline | G3 | Auto (BLOCKED on red baseline) | controller |
+| 4. Dev loop + reviews | G4–G6 | Auto | controller → implementers → reviewers |
+| 4.5 Visual check (UI) | G4.5 | Auto, soft block | visual compliance tooling |
+| 5. Docs on branch | — | Auto | scribe |
+| 6. Finish | G7 | **Human** | finishing skill (adapter) |
 
 Legend: **Human** = requires a user decision (pause); `auto` = passes automatically; `▶` = automatic transition; `→` = data/control flow.
 
 ## Entry (plan-only start)
 
-The user tells the container manager «продолжаем траекторию #NNN». @manager pre-flight, in order:
+The user tells the IMPL session manager «start impl #NNN». The session manager pre-flight, in order:
 
-1. **Board:** issue #NNN must be at `Ready to IMPL (G2)`. Any other status → do NOT start IMPL; show the status to the user.
-2. **Git:** `git fetch origin && git status -sb`. Behind → fast-forward. **Diverged → STOP + user** (never reset/merge on your own; no local-only commits on main while a host DESIGN session is in flight).
+1. **Board:** issue #NNN must be at `Ready to IMPL`. Any other status → do NOT start IMPL; show the status to the user.
+2. **Git:** `git fetch origin && git status -sb`. Behind → fast-forward. **Diverged → STOP + user** (never reset/merge on your own; no local-only commits on main while a DESIGN session is in flight).
 3. **Plan file:** must exist on the fetched main. Missing → STOP + user.
 
-Then: dispatch @architect with the **plan-only** template (no `## Worktree:` line — the architect creates the worktree as its first action) and flip the board to `In IMPL`. No brainstorming — the feature is approved through G2.
+Then: dispatch the controller with the **plan-only** template (no `## Worktree:` line — the controller creates the worktree as its first action) and flip the board to `In IMPL`. No brainstorming — the feature is approved through G2.
 
 ## Full flow
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 0: WORKTREE + BASELINE  (Auto Gate G3)                  ║
-║  The architect's FIRST action of IMPL (plan-only start)       ║
+║  The controller's FIRST action of IMPL (plan-only start)      ║
 ╚══════════════════════════════════════════════════════════════╝
          │ 1. Fetch/ff + plan-vs-main sanity check
-         │ 2. Invoke skill `using-git-worktrees`
-         │ 3. Run .opencode/scripts/create-worktree.sh <branch>
+         │ 2. Invoke the worktree skill (adapter)
+         │ 3. Create the feature worktree (adapter script:
+         │    create-worktree.sh <branch>)
          │ 4. cd .worktrees/<branch>; confirm .worktrees/ gitignored
          │ 5. Verify clean baseline (CI fact-check, or local suite)
          │
@@ -63,9 +84,8 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
     ┌─────────────────────┐
     │ 4b. Dispatch         │
     │ Implementer          │
-    │ (frontend-coder /    │
-    │  backend-coder)      │
-    │ via task() tool      │
+    │ (via the dispatch    │
+    │  tool)               │
     │                      │
     │ Prompt includes:     │
     │ • Task text (verbatim│
@@ -96,7 +116,7 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
     └──────────────────────────────────────────────┘
          │
          │ ┌─────────────────────────────────────────┐
-         │ │ Trivial: self-review + @architect       │
+         │ │ Trivial: self-review + controller       │
          ├─│   git diff spot-check (≤5 lines)        │
          │ └─────────────────────────────────────────┘
          │
@@ -106,10 +126,10 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
           │ │   git diff --stat BASE..HEAD (see scale) │
           │ │   git diff BASE..HEAD > /tmp/diff.patch  │
           │ │   Pass FILE PATH to reviewer prompt      │
-          │ │   Dispatch @code-compliance-reviewer     │
+          │ │   Dispatch compliance reviewer           │
           │ │   If ❌ → re-dispatch implementer         │
           │ └─────────────────────────────────────────┘
-          │
+         │
           │ ┌─────────────────────────────────────────┐
           │ │ Standard/Large: full two-stage review   │
           ├─│   (each max 3 loops)                     │
@@ -117,15 +137,15 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
           │ │   git diff --stat (see scale)            │
           │ │   git diff > /tmp/task-diff.patch        │
           │ │                                          │
-          │ │   Stage 1: @code-compliance-reviewer     │
+          │ │   Stage 1: compliance reviewer           │
           │ │     Reads diff file independently        │
           │ │     If ❌ → implementer fixes → re-review │
           │ │     If ✅ → Stage 2                       │
           │ │                                          │
-          │ │   Stage 2: @code-quality-reviewer         │
+          │ │   Stage 2: quality reviewer              │
           │ │     Reads diff file + runs test suite    │
           │ │     UI diff → full visual tests         │
-          │ │       (example Memo: `npm run test:all`)  │
+          │ │       (example Memo: `npm run test:all`) │
           │ │     Else → unit tests only              │
           │ │       (example Memo: `npm run test`)    │
           │ │     If ❌ → implementer fixes → re-review │
@@ -144,14 +164,15 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
     │ (auto)               │
     └──────────────────────┘
          │
-          │ ALL TASKS DONE
-          ▼
+         │ ALL TASKS DONE
+         ▼
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 4.5: VISUAL COMPLIANCE GATE  (Auto Gate G4.5)       ║
 ║  Run ONCE per phase — NOT per task                         ║
 ╚══════════════════════════════════════════════════════════════╝
           │ 1. Start dev server (or use static build)
-          │ 2. Run visual-compliance-check.sh <url> <spec>
+          │ 2. Run the visual compliance check (adapter
+          │    script: visual-compliance-check.sh <url> <spec>)
           │    • Captures screenshots to /tmp/visual-compliance/
           │    • Verifies DOM elements from spec's Visual Compliance Checks
           │    • Generates markdown report
@@ -167,15 +188,15 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
 ║  STEP 5: DOCUMENTATION COMMIT  (Auto)                        ║
 ╚══════════════════════════════════════════════════════════════╝
          │ 1. Gather context (design doc, plan, tasks, tests)
-         │ 2. Dispatch @docser via task() tool
-         │ 3. @docser updates PLAN.md + CHANGELOG.md
+         │ 2. Dispatch the scribe via the dispatch tool
+         │ 3. Scribe updates PLAN.md + CHANGELOG.md
          │ 4. Commit INTO feature branch
          │
          ▼
 ╔══════════════════════════════════════════════════════════════╗
 ║  STEP 6: FINISHING  (Human Gate G7)                          ║
 ╚══════════════════════════════════════════════════════════════╝
-         │ 1. Invoke skill `finishing-a-development-branch`
+         │ 1. Invoke the finishing skill (adapter)
          │ 2. Run final tests (project-specific;
          │    example Memo: `npm run test:all`)
          │ 3. Present 4 options:
@@ -184,19 +205,33 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
          │
     ┌──────┴───────────────────────────────────────────────────┐
     │                                                           │
-    ▼            ▼              ▼                   ▼           │
-┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐             │
-│Option 1│ │ Option 2 │ │ Option 3 │ │ Option 4 │             │
-│ Merge  │ │ Push + PR│ │ Keep     │ │ Discard  │             │
-│ locally│ │ (default)│ │ branch   │ │ (confirm)│             │
-└────────┘ └──────────┘ └──────────┘ └──────────┘             │
+    ▼            ▼              ▼                   ▼           ▼
+┌────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐
+│Option 1│ │ Option 2 │ │ Option 3 │ │ Option 4 │
+│ Merge  │ │ Push + PR│ │ Keep     │ │ Discard  │
+│ locally│ │ (default)│ │ branch   │ │ (confirm)│
+└────────┘ └──────────┘ └──────────┘ └──────────┘
 ```
 
-> **Diagram note:** Commands shown as *example (Memo)* illustrate one reference stack (Next.js + vitest/playwright). Your project uses its own test commands in the `.opencode/` copy of agents/skills — not defined in this framework repo.
+> **Diagram note:** Commands shown as *example (Memo)* illustrate one reference stack (Next.js + vitest/playwright). Your project uses its own test commands in its adapter copy of agents/skills — not defined in this framework repo.
 
-**After merge / polish:** [`fast-track-protocol`](../../.opencode/skills/fast-track-protocol/SKILL.md) (lighter path, @manager dispatches coders directly).
+**After merge / polish:** the fast-track protocol (adapter skill: `fast-track-protocol` — the session manager dispatches implementers directly, lighter path).
 
-## Agent architecture (container)
+## Role architecture
+
+Theory roles and their contracts:
+
+- **Session manager** — single entry point; owns the conversation, gates, scratchpad, board. The only role that talks to the user.
+- **Controller** — phase executor; plans and delegates, **never implements code, never talks to the user**.
+- **Implementers** — write code per task prompt; TDD required.
+- **Compliance reviewer** (read-only) — code matches the task/plan.
+- **Quality reviewer** (read-only + tests) — code is well-built and tests pass.
+- **Investigator** — root-cause analysis on BLOCKED/bugs.
+- **Test runner** — env prep and test suite runs (cheap model).
+- **Scribe** — meta documentation (PLAN.md, CHANGELOG) after all tasks.
+- **Deployer** — production deployment, on user request.
+
+The org chart as wired in the current opencode adapter:
 
 ```
                ┌──────────────────────────┐
@@ -220,7 +255,7 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
           ▼                 ▼                         ▼
 ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐
 │ @frontend-coder  │  │  @backend-coder  │  │  @debugger       │
-│ (implementer)    │  │  (implementer)   │  │  (investigator)  │
+│ (implementer)    │  │  (implementer)   │  │ (investigator)  │
 │ Next.js + TDD    │  │  FastAPI + TDD   │  │  root cause      │
 └──────────────────┘  └──────────────────┘  └──────────────────┘
 
@@ -248,7 +283,7 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
           └──────────────────┘
 ```
 
-**Unsure which agent to dispatch?** @architect may use [`.opencode/skills/find-specialist`](../../.opencode/skills/find-specialist/SKILL.md) (not a gate).
+**Unsure which agent to dispatch?** The controller may use the adapter's find-specialist skill (not a gate).
 
 ## Task classification & review budget
 
@@ -294,7 +329,7 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
 **Why:** prevents UI mismatch (wrong tabs, missing controls). Catches what unit tests often miss — layout and visible DOM.
 
 **What it does:**
-1. **Screenshot capture** — Playwright captures key page states (mobile 390x844 by default, desktop optional)
+1. **Screenshot capture** — captures key page states (mobile 390x844 by default, desktop optional)
 2. **Element presence checks** — verifies DOM elements from the spec exist and are visible
 3. **Report generation** — markdown report with pass/fail status and screenshot paths
 
@@ -303,14 +338,14 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
 | Situation | Step 4.5 |
 |-----------|----------|
 | Phase changes **user-visible UI** (pages, components, styles users see) | **Run** after all tasks in that phase — once per phase, not per task |
-| Design spec has **`## Visual Compliance Checks`** with real checklist items | **Run** — script reads that section |
-| Phase is **backend/API/CLI/data only** — no UI surface in scope | **Skip** — go Step 4 → Step 5; do not run the script |
+| Design spec has **`## Visual Compliance Checks`** with real checklist items | **Run** — the check reads that section |
+| Phase is **backend/API/CLI/data only** — no UI surface in scope | **Skip** — go Step 4 → Step 5; do not run the check |
 | Spec explicitly says **Visual Compliance N/A** (e.g. infra skill, no UI) | **Skip** — document in spec why N/A |
 | **Mixed phase** (API + UI) | **Run** if any UI shipped; checks cover UI portion of spec |
 
-**Architect rule of thumb:** if the spec never needed a Visual Compliance section and no `.tsx`/user-facing CSS was in the plan, skip 4.5. If UI was in scope, the spec should have included checks; a missing section on a UI feature is a spec gap — add checks or ask the user before skipping.
+**Controller rule of thumb:** if the spec never needed a Visual Compliance section and no `.tsx`/user-facing CSS was in the plan, skip 4.5. If UI was in scope, the spec should have included checks; a missing section on a UI feature is a spec gap — add checks or ask the user before skipping.
 
-**Per-task vs phase:** implementers may run narrower visual/unit tests **per task** when UI files change. **G4.5** is the **phase-level** gate with `visual-compliance-check.sh` and the design spec file — one run before documentation (Step 5).
+**Per-task vs phase:** implementers may run narrower visual/unit tests **per task** when UI files change. **G4.5** is the **phase-level** gate with the visual compliance tooling and the design spec file — one run before documentation (Step 5).
 
 **Spec integration (UI features):** design specs include a `## Visual Compliance Checks` section:
 
@@ -323,9 +358,9 @@ Then: dispatch @architect with the **plan-only** template (no `## Worktree:` lin
 - [ ] Clicking a filter pill highlights it and filters the list
 ```
 
-**Execution (example — Memo, Next.js on :3000):**
+**Execution (adapter + example project — Memo, Next.js on :3000):**
 ```bash
-/root/workspace/superagents/.opencode/scripts/visual-compliance-check.sh \
+<repo>/.opencode/scripts/visual-compliance-check.sh \
   http://localhost:3000 \
   docs/specs/YYYY-MM-DD-<feature>-design.md \
   /tmp/visual-compliance \
@@ -343,8 +378,9 @@ User: post-merge fixes / UI polish / wiring tweaks
          │
          ▼
 ┌────────────────────────────────────────────┐
-│ @manager invokes `fast-track-protocol`     │
-│ • Dispatches coders directly (no architect)│
+│ Session manager invokes fast-track         │
+│ • Dispatches implementers directly         │
+│   (no controller)                          │
 │ • Skip G1–G2 (no new spec/plan)            │
 │ • UI changes → visual verification still   │
 │   mandatory (per skill)                    │
@@ -357,49 +393,51 @@ User: post-merge fixes / UI polish / wiring tweaks
     STOP FasTP → back to Phase 0 (brainstorming)
 ```
 
-Runtime: [`fast-track-protocol`](../../.opencode/skills/fast-track-protocol/SKILL.md) + rules in [`.opencode/agents/architect.md`](../../.opencode/agents/architect.md).
+Runtime: adapter skill `fast-track-protocol` + rules in the controller's agent definition.
 
 ## Board during IMPL
 
-`In IMPL` (at dispatch) → `PR (G7)` (at finishing) → `In-main` (after merge; if the issue was Next Up 1 → `shift`), then `gh_board.py merged <issue> <pr> "<short title>"` appends the `## Recently merged` scratchpad line (v2) and the manager removes its session section. Flips belong to @manager. The board script lives in the project repo: `.opencode/scripts/gh_board.py`.
+The board is the project's state visualizer, not a context carrier; the session manager's flips keep it truthful.
+
+`In IMPL` (at dispatch) → `PR (G7)` (at finishing) → `In-main` (after merge; if the issue was Next up 1 → `shift`), then the board script's `merged` command (`gh_board.py merged <issue> <pr> "<short title>"`) appends the `## Recently merged` scratchpad line (v2) and the session manager removes its session section. Flips belong to the session manager. The board script ships with the adapters.
 
 ## Return path (spec/plan invalid → back to DESIGN)
 
 A one-time bounce-back, not a live channel:
 
-1. @architect reports BLOCKED because the spec or the plan itself is wrong (not an env or implementer issue) → @manager presents it to the user.
+1. The controller reports BLOCKED because the spec or the plan itself is wrong (not an env or implementer issue) → the session manager presents it to the user.
 2. **The user decides** to return the trajectory.
-3. @manager posts a GH issue comment describing the problem, then moves the card back: spec invalid → `In Design (G1a)`; spec intact, plan broken → `Spec OK (G1b)`.
+3. The session manager posts a GH issue comment describing the problem, then moves the card back to `In Design`: a broken spec restarts the design (Gate A); a broken plan additionally marks a pending plan decision on the card — the next DESIGN session resumes at Gate C.
 4. Worktree/branch keep-vs-discard is the user's call.
 5. Scratchpad (v2): the section is removed if the worktree/branch is discarded; if it was kept, the section stays while that worktree lives. The durable record of the return is the issue comment + board status.
 
-The next host DESIGN session picks the issue up from the board with the issue comment as input — see [design-phase.md](design-phase.md).
+The next DESIGN session picks the issue up from the board with the issue comment as input — see [design-phase.md](design-phase.md).
 
 ## Gates summary
 
 ```
 G3 ─── Clean Baseline ────────── Auto ─── Baseline green: CI fact-check of latest merged PR, or local suite
 G4 ─── TDD Compliance ────────── Auto ─── Implementer self-check
-G4a ── Architect Spot-Check ──── Auto ─── Diff ≤5 lines (trivial only)
+G4a ── Controller Spot-Check ─── Auto ─── Diff ≤5 lines (trivial only)
 G4.5 ─ Visual Compliance ─────── Auto ─── UI phases only; skip if no UI
-G5 ─── Code Compliance ───────── Auto ─── Code matches plan (code-compliance-reviewer)
+G5 ─── Code Compliance ───────── Auto ─── Code matches plan (compliance reviewer)
 G6 ─── Code Quality + Tests ──── Auto ─── Clean code, tests pass
 G6a ── Review Loop Limit ─────── Auto ─── Max 3 iterations → escalate
-G6b ── Controller Never Implem.─ Auto ─── Architect did not edit code
+G6b ── Controller Never Implem.─ Auto ─── Controller did not edit code
 G7 ─── Final Tests + Choice ──── Human ── Merge/PR/Keep/Discard
 ```
 
 ## Key principles (IMPL)
 
-1. **Manager Owns Conversation** — @manager is the single entry point; @architect never talks to the user
-2. **Controller Never Implements** — @architect plans and delegates, never edits code
+1. **Manager Owns Conversation** — the session manager is the single entry point; the controller never talks to the user
+2. **Controller Never Implements** — the controller plans and delegates, never edits code
 3. **Two-Stage Review** — code compliance → code quality, never one without the other
 4. **Sequential Tasks** — one implementer at a time, no parallel dispatch
 5. **Circuit Breaker** — max 3 review loops per reviewer, then escalate
-6. **Hybrid Diff Review** — @architect reads `--stat` only, passes the file path to reviewers (saves ~30-40% tokens)
+6. **Hybrid Diff Review** — the controller reads `--stat` only, passes the file path to reviewers (saves ~30-40% tokens)
 7. **TDD Required** — RED-GREEN-REFACTOR for every implementation task
-8. **Env Work Delegated** — env prep and e2e/full-suite test runs go to @tester (cheap model)
-9. **No Temporary Tool Installation** — all tools in Dockerfile, never in worktree
-10. **Scratchpad v2** — DESIGN writes nothing; the manager's section lives while the worktree exists; finishing = board flip + `merged` line (`## Recently merged`, max 5) + section removal; `/sanitize-scratchpad` audits legacy files
+8. **Env Work Delegated** — env prep and e2e/full-suite test runs go to the test runner (cheap model)
+9. **No Temporary Tool Installation** — all tools in the runtime image, never in worktree
+10. **Scratchpad v2** — DESIGN writes nothing; the session manager's section lives while the worktree exists; finishing = board flip + `merged` line (`## Recently merged`, max 5) + section removal; the adapter's sanitize command audits legacy files
 
-**Container restart required** after any `.opencode/agents/*.md` or `.opencode/skills/**/SKILL.md` changes.
+> **opencode adapter note:** restart the container runtime after any change to its agent/skill files (`.opencode/agents/*.md`, `.opencode/skills/**/SKILL.md`).

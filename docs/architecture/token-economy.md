@@ -1,27 +1,27 @@
 # Token Economy
 
 > Minimize token usage while preserving quality.
-> Cost model for SuperAgents workflow v3.5.
+> Cost model for the SuperAgents workflow. Role names are theory roles (controller, implementer, reviewers); concrete dispatch tools and model assignments live in each harness adapter.
 
 ## Per-Subagent Spawn Cost
 
-Each `task()` call creates a **new LLM API request with zero context inheritance**. No shared conversation history between subagent sessions.
+Each subagent dispatch creates a **new LLM API request with zero context inheritance** — true for every harness's dispatch tool. No shared conversation history between subagent sessions.
 
 **What prompt caching saves:**
 
 | Component | Cached? | Details |
 |-----------|---------|---------|
-| Implementer `agent.md` (system prompt) | ✅ from 2nd+ spawn | Same agent type, identical system prompt → provider may cache. Saves ~1K tokens on repeated dispatches. |
-| Reviewer `agent.md` (system prompt) | ✅ from 2nd+ spawn | Same. Saves ~500 tokens per repeated review. |
+| Implementer agent definition (system prompt) | ✅ from 2nd+ spawn | Same agent type, identical system prompt → provider may cache. Saves ~1K tokens on repeated dispatches. |
+| Reviewer agent definition (system prompt) | ✅ from 2nd+ spawn | Same. Saves ~500 tokens per repeated review. |
 | Task `prompt` (user message) | ❌ NEVER | Unique per task: different feature, different context, different diff. |
 | Git diff embedded in prompt | ❌ NEVER | Unique per task. |
 | Output tokens | ❌ NEVER | Unique response per agent. |
 
 ## Duplicate Read Elimination
 
-In v1.0, reviewers used `read` tool to read files independently. This caused **duplicate file reads** (10K tokens × 2 reviewers = 20K waste per task).
+In v1.0, reviewers used the file-read tool to read files independently. This caused **duplicate file reads** (10K tokens × 2 reviewers = 20K waste per task).
 
-**In v3.0:** @architect embeds `git diff` output directly in reviewer prompts. Reviewers analyze embedded diff, NOT `read` tool. **Zero duplicate file reads.**
+**Current:** the controller saves `git diff` to a file and passes the file PATH to reviewers — diff contents are never pasted into chat prompts. Reviewers analyze the diff file. **Zero duplicate file reads.**
 
 ## Per-Task Cost Model by Tier
 
@@ -60,7 +60,7 @@ A medium feature (5 tasks: 2 trivial, 2 small, 1 standard, 1 fix-loop average):
 - **Trivial (2):** 2 × 4K = 8K
 - **Small (2):** 2 × 20K = 40K
 - **Standard (1):** 1 × 36K = 36K
-- **+ docser:** ~5K
+- **+ scribe:** ~5K
 - **+ finishing:** ~5K
 - **Total feature:** **~94K tokens**
 
@@ -68,24 +68,24 @@ At typical model pricing, a single feature costs **~$0.40–$1.80** for subagent
 
 ## Model Selection Guidance
 
-| Role | Model | Why |
+| Role | Model tier | Why |
 |------|-------|-----|
-| @architect | Most capable (kimi-k2.6, etc.) | Planning, delegation, context management |
-| @frontend-coder / @backend-coder | Standard (qwen3.6-plus) | Implementation, clear specs |
-| @code-compliance-reviewer | Fast, cheap (deepseek-v4-flash) | Read-only, pattern matching |
-| @code-quality-reviewer | Fast, cheap (deepseek-v4-flash) | Read-only + test execution |
-| @debugger | Standard (qwen3.6-plus) | Reasoning, investigation |
-| @docser | Fast, cheap (deepseek-v4-flash) | Structured writing |
-| @deployer | Fast, cheap (deepseek-v4-flash) | Command execution |
+| Controller | Most capable | Planning, delegation, context management |
+| Implementers | Standard | Implementation, clear specs |
+| Compliance reviewer | Fast, cheap | Read-only, pattern matching |
+| Quality reviewer | Fast, cheap | Read-only + test execution |
+| Investigator | Standard | Reasoning, investigation |
+| Scribe | Fast, cheap | Structured writing |
+| Deployer | Fast, cheap | Command execution |
 
-**Rule:** Use the least powerful model that can handle each role to conserve cost and increase speed.
+**Rule:** Use the least powerful model that can handle each role to conserve cost and increase speed. Which concrete model id fills each tier is adapter config, not theory.
 
 ## Why This Works
 
-- **Architect** loads workflow skills (generic, reusable).
-- **Implementer** loads `agent.md` (domain-specific) ONCE per subagent dispatch.
-- **Project context** lives in `agent.md`, NOT in task prompts. @architect sends only task-specific text + scene-setting.
+- **Controller** loads workflow skills (generic, reusable).
+- **Implementer** loads its agent definition (domain-specific) ONCE per subagent dispatch.
+- **Project context** lives in the implementer's agent definition, NOT in task prompts. The controller sends only task-specific text + scene-setting.
 - **Reviewers** use cheap models because they only read diffs and report, no generation.
-- **No project skill** — avoids loading full project context into @architect session repeatedly.
-- **Git diff in reviewer prompts** — eliminates duplicate file reads.
+- **No project skill** — avoids loading full project context into the controller session repeatedly.
+- **Diff file for reviewers** — the controller passes paths, not contents; eliminates duplicate file reads.
 - **Task complexity classification** — trivial tasks skip reviewers entirely (~34K savings).
