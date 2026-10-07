@@ -399,7 +399,7 @@ Runtime: adapter skill `fast-track-protocol` + rules in the controller's agent d
 
 The board is the project's state visualizer, not a context carrier; the session manager's flips keep it truthful.
 
-`In IMPL` (at dispatch) → `PR (G7)` (at finishing) → `In-main` (after merge; if the issue was Next up 1 → `shift`), then the board script's `merged` command (`gh_board.py merged <issue> <pr> "<short title>"`) appends the `## Recently merged` scratchpad line (v2) and the session manager removes its session section. Flips belong to the session manager. The board script ships with the adapters.
+`In IMPL` (at dispatch) → `PR (G7)` (at finishing) → `In-main` (after merge), then the board script's `merged` command (`gh_board.py merged <issue> <pr> "<short title>"`) appends the `## Recently merged` scratchpad line (v2) and the session manager removes its session section. Flips belong to the session manager. The board script ships with the adapters. The card's `host` field marks the owning machine; per-host budgets (`docs/board/board_config.json`) count `In IMPL` cards only — the script's `pick-next` token honors them.
 
 ## Return path (spec/plan invalid → back to DESIGN)
 

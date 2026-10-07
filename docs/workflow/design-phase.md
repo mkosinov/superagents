@@ -41,7 +41,7 @@ The card sits in `In Design` for the whole design; the **pending ask is visible 
 ╚══════════════════════════════════════════════════════════════╝
          │ 1. Session-start ritual: pre-flight git (fetch;
          │    behind → pull --ff-only; diverged → STOP + user),
-         │    board next-up, user picks an issue
+         │    board pick-next-design proposal, user picks an issue
          │ 2. Card → "In Design"
          │ 3. Scout: read-only explorer subagents → compact
          │    fact sheet + issue-actuality verdict
