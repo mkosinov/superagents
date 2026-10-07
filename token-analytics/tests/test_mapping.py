@@ -117,6 +117,16 @@ class AttributeProjectTests(unittest.TestCase):
         }
         self.assertEqual(collector.attribute_project("/root/work/special/x", overlap), "broad")
 
+    def test_empty_prefix_is_skipped_not_wildcard(self):
+        # a prefix that rstrip("/") reduces to "" would match EVERYTHING —
+        # it must be skipped instead
+        wildcard = {"projects": {"wild": {"directories": ["/"]},
+                                 "emptier": {"directories": [""]}}}
+        self.assertIsNone(collector.attribute_project("/root/workspace/memo", wildcard))
+        self.assertIsNone(collector.attribute_project("/opt/playground", wildcard))
+        self.assertIsNone(collector.attribute_project("/", wildcard))
+        self.assertIsNone(collector.attribute_project("relative/path", wildcard))
+
 
 class RootDetectionTests(unittest.TestCase):
     def test_is_root_is_parent_null(self):
@@ -146,6 +156,21 @@ class RootDetectionTests(unittest.TestCase):
         ]
         groups = collector.group_by_root(sessions)
         self.assertEqual(set(groups), {"ghost-child"})
+
+    def test_parent_cycle_terminates_each_becomes_own_root(self):
+        # A↔B parent cycle must not hang the walk; each member becomes its
+        # own root (deepest real ancestor of a looped chain is undefined, so
+        # no folding happens)
+        sessions = [
+            fixtures.make_host_session("a", "/tmp/scratch", "cycle member a",
+                                       parent_id="b", created=T0, updated=T0),
+            fixtures.make_host_session("b", "/tmp/scratch", "cycle member b",
+                                       parent_id="a", created=T0, updated=T0),
+        ]
+        groups = collector.group_by_root(sessions)
+        self.assertEqual(set(groups), {"a", "b"})
+        self.assertEqual([s["id"] for s in groups["a"]], ["a"])
+        self.assertEqual([s["id"] for s in groups["b"]], ["b"])
 
 
 class PhaseTests(unittest.TestCase):
@@ -237,6 +262,43 @@ class OverrideIOTests(unittest.TestCase):
             self.assertEqual(leftovers, [])
             self.assertEqual(collector.load_overrides(nested)["s2"]["issue"], 2)
             self.assertNotIn("s1", collector.load_overrides(nested))
+
+
+class OverrideCoercionTests(unittest.TestCase):
+    """A malformed override issue must coerce to None — never bind silently."""
+
+    def _load_entry(self, issue):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "overrides.json"
+            path.write_text(json.dumps(
+                {"s1": {"project": "memo", "issue": issue, "phase": "design"}}),
+                encoding="utf-8")
+            return collector.load_overrides(tmp)["s1"]
+
+    def test_malformed_issue_values_coerce_to_none(self):
+        # hand-edit typos: junk strings, bools (bool IS int in Python),
+        # floats (32.5 must not bind 32), non-positives, containers, None
+        for bad in ("№327", "327abc", "issue 327", True, False, 32.5, -5, 0,
+                    [327], {"n": 327}, None):
+            self.assertIsNone(self._load_entry(bad)["issue"], repr(bad))
+
+    def test_coercible_string_issue_normalized_to_positive_int(self):
+        self.assertEqual(self._load_entry("327")["issue"], 327)
+        self.assertEqual(self._load_entry("327 ")["issue"], 327)  # stray space tolerated
+        entry = self._load_entry("327 ")
+        self.assertIsInstance(entry["issue"], int)
+
+    def test_malformed_override_keeps_root_in_unmatched(self):
+        # even when overrides reach build_unmatched un-normalized (raw
+        # dicts), a junk issue must NOT count as a binding: the root stays
+        # visible in the unmatched table instead of vanishing silently
+        host = fixtures.host_scenario()
+        container = fixtures.container_scenario()
+        for bad in ("№327", True, 32.5):
+            overrides = {"h-loose": {"project": "memo", "issue": bad, "phase": "design"}}
+            rows = collector.build_unmatched(host, container, CONFIG, overrides)
+            self.assertEqual([r["session_id"] for r in rows], ["h-loose", "c-play"],
+                             repr(bad))
 
 
 class OverrideBindsUnattributedTests(unittest.TestCase):

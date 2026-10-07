@@ -191,7 +191,9 @@ def attribute_project(directory, config):
     for name, spec in config.get("projects", {}).items():
         for prefix in spec.get("directories", []):
             stripped = prefix.rstrip("/")
-            if not stripped or directory == stripped or directory.startswith(stripped + "/"):
+            if not stripped:
+                continue  # "" or "/" would match every path — skip, not wildcard
+            if directory == stripped or directory.startswith(stripped + "/"):
                 return name
     return None
 
@@ -262,14 +264,32 @@ def extract_issue(title):
 
 # --- Mapping: manual overrides (spec §Session → issue mapping) --------------
 
+def _coerce_issue(value):
+    """Any override issue value → positive int or None — never a silent binding.
+
+    Accepts ints and digit-only strings (surrounding whitespace tolerated —
+    the file is hand-edited). Rejects everything else: bools (bool IS int
+    in Python, guard first), floats (32.5 must not bind issue 32), junk
+    strings («№327»), zero/negatives, containers. A None result keeps the
+    root visible in the unmatched table instead of binding it silently.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value if value > 0 else None
+    if isinstance(value, str):
+        text = value.strip()
+        if text.isdecimal():
+            number = int(text)
+            return number if number > 0 else None
+    return None
+
+
 def _normalize_override_entry(entry):
     """{project, issue, phase} with a liberal hand-editable value coercion."""
-    issue = entry.get("issue")
-    if isinstance(issue, str) and issue.isdigit():
-        issue = int(issue)
     return {
         "project": entry.get("project"),
-        "issue": issue,
+        "issue": _coerce_issue(entry.get("issue")),
         "phase": entry.get("phase"),
     }
 
@@ -357,28 +377,28 @@ def _utc_date(epoch_ms) -> str:
     return moment.date().isoformat()
 
 
-def _host_turn_total(turn) -> int:
-    """Plain raw sum of a turn's 5 canonical token components."""
-    return (turn["tokens_input"] + turn["tokens_output"] + turn["tokens_reasoning"]
-            + turn["tokens_cache_read"] + turn["tokens_cache_write"])
+def _token_total(row) -> int:
+    """Plain raw sum of a row's 5 canonical token components.
 
-
-def _container_session_total(session) -> int:
-    """Plain raw sum of a container session's 5 token components."""
-    return (session["tokens_input"] + session["tokens_output"]
-            + session["tokens_reasoning"] + session["tokens_cache_read"]
-            + session["tokens_cache_write"])
+    Host turn_usage rows and container session rows carry the same five
+    token_* column names, so one sum serves both sources.
+    """
+    return (row["tokens_input"] + row["tokens_output"] + row["tokens_reasoning"]
+            + row["tokens_cache_read"] + row["tokens_cache_write"])
 
 
 def build_unmatched(host, container, config, overrides=None):
     """Rows for roots matching no issue (any directory), tokens desc.
 
     `host`/`container` are reader payloads (or None for a failed source):
-    an override with an issue binds its root regardless of title or
-    directory (overrides beat every heuristic and carry the project for
-    unattributed directories, so such roots leave this table). Each row:
-    {project (derived else «—»), date, directory, title, tokens, session_id}
-    with tokens summed over the root's whole subtree.
+    an override with a well-formed issue (positive int, or a string that
+    coerces to one — see `_coerce_issue`) binds its root regardless of
+    title or directory (overrides beat every heuristic and carry the
+    project for unattributed directories, so such roots leave this
+    table); a malformed override issue coerces to None and the root stays
+    visible here. Each row: {project (derived else «—»), date, directory,
+    title, tokens, session_id} with tokens summed over the root's whole
+    subtree.
     """
     overrides = overrides or {}
     rows = []
@@ -392,13 +412,15 @@ def build_unmatched(host, container, config, overrides=None):
             per_session = {}
             for turn in payload["turns"]:
                 per_session[turn["session_id"]] = (
-                    per_session.get(turn["session_id"], 0) + _host_turn_total(turn))
+                    per_session.get(turn["session_id"], 0) + _token_total(turn))
         else:
-            per_session = {s["id"]: _container_session_total(s) for s in sessions}
+            per_session = {s["id"]: _token_total(s) for s in sessions}
         for root_id, members in groups.items():
             root = by_id[root_id]
             override = overrides.get(root_id) or {}
-            issue = override.get("issue")
+            # coerce at point of use too: overrides may arrive as raw dicts
+            # that never passed through load_overrides normalization
+            issue = _coerce_issue(override.get("issue"))
             if issue is None:
                 issue = extract_issue(root.get("title"))
             if issue is not None:
