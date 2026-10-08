@@ -66,8 +66,6 @@ Before writing ANY code:
 ## Superpowers Integration
 
 ### Skill Invocation Rule
-Before designing or implementing backend architecture, MUST invoke `fastapi-clean-architecture` skill via `skill` tool.
-
 Before writing any test code, MUST invoke `pytest-patterns` skill via `skill` tool.
 
 Before implementing ANY feature or bugfix:
