@@ -82,8 +82,8 @@ When dispatching a **bug fix** (not a feature/plan task), use a TWO-GATE sub-pro
 4. **Visual Compliance Gate (ONCE per phase, NOT per task)**
    - Trigger: All tasks in this phase complete, all reviews passed
    - Run `.opencode/scripts/visual-compliance-check.sh <dev-url> <spec-file>`
-   - If FAILS → soft block: report to user with screenshots, wait for decision (fix/override/abort)
-   - Only proceed to Step 5 (documentation) after pass or explicit user override
+   - Branch on the literal exit code (canon table: script header). **1** (checks failed) → fix loop per the architect.md Step 4.5 policy (coder dispatch, max 3 iterations, then user decision fix/override/abort with report + screenshots) — not restated here. **2** (infrastructure/usage) → not a fix loop: resolve the env, escalate if impossible. **3** (spec gap: section missing/empty/zero machine hints) → NOT a fix loop, NOT patched here — report up: the card returns to In Design, the section is redesigned in a design session
+   - Only proceed to Step 5 (documentation) after exit 0 or explicit user override
 
 5. Use finishing-a-development-branch skill to complete
 

@@ -274,7 +274,7 @@ Triggered by manager dispatch with the feature request (an explicitly brainstorm
    - Preserve ALL requirements from the user's source materials (sketches, specs) — never silently change/remove/reinterpret. Conflicts → flag as questions in the report.
    - Include `## User Scenarios` section — 3-7 user tasks the feature enables, each mapping to an E2E test (anchors the plan's E2E-in-DoD rule; the completeness panelist checks for it).
    - Include `## Behavioral Delta` section — what changes for the user, before → after (written at spec time so the panel reviews it and Gate B prints it; the plan does NOT restate it).
-   - Include `## Visual Compliance Checks` section (UI features): checklist of key UI elements, e.g. `- [ ] <UI element name> is visible and <expected behavior>`
+   - Include `## Visual Compliance Checks` section (UI features): checklist of key UI elements, e.g. `- [ ] <UI element name> is visible and <expected behavior>`; at least one item must carry a machine-usable hint (`data-testid`, `aria-*`, UI text in quotes). Format canon (item template, machine hints, N/A grammar, parse-only self-check): `.zcode/skills/design-phase/SKILL.md` §3 — not restated here. Non-visual feature → the section's only content line, trimmed, equals `N/A` or `- N/A` (ASCII hyphen only, case-insensitive)
 4. Commit: `git add docs/specs/... && git commit -m "docs: add design for <feature>"`
    - **DESIGN-phase docs are pushed to main immediately after gate approval (rule).** Do NOT push
      the spec before Gate B — the user may request changes at the gate. But NEVER leave the approved
@@ -431,14 +431,18 @@ Triggered by manager dispatch. Two entry variants:
 
 ## Step 4.5: Visual Compliance Gate
 
-Trigger: all tasks done, tests green. Run ONCE per phase. Skip if no user-visible UI (or spec marks it N/A) — note the skip in the report.
+Trigger: all tasks done, tests green. Run ONCE per phase. Do NOT skip on a non-visual guess: an N/A-marked spec exits 0 "not applicable" before any dependency/server stage, and a missing section is itself a red outcome (exit 3).
 
 **Autonomous by default.** Escalate to the user (NEEDS_APPROVAL, Gate G4.5) ONLY when autonomous verification is impossible: browser tooling (browserMCP / Playwright) unavailable, dev server won't start, or the check requires credentials/state you cannot set up yourself.
 
 1. Dev server up (<project dev server command>).
 2. Run: <project visual compliance script> <dev server URL> docs/specs/<feature>-design.md /tmp/visual-compliance mobile (from repo/worktree root)
    Fallback: browserMCP → Playwright (navigate + screenshots vs spec), per the pair-visual-debugging skill.
-3. ALL passed → proceed. ANY failed → fix via coder dispatch (max 3 iterations per issue, per Review Loop Limit), then re-run the check. Issues that survive 3 fix iterations → NEEDS_APPROVAL (Gate G4.5) with report path + screenshot paths. User decides: fix / override / abort.
+3. Branch on the script's literal exit code (canon table: header of `.opencode/scripts/visual-compliance-check.sh` — never wrap into "any non-zero = failure"):
+   - **0** → green (incl. N/A "not applicable") → proceed.
+   - **1** (automatable checks failed) → fix loop: coder dispatch (max 3 iterations per issue, per Review Loop Limit), then re-run the check. Issues that survive 3 fix iterations → NEEDS_APPROVAL (Gate G4.5) with report path + screenshot paths. User decides: fix / override / abort.
+   - **2** (infrastructure/usage: bad args, missing dependency, parser crash, dev server unreachable) → NOT a fix loop: resolve the environment yourself; impossible → NEEDS_APPROVAL (Gate G4.5) per the autonomous-by-default rule above.
+   - **3** (spec gap: the `## Visual Compliance Checks` section is missing, empty, or has zero machine-usable hints) → a design hole, NOT a code bug. Do NOT start the fix loop and do NOT suggest patching the spec from implementation — report to the manager in the phase report (state "visual gate exit 3 (spec gap)"): the card returns to In Design, the section is redesigned in a design session.
 
 ## Step 5: Documentation Commit
 

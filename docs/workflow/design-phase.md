@@ -56,9 +56,12 @@ The card sits in `In Design` for the whole design; the **pending ask is visible 
 ║  STEP 1: SPEC + PANEL  (Gate B — HUMAN, the main OK)          ║
 ╚══════════════════════════════════════════════════════════════╝
          │ 1. Write spec → docs/specs/YYYY-MM-DD-…-design.md
-         │    (## User Scenarios + ## Behavioral Delta;
-         │    self-contained BEFORE the panel: panelists get
-         │    the spec path only — they do not read GitHub issues)
+         │    (## User Scenarios + ## Behavioral Delta +
+         │    ## Visual Compliance Checks — mandatory, N/A
+         │    for non-visual, format canon in the adapter's
+         │    design-phase skill; self-contained BEFORE the
+         │    panel: panelists get the spec path only — they
+         │    do not read GitHub issues)
          │ 2. Self-review (placeholders, consistency, scope)
          │ 3. Spec Panel Review: 6 parallel independent agents
          │ 4. Consolidated report → user decides on fixes
@@ -167,7 +170,9 @@ IMPL session entirely and be implemented by the DESIGN session itself
   the fast-track; the implementation order and the verification design live
   in a `## Verification` section of the spec — mechanical checks (greps,
   path/line existence, coverage lists); the E2E-in-DoD rule does not apply
-  (no app surface). Write the plan anyway when the change decomposes into
+  (no app surface) — and the spec's `## Visual Compliance Checks` section
+  carries the N/A marker (docs/harness changes are non-UI by definition).
+  Write the plan anyway when the change decomposes into
   ≥3 independent tasks or the verification itself needs design — the
   user decides at Gate B.
 - **Seam:** gate pushes are replaced by the PR — the spec (and plan, if
