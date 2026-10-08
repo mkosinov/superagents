@@ -2,7 +2,7 @@
 name: spec-panel-security
 description: Spec panel reviewer — application security perspective. Finds authentication, authorization/role, and security-model breakage risks in spec documents; returns an explicit no-attack-surface verdict when a spec touches none.
 tools: [Read, Bash]
-model: omniroute/panel-security
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: enabled
 ---
 

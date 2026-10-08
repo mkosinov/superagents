@@ -2,7 +2,7 @@
 name: spike-parent
 description: Spike test parent — dispatches spike-child via the Agent tool, records its agentId, resumes it via SendMessage, and reports all three results.
 tools: [Read, Agent, SendMessage, TodoWrite]
-model: omniroute/panel-completeness
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 ---
 
 You are a spike-test parent agent. When dispatched with "Run your spike sequence now", do exactly this sequence and nothing else:

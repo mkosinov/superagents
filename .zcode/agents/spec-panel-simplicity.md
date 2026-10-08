@@ -2,7 +2,7 @@
 name: spec-panel-simplicity
 description: Spec panel reviewer — simplicity/YAGNI perspective. Finds overengineering, unrequested scope, and needless complexity in spec documents.
 tools: [Read, Bash]
-model: omniroute/panel-simplicity
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: enabled
 ---
 

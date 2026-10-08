@@ -2,7 +2,7 @@
 name: spec-panel-best-practices
 description: Spec panel reviewer — best-practices perspective. Verifies spec decisions against current community/vendor best practices, using web research (WebSearch/WebFetch). Read-only.
 tools: [Read, Bash, WebSearch, WebFetch]
-model: omniroute/panel-best-practices
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: enabled
 ---
 

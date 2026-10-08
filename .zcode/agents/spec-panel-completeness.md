@@ -2,7 +2,7 @@
 name: spec-panel-completeness
 description: Spec panel reviewer — completeness perspective. Finds holes, unhandled edge cases, and missing scenarios in spec documents. Read-only.
 tools: [Read, Bash]
-model: omniroute/panel-completeness
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: enabled
 ---
 

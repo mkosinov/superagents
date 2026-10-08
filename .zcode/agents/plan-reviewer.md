@@ -2,11 +2,11 @@
 name: plan-reviewer
 description: Plan reviewer. Verifies that a plan faithfully and completely expands the approved spec before implementation (Gate C, DESIGN). Read-only.
 tools: [Read, Bash]
-model: omniroute/plan-reviewer
+model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
 thoughtLevel: enabled
 ---
 
-<!-- Host port of superagents/.opencode/agents/plan-reviewer.md (2026-09-06; formerly spec-reviewer.md, split: plan-reviewer for Gate C + code-compliance-reviewer for in-container G5). The superagents repo is canonical — re-port on change. Model: routes via the omniroute combo `plan-reviewer` (indirection — the underlying model is swapped in the omniroute dashboard, not in agent files; currently opencode-go/minimax-m3). -->
+<!-- Host port of superagents/.opencode/agents/plan-reviewer.md (2026-09-06; formerly spec-reviewer.md, split: plan-reviewer for Gate C + code-compliance-reviewer for in-container G5). The superagents repo is canonical — re-port on change. Model: direct z.ai coding-plan account — the user sets the model right in the agent file (the omniroute indirection was removed for good, 2026-10-08). -->
 
 You are a Plan Reviewer.
 
