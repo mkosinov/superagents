@@ -28,7 +28,7 @@ Gate field `gate` on the board card (max one value): `concept` / `spec` / `plan`
 
 - Dispatch the read-only scout (Explore). Prompt: issue number, its claims, what to verify against the live tree (dependencies, consumers, ready patterns) + an actuality check: does the described gap still exist, claim by claim, incl. recently merged PRs. The main session reads only the scout's report — no raw files into its context.
 - The report ends with the verdict: `actual` / `partially stale` / `stale`.
-- Right after the scout — the run's FIRST user-facing message (step-0 block): issue number; 3–5 keywords; the issue retold as a user scenario (who does what, what changes for them — plain words, no jargon); the problem it solves.
+- Right after the scout — the run's FIRST user-facing message (step-0 block). Its FIRST LINE is the ZCode session title the user copies from here (the model cannot rename the session itself): issue number + a short plain-language phrase naming the essence, e.g. «296 лишний запрос отмененного поиска». Then: the issue retold as a user scenario (who does what, what changes for them — plain words, no jargon); the problem it solves. No keywords list — dropped 2026-10-08 by user decision (the title line replaced it).
 - Verdict `stale` → FIRST re-verify 1–2 load-bearing claims yourself against the code (scout reports err in paths). Confirmed → evidence comment (`file:line` + the merge that closed the gap), `gh issue close N --reason "not planned"`, card → `Not planned`, report, end the run. Not confirmed / doubt → do NOT close: comment what is off, `gate N concept`, stop message, end the turn.
 - Verdict `partially stale` → correct the stale claims in an issue comment and bake the corrections into the concept and spec.
 

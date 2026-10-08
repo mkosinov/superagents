@@ -104,7 +104,7 @@ Candidate approaches are filtered before any user stop. The gate auto-OKs when o
 4. Approaches are **divergent** — the user picks — when they differ in any of: user-visible behavior; data model; API contract; scope (one of them deliberately does NOT build part of the issue); reversibility (breaking or one-way change).
 5. Never present more than three; merge near-identical ones first. In doubt — stop for the user: a wasted stop is cheaper than a silently wrong choice.
 
-There is **no interactive question-by-question brainstorm** inside the design flow; the design turn opens with a **step-0 report** — the issue retold for a reader who has not opened it (number; 3–5 keywords; the issue as a user scenario; the problem it solves) — followed by the candidate approaches. The full brainstorm dialogue exists as the standalone `brainstorming` skill, explicit invocation only.
+There is **no interactive question-by-question brainstorm** inside the design flow; the design turn opens with a **step-0 report** — the issue retold for a reader who has not opened it (FIRST LINE = the ZCode session title the user copies from there — issue number + a short plain-language phrase naming the essence; then the issue as a user scenario; the problem it solves; no keywords list — dropped 2026-10-08 by user decision) — followed by the candidate approaches. The full brainstorm dialogue exists as the standalone `brainstorming` skill, explicit invocation only.
 
 ## Gate B — the human gate
 
