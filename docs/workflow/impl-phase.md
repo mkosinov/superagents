@@ -6,7 +6,7 @@
 >
 > **Input:** an approved plan already on origin/main, card at `Ready to IMPL` (produced by the [DESIGN phase](design-phase.md)). **Output:** merged PR / In-main.
 >
-> **Version:** 3.11 · **Last aligned:** 2026-10-07
+> **Version:** 3.15 · **Last aligned:** 2026-10-08 (old gate-name residue swept)
 
 ## Executors (adapters)
 
@@ -51,7 +51,7 @@ The user tells the IMPL session manager «start impl #NNN». The session manager
 2. **Git:** `git fetch origin && git status -sb`. Behind → fast-forward. **Diverged → STOP + user** (never reset/merge on your own; no local-only commits on main while a DESIGN session is in flight).
 3. **Plan file:** must exist on the fetched main. Missing → STOP + user.
 
-Then: dispatch the controller with the **plan-only** template (no `## Worktree:` line — the controller creates the worktree as its first action) and flip the board to `In IMPL`. No brainstorming — the feature is approved through G2.
+Then: dispatch the controller with the **plan-only** template (no `## Worktree:` line — the controller creates the worktree as its first action) and flip the board to `In IMPL`. No brainstorming — the feature is approved through Gate C.
 
 ## Full flow
 
@@ -381,7 +381,7 @@ User: post-merge fixes / UI polish / wiring tweaks
 │ Session manager invokes fast-track         │
 │ • Dispatches implementers directly         │
 │   (no controller)                          │
-│ • Skip G1–G2 (no new spec/plan)            │
+│ • Skip A–C (no new spec/plan)             │
 │ • UI changes → visual verification still   │
 │   mandatory (per skill)                    │
 │ • Local WIP commits until user signals     │

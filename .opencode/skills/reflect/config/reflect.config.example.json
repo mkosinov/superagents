@@ -4,7 +4,7 @@
     "mandatory_reviewer_for_code": { "enabled": true, "file_patterns": ["*.ts", "*.tsx", "*.py"], "severity": "critical" },
     "tdd_red_first": { "enabled": true, "severity": "warning" },
     "max_review_loops": { "enabled": true, "max_loops": 3, "severity": "warning" },
-    "gate_compliance": { "enabled": true, "gates": ["G1a", "G1b", "G2", "G7"], "severity": "critical" },
+    "gate_compliance": { "enabled": true, "gates": ["A", "B", "C", "G7"], "severity": "critical" },
     "regression_test_on_bugfix": { "enabled": true, "severity": "warning" },
     "stuck_in_retry": { "enabled": true, "min_repeats": 3, "severity": "critical" },
     "same_error_repeated": { "enabled": true, "min_sessions": 3, "severity": "critical" },

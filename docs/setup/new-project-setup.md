@@ -10,7 +10,7 @@
 
 ## Step 0: Host DESIGN Pipeline (.zcode)
 
-The workflow is split: DESIGN (gates G1a/G1b/G2) runs on the host in ZCode; IMPL runs in the container in OpenCode. The host part deploys from the canon's `.zcode/` (DESIGN executors only):
+The workflow is split: DESIGN (gates A/B/C) runs on the host in ZCode; IMPL runs in the container in OpenCode. The host part deploys from the canon's `.zcode/` (DESIGN executors only):
 
 ```bash
 cp -R <superagents-checkout>/.zcode/ .zcode/
@@ -97,7 +97,7 @@ echo ".worktrees/" >> .gitignore
 touch .opencode/scratchpad.md
 ```
 
-Leave it empty. The container manager seeds its own section per trajectory at IMPL start (plan-only entry: architect's IMPL task_id + "gates G1a/G1b/G2 passed per board" + plan path). Do NOT pre-fill a legacy workflow template.
+Leave it empty. The container manager seeds its own section per trajectory at IMPL start (plan-only entry: architect's IMPL task_id + "gates A–C passed per board" + plan path). Do NOT pre-fill a legacy workflow template.
 
 ## Step 6: Restart OpenCode Container
 
