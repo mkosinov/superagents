@@ -12,7 +12,7 @@ DEFAULT_CHECKS = {
     "mandatory_reviewer_for_code": ("critical", {"file_patterns": ["*.ts", "*.tsx", "*.py"]}),
     "tdd_red_first": ("warning", {}),
     "max_review_loops": ("warning", {"max_loops": 3}),
-    "gate_compliance": ("critical", {"gates": ["G1a", "G1b", "G2", "G7"]}),
+    "gate_compliance": ("critical", {"gates": ["A", "B", "C", "G7"]}),
     "regression_test_on_bugfix": ("warning", {}),
     "stuck_in_retry": ("critical", {"min_repeats": 3}),
     "same_error_repeated": ("critical", {"min_sessions": 3}),
