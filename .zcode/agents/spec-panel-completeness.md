@@ -3,7 +3,6 @@ name: spec-panel-completeness
 description: Spec panel reviewer — completeness perspective. Finds holes, unhandled edge cases, and missing scenarios in spec documents. Read-only.
 tools: [Read, Bash]
 model: "account:zai-individual-coding-plan/GLM-5.3-Flash"
-thoughtLevel: enabled
 ---
 
 <!-- Host port of superagents/.opencode/agents/spec-panel-completeness.md (2026-09-05; renamed from spec-review-completeness 2026-09-06). The superagents repo is canonical — re-port on change. -->
