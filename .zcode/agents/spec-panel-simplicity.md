@@ -24,6 +24,8 @@ Your tools are allowlisted to file reading and shell inspection; there is no edi
 - A simpler existing alternative in the codebase being ignored
 - A new component, form, or API invented by the spec where an existing one could be extended or reused — check the repo for a matching solution before flagging
 
+Out of scope BY DESIGN: economies that change what a test verifies or what a contract promises. Reducing a test's exercise below the functionality it claims — the "minimal" 1-client e2e stayed green with the feature broken (#216). Merging tests of different contracts — the is_active preserve/explicit pairs each verify a different rule (#184; merging same-function duplicates is fine when checks are independent and labeled). Deriving identifiers/config by string tricks — `rstrip('s')` broke on `activities` (D15). Folding one concern into another endpoint's contract — `total_paid` as a subquery inside `GET /records` changed the contract for all consumers (#186). Such calls belong to the test-design panelist. Verification-preserving economies (merging true duplicates, dropping steps that assert nothing) are your legitimate ground — propose them WITH the preservation argument.
+
 ## Report Format (MANDATORY)
 
 ```markdown
