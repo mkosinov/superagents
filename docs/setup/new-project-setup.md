@@ -64,7 +64,7 @@ Adapt per project: agent bodies reference project deltas (models, test commands)
 
 ## Step 3: Configure Spec Review Panel models
 
-The brainstorming skill runs a 6-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
+The DESIGN-phase skills (design-phase/auto-design) run a 7-perspective **Spec Panel Review** before the user approves any spec. Each panelist agent (`spec-panel-*.md`) needs its configured model to be resolvable by the project's providers.
 
 Reference default (memo project, since the omniroute removal 2026-10-08): direct providers —
 

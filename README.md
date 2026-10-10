@@ -28,7 +28,7 @@ flowchart TD
         PICK["Pick an issue from the board"] --> SCOUT["Scout: recon + issue actuality"]
         SCOUT -->|"concept"| A["Gate A · concept — auto<br/>user only if approaches diverge"]
         A --> SPEC["Spec draft"]
-        SPEC -->|"panel report ×6"| B(["Gate B · spec — HUMAN<br/>the phase's main OK"])
+        SPEC -->|"panel report ×7"| B(["Gate B · spec — HUMAN<br/>the phase's main OK"])
         B --> PLAN["Plan draft"]
         PLAN -->|"plan review"| C["Gate C · plan — auto<br/>user only if the plan changes the spec"]
     end
