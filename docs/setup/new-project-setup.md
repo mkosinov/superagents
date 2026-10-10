@@ -76,7 +76,7 @@ Reference default (memo project, since the omniroute removal 2026-10-08): direct
 
 **Model substitution:** to swap a panelist's model, edit the `model:` line in the corresponding agent file — the model is set directly in the file, there is no gateway indirection.
 
-If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the brainstorming skill).
+If no suitable free models are available in a project, the panel degrades gracefully: the architect retries, skips unavailable perspectives, or skips the panel entirely with an explicit warning (see the availability policy in the design-phase skill).
 
 ## Step 4: Create Project Directories
 
