@@ -34,6 +34,15 @@ OUT="/root/workspace/panel-out/$RUN_ID"
 IN_TARGET="$CLONE/.panel-review"
 TIMEOUT="${PANEL_TIMEOUT:-1500}"
 
+# 0. Container-wide panel lock — ONE panel set at a time on the free models
+#    (user decision 2026-10-10). The lock path is shared by convention: any
+#    other panel runner in this container should honor the same file. A second
+#    run waits up to 40 min, then exits 4 (busy) — never clobbers.
+LOCK="/root/workspace/panel.lock"
+exec 9>"$LOCK"
+flock -w 2400 9 || { echo "ERROR: another panel run holds $LOCK (waited 40 min) — not starting $RUN_ID"; exit 4; }
+echo "lock: $RUN_ID holds $LOCK"
+
 mkdir -p "$OUT"
 
 # 1. Sync the clean clone. It fetches from the main clone (which tracks
