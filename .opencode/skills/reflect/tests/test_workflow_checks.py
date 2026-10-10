@@ -286,12 +286,12 @@ def test_over_orchestration_detects():
     sessions = [
         {"id": "main", "title": "big wave", "parent_id": None, "agent": "architect", "time_created": 1, "time_updated": 200, "time_archived": 200},
     ]
-    # 7 subagents > default max of 6
-    for i in range(7):
+    # 9 subagents > default max of 8
+    for i in range(9):
         sessions.append({"id": f"s{i}", "title": f"sub{i}", "parent_id": "main", "agent": "backend-coder", "time_created": 10, "time_updated": 20, "time_archived": 20})
     v = check_over_orchestration(sessions, [], ReflectConfig.from_dict({}))
     assert len(v) == 1
-    assert v[0].context["subagent_count"] == 7
+    assert v[0].context["subagent_count"] == 9
 
 
 def test_over_orchestration_clean():

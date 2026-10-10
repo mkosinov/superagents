@@ -383,7 +383,7 @@ def check_over_orchestration(
     cfg = config.workflow_checks["over_orchestration"]
     if not cfg.enabled:
         return []
-    max_sub = cfg.options.get("max_subagents", 6)
+    max_sub = cfg.options.get("max_subagents", 8)
     children_by_parent = Counter()
     for s in sessions:
         if s["parent_id"]:
