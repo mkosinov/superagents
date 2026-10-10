@@ -39,15 +39,19 @@ mkdir -p "$OUT"
 # 1. Sync the clean clone. It fetches from the main clone (which tracks
 #    origin), so network credentials stay the main clone's concern.
 #    Superagents port: the main clone may hold unpublished local commits
-#    (mirror ports ahead of origin) — the review clone resets to the main
-#    clone's refs/remotes/origin/main (PUBLISHED main), never its local branch.
+#    (mirror ports ahead of origin) — the review clone resets to PUBLISHED
+#    main (the main clone's refs/remotes/origin/main, passed as an explicit
+#    SHA). A refspec fetch of refs/remotes/* proved unreliable here (silent
+#    no-op, 2026-10-10: the review clone silently sat on the local branch).
 if [ ! -d "$CLONE/.git" ]; then
   echo "clone: creating $CLONE from $MAIN_CLONE"
   git clone --no-hardlinks -q "$MAIN_CLONE" "$CLONE"
 fi
 git -C "$MAIN_CLONE" fetch origin --prune -q || echo "WARN: main-clone fetch failed; using last fetched origin state"
-git -C "$CLONE" fetch origin -q "+refs/remotes/origin/main:refs/remotes/origin/main"
-git -C "$CLONE" reset --hard -q origin/main
+PUBLISHED_MAIN="$(git -C "$MAIN_CLONE" rev-parse --verify -q refs/remotes/origin/main)" || { echo "ERROR: main clone has no refs/remotes/origin/main"; exit 3; }
+git -C "$CLONE" fetch origin -q "+refs/heads/*:refs/remotes/origin/*"
+git -C "$CLONE" cat-file -e "$PUBLISHED_MAIN^{commit}" 2>/dev/null || git -C "$CLONE" fetch origin -q "$PUBLISHED_MAIN"
+git -C "$CLONE" reset --hard -q "$PUBLISHED_MAIN"
 git -C "$CLONE" clean -fdq
 # 1b. Strip sibling specs/plans from the review clone — the submitted inputs
 #     are the ONLY documents under review. Tracked docs/specs + docs/plans in
