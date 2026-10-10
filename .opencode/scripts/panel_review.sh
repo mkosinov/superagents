@@ -38,12 +38,15 @@ mkdir -p "$OUT"
 
 # 1. Sync the clean clone. It fetches from the main clone (which tracks
 #    origin), so network credentials stay the main clone's concern.
+#    Superagents port: the main clone may hold unpublished local commits
+#    (mirror ports ahead of origin) — the review clone resets to the main
+#    clone's refs/remotes/origin/main (PUBLISHED main), never its local branch.
 if [ ! -d "$CLONE/.git" ]; then
   echo "clone: creating $CLONE from $MAIN_CLONE"
   git clone --no-hardlinks -q "$MAIN_CLONE" "$CLONE"
 fi
 git -C "$MAIN_CLONE" fetch origin --prune -q || echo "WARN: main-clone fetch failed; using last fetched origin state"
-git -C "$CLONE" fetch origin -q
+git -C "$CLONE" fetch origin -q "+refs/remotes/origin/main:refs/remotes/origin/main"
 git -C "$CLONE" reset --hard -q origin/main
 git -C "$CLONE" clean -fdq
 # 1b. Strip sibling specs/plans from the review clone — the submitted inputs
