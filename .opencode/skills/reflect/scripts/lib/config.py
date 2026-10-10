@@ -20,7 +20,7 @@ DEFAULT_CHECKS = {
     "skill_triggered_when_should": ("warning", {}),
     "subagent_completion_rate": ("warning", {"min_rate": 0.8}),
     "first_time_right": ("warning", {"target_rate": 0.5}),
-    "over_orchestration": ("warning", {"max_subagents": 6}),
+    "over_orchestration": ("warning", {"max_subagents": 8}),
     "dead_end_sessions": ("info", {"max_duration_sec": 60}),
     "skill_orphan": ("info", {"max_days_unused": 30}),
     "context_overflow": ("info", {}),

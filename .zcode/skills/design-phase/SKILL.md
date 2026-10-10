@@ -1,6 +1,6 @@
 ---
 name: design-phase
-description: DESIGN phase on the host (zcode) in the host/container split topology — scout + issue-actuality check → concept gate A (auto) → spec + 6-reviewer panel → spec gate B (the user's main OK) → plan + plan-reviewer → plan gate C (auto), DoD = push to origin, board = the gh_board.py script shipped in this repo, handoff to IMPL is «start impl #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
+description: DESIGN phase on the host (zcode) in the host/container split topology — scout + issue-actuality check → concept gate A (auto) → spec + 7-reviewer panel → spec gate B (the user's main OK) → plan + plan-reviewer → plan gate C (auto), DoD = push to origin, board = the gh_board.py script shipped in this repo, handoff to IMPL is «start impl #NNN». Use when the user writes «design #NNN», «продолжаем design», «вернулся #NNN», or asks for a spec/plan for an issue in a host session.
 ---
 
 # DESIGN phase on the host (split host/container)
@@ -93,7 +93,7 @@ Restructured 2026-09-18 by user decision: the old interactive concept gate and t
 
 ## 4. Panel (host dispatch of the spec-panel agents)
 
-1. Dispatch: **6 agents in parallel**, in a single Agent-tool message: `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices`, `spec-panel-security` (files in the repo's `.zcode/agents/`, models per their headers).
+1. Dispatch: **7 agents in parallel**, in a single Agent-tool message: `spec-panel-completeness`, `spec-panel-consistency`, `spec-panel-feasibility`, `spec-panel-simplicity`, `spec-panel-best-practices`, `spec-panel-security`, `spec-panel-test-design` (files in the repo's `.zcode/agents/`, models per their headers).
 2. Each prompt: the **spec path** (+ the previous spec revision's path, if there was one). No `gh issue view`, no network — except best-practices, whose design includes WebSearch/WebFetch.
 3. Aggregation: dedupe identical findings → rank **BLOCKER > MAJOR > MINOR** → one consolidated report to the user for the fix decision. Before trusting a finding, verify it against the code — panelists err in paths.
 4. **Availability policy:** a panelist did not return / crashed / returned an empty report → **one** rerun of that agent alone; second failure → mark it `skipped` in the consolidated report, verdict on the rest.

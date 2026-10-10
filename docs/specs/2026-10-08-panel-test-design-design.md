@@ -1,7 +1,7 @@
 # Panel Test-Design Reviewer (7th Panelist) + Simplicity Mandate Surgery — Design
 
 **Date:** 2026-10-08
-**Status:** In design — Gate B pending (auto-design cycle, issue #15); v2 2026-10-10 — mandate reframed per user decision (see Frame decision); v3 2026-10-10 — panel findings folded: edit-map precision (primary-path roster, companion counts, reflect over-orchestration default), sweep hardening, Visual Compliance Checks N/A, filter wording
+**Status:** Spec OK (gate B 2026-10-10), plan approved (gate C 2026-10-10) — in IMPL
 **Author:** auto-design watcher session (host, zcode)
 
 **Placement:** SuperAgents is the framework source of truth. The panel runs in the opencode container on zen free models via the repo's own runner `.opencode/scripts/panel_review.sh` (migrated from the memo project 2026-10-10 by user decision — no cross-repo dependency); host dispatch is the fallback. Canon bodies live in `.opencode/agents/`, host-port twins in `.zcode/agents/`. Projects receive the change via git (host ports are the reference seeds; containers sync `.opencode/` from canon on pull).

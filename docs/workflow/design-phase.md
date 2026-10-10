@@ -16,7 +16,7 @@ The theory below names roles and artifacts, never tools. Adapters own the mechan
 |---|---|
 | DESIGN session orchestration | zcode host session — skill `design-phase` |
 | Scout (read-only explorer) | zcode built-in `Explore`; opencode `explorer` |
-| Spec panel ×6 | agents `spec-panel-*` — currently run in the opencode container through a panel-runner script; host dispatch is the fallback |
+| Spec panel ×7 | agents `spec-panel-*` — currently run in the opencode container through a panel-runner script; host dispatch is the fallback |
 | Plan reviewer | agent `plan-reviewer` — same container runner |
 | Standalone brainstorm dialogue | skill `brainstorming` — explicit invocation only; **no gate routes through it** |
 | Board | script `gh_board.py` (shipped with each adapter) |
@@ -63,7 +63,7 @@ The card sits in `In Design` for the whole design; the **pending ask is visible 
          │    panel: panelists get the spec path only — they
          │    do not read GitHub issues)
          │ 2. Self-review (placeholders, consistency, scope)
-         │ 3. Spec Panel Review: 6 parallel independent agents
+         │ 3. Spec Panel Review: 7 parallel independent agents
          │ 4. Consolidated report → user decides on fixes
          │ 5. Gate B message (§Gate B) → the user's OK
          │
@@ -124,7 +124,7 @@ The message at Gate B is plain words, no jargon, self-contained (understandable 
 
 ## Spec Panel Review (Gate B)
 
-Six **independent parallel** perspectives, one agent each: `completeness`, `consistency`, `feasibility`, `simplicity`, `best-practices`, `security` (the best-practices one does web research; a `Verdict: FAILED` from it is its designed no-network refusal — excluded from the verdict, not counted as a crash).
+Seven **independent parallel** perspectives, one agent each: `completeness`, `consistency`, `feasibility`, `simplicity`, `best-practices`, `security`, `spec-panel-test-design` (the best-practices one does web research; a `Verdict: FAILED` from it is its designed no-network refusal — excluded from the verdict, not counted as a crash).
 
 The session aggregates: deduplicate identical findings, rank **BLOCKER > MAJOR > MINOR**, present ONE consolidated report; the user decides which fixes to apply. Before trusting a finding, verify it against the code — panelists read a clean clone and err in paths. Availability policy: a panelist that fails to return is retried once, then marked `skipped` in the report — the verdict rests on the rest.
 

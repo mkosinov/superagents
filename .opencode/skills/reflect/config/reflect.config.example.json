@@ -12,7 +12,7 @@
     "skill_triggered_when_should": { "enabled": true, "severity": "warning" },
     "subagent_completion_rate": { "enabled": true, "min_rate": 0.8, "severity": "warning" },
     "first_time_right": { "enabled": true, "target_rate": 0.5, "severity": "warning" },
-    "over_orchestration": { "enabled": true, "max_subagents": 6, "severity": "warning" },
+    "over_orchestration": { "enabled": true, "max_subagents": 8, "severity": "warning" },
     "dead_end_sessions": { "enabled": true, "max_duration_sec": 60, "severity": "info" },
     "skill_orphan": { "enabled": true, "max_days_unused": 30, "severity": "info" },
     "context_overflow": { "enabled": true, "severity": "info" },
