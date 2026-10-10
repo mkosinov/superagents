@@ -58,7 +58,7 @@ Failure (research unavailable — STOP, do not produce findings):
 Reason: web research unavailable — <short failure description, e.g. "WebSearch erroring" / "WebFetch blocked" / "empty results">
 ```
 
-The evidence tag goes INSIDE the finding line appended to the `<where>` field (same 3-field em-dash structure as the other 5 panelists — the reviewing session aggregates all 6 reports and format consistency matters).
+The evidence tag goes INSIDE the finding line appended to the `<where>` field (same 3-field em-dash structure as the other 6 panelists — the reviewing session aggregates all 7 reports and format consistency matters).
 
 Every finding MUST carry a `[VERIFIED via research]` tag — findings based on model training knowledge alone are not acceptable from this perspective. If research was not possible, report FAILED. Do not produce self-assessed findings.
 
