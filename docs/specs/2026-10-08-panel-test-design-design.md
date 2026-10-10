@@ -91,7 +91,7 @@ Why a separate panelist rather than a completeness checklist: completeness asks 
 | # | Perspective | Agent files | Model | Looks for |
 |---|-------------|------------|-------|-----------|
 | 1–6 | completeness, consistency, feasibility, simplicity, best-practices, security | existing `spec-panel-*.md` twins | unchanged | unchanged (except simplicity: mandate surgery below) |
-| 7 | **Test design** | `.opencode/agents/spec-panel-test-design.md` (canon) + `.zcode/agents/spec-panel-test-design.md` (host-port twin) | canon: `opencode/nemotron-3-ultra-free` (zen free class; the panel convention is one model per panelist — Appendix A is the definitive pin); host: `"account:zai-individual-coding-plan/GLM-5.3-Flash"` (current host convention, commit ec39dbf) | exercise completeness, non-duplication, failure localizability, AC testability; weighs spec-proposed economies against verification; explicit no-test-surface verdict when the spec defines none |
+| 7 | **Test design** | `.opencode/agents/spec-panel-test-design.md` (canon) + `.zcode/agents/spec-panel-test-design.md` (host-port twin) | canon: `opencode/nemotron-3-ultra-free` (zen free class; the pin is shared with feasibility deliberately — model sharing is accepted when chosen, precedent: plan-reviewer shares a panelist's pin; Appendix A is definitive); host: `"account:zai-individual-coding-plan/GLM-5.3-Flash"` (current host convention, commit ec39dbf) | exercise completeness, non-duplication, failure localizability, AC testability; weighs spec-proposed economies against verification; explicit no-test-surface verdict when the spec defines none |
 
 ### Simplicity mandate surgery (both twins, identical block)
 
@@ -99,7 +99,7 @@ Inserted after the "What you look for" list, before "Report Format" (same placem
 
 > Out of scope BY DESIGN: economies that change what a test verifies or what a contract promises. Reducing a test's exercise below the functionality it claims — the "minimal" 1-client e2e stayed green with the feature broken (#216). Merging tests of different contracts — the is_active preserve/explicit pairs each verify a different rule (#184; merging same-function duplicates is fine when checks are independent and labeled). Deriving identifiers/config by string tricks — `rstrip('s')` broke on `activities` (D15). Folding one concern into another endpoint's contract — `total_paid` as a subquery inside `GET /records` changed the contract for all consumers (#186). Such calls belong to the test-design panelist. Verification-preserving economies (merging true duplicates, dropping steps that assert nothing) are your legitimate ground — propose them WITH the preservation argument.
 
-Nothing else in the simplicity bodies changes: the intro line, the kept checklist (scope, "for the future", needless abstraction, simpler existing alternative, reuse check), the report format, and the one-sentence-direction constraint all stay.
+Nothing else in the simplicity bodies changes: the intro line, the kept checklist (scope, "for the future", needless abstraction, simpler existing alternative, reuse check), the report format, and the one-sentence-direction constraint all stay. On insert, the block lands as a plain paragraph (form follows the security panelist's scope note) — the blockquote marker above is this document's rendering, not part of the file text.
 
 ### The new panelist's distinguishing rules
 
@@ -131,7 +131,7 @@ Nothing else in the simplicity bodies changes: the intro line, the kept checklis
 | `README.md` | count sites 6 → 7 (e.g. mermaid edge "panel report ×6", perspective counts) — caught by the grep sweep, not enumerated by hand |
 | `docs/setup/new-project-setup.md` | the count site `6-perspective` → 7-perspective, fixing its stale attribution in the same sentence — the panel is dispatched by the DESIGN-phase skills (design-phase/auto-design), not by the brainstorming skill; no per-panelist roster table exists there (model rows are wildcarded `spec-panel-*`) |
 
-**Grep sweep (plan DoD):** case-insensitive, scoped to the harness carriers and docs (`README.md`, `docs/` minus `docs/specs/` + `docs/plans/`, `.zcode/`, `.opencode/agents/`, `.opencode/skills/`; excluding `token-analytics/` — its "all 6 canonical paths" test docstring is an unrelated domain — and any `node_modules/`): pattern `all 6|the 6|6 host|6 panel|6 parallel|6-reviewer|6-perspective|6 Task|6 agents|6 reports|other 5|×6|[Ss]ix (independent|parallel|perspectiv)` → zero live hits after the edits. Historical specs/plans keep their era's counts.
+**Grep sweep (plan DoD):** case-insensitive, scoped to the harness carriers and docs (`README.md`, `docs/` minus `docs/specs/` + `docs/plans/`, `.zcode/`, `.opencode/agents/`, `.opencode/skills/`; excluding `token-analytics/` — its "all 6 canonical paths" test docstring is an unrelated domain — and any `node_modules/`): pattern `all 6|the 6|6 host|6 panel|6 parallel|6-reviewer|6-perspective|6 reviewers|6 perspectives|6 panelists|panel of 6|6 Task|6 agents|6 reports|other 5|×6|× 6|[Ss]ix (independent|parallel|perspectiv)` → zero live hits after the edits. Historical specs/plans keep their era's counts.
 
 ---
 
